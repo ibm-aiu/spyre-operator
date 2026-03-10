@@ -20,6 +20,10 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	nfdv1alpha1 "github.com/openshift/cluster-nfd-operator/api/v1alpha1"
+	spyrev1alpha1 "github.ibm.com/ibm-aiu/spyre-operator/v2/api/v1alpha1"
+	"github.ibm.com/ibm-aiu/spyre-operator/v2/internal/state"
+	"github.ibm.com/ibm-aiu/spyre-operator/v2/test/testutil"
+	testutils "github.ibm.com/ibm-aiu/spyre-operator/v2/test/testutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
@@ -71,6 +75,8 @@ var _ = BeforeSuite(func() {
 	err = spyrev1alpha1.AddToScheme(scheme)
 	Expect(err).To(BeNil())
 	err = nfdv1alpha1.AddToScheme(scheme)
+	Expect(err).To(BeNil())
+	err = state.InitializeScheme(scheme)
 	Expect(err).To(BeNil())
 	spyreV2Client, err = client.New(config, client.Options{Scheme: scheme})
 	Expect(err).To(BeNil())

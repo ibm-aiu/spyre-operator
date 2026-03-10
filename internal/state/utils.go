@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	spyrev1alpha1 "github.com/ibm-aiu/spyre-operator/api/v1alpha1"
 	configv1 "github.com/openshift/api/config/v1"
 	imagev1 "github.com/openshift/api/image/v1"
@@ -84,6 +85,9 @@ func metricsExporterEnabled(clusterPolicy *spyrev1alpha1.SpyreClusterPolicy) boo
 func InitializeScheme(scheme *runtime.Scheme) error {
 	if err := promv1.AddToScheme(scheme); err != nil {
 		return fmt.Errorf("failed to add prometheus operator scheme: %w", err)
+	}
+	if err := certmanagerv1.AddToScheme(scheme); err != nil {
+		return fmt.Errorf("failed to add cert-manager scheme: %w", err)
 	}
 	if err := secv1.AddToScheme(scheme); err != nil {
 		return fmt.Errorf("failed to add openshift security scheme: %w", err)

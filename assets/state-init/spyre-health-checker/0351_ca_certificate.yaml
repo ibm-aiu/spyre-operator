@@ -1,0 +1,20 @@
+# +-------------------------------------------------------------------+
+# | Copyright IBM Corp. 2025 All Rights Reserved                      |
+# | PID 5698-SPR                                                      |
+# +-------------------------------------------------------------------+
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: spyre-ca-cert
+  namespace: "FILLED BY THE OPERATOR"
+spec:
+  secretName: spyre-ca-secret
+  isCA: true
+  commonName: spyre-ca
+  privateKey:
+    algorithm: RSA
+    encoding: PKCS1
+    size: 2048
+  issuerRef:
+    name: spyre-selfsigned-issuer
+    kind: Issuer

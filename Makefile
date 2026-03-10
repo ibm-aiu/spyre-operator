@@ -369,6 +369,7 @@ test: fmt vet ginkgo jq manifests generate envtest ## Run unit tests.
 	$(call fetch-external-crds,github.com/openshift/cluster-nfd-operator,api/v1alpha1)
 	$(call fetch-external-crds,github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring,v1)
 	$(call fetch-external-crds,github.com/openshift/api,security/v1)
+	$(call fetch-external-crds,github.com/cert-manager/cert-manager,pkg/apis/certmanager/v1)
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(LOCALBIN)/ginkgo run --label-filter="!(e2e||integration)" --seed 777 --cover --coverprofile=$(COVERAGE_FILE) ./controllers/... ./pkg/... ./internal/...
 	go tool cover -func $(COVERAGE_FILE)
 	go tool cover -html $(COVERAGE_FILE) -o coverage-report.html

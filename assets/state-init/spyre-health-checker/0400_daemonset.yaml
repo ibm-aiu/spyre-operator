@@ -54,6 +54,9 @@ spec:
         - name: device-plugin-sockets
           mountPath: /usr/local/etc/device-plugins/spyre-sockets
           readOnly: false
+        - name: spyre-device-plugin-cert
+          mountPath: /etc/spyre-health-checker/certs
+          readOnly: true
         resources:
           requests:
             cpu: 100m
@@ -105,3 +108,6 @@ spec:
         hostPath:
           path: /usr/local/etc/device-plugins/spyre-sockets
           type: DirectoryOrCreate
+      - name: spyre-device-plugin-cert
+        secret:
+          secretName: spyre-device-plugin-cert
