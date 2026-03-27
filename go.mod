@@ -12,7 +12,7 @@ require (
 	github.com/openshift/cluster-nfd-operator v0.0.0-20250608084427-c57e91e1a0c8
 	github.com/openshift/secondary-scheduler-operator v0.0.0-20220308123520-e9a43b481448
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.57.0
-	go.uber.org/zap v1.27.0
+	go.uber.org/zap v1.27.1
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.32.9
 	k8s.io/apimachinery v0.32.9
