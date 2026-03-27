@@ -1,0 +1,866 @@
+# +-------------------------------------------------------------------+
+# | Copyright IBM Corp. 2025 All Rights Reserved                      |
+# | PID 5698-SPR                                                      |
+# +-------------------------------------------------------------------+
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: dashboard-spyre-operator
+  namespace: openshift-config-managed
+  labels:
+    console.openshift.io/dashboard: 'true'
+    console.openshift.io/odc-dashboard: 'true'
+data:
+  spyre-metrics-dashboard.json: |-
+    {
+        "annotations": {
+            "list": [
+
+            ]
+        },
+        "editable": true,
+        "gnetId": null,
+        "graphTooltip": 0,
+        "hideControls": false,
+        "links": [
+
+        ],
+        "refresh": "60s",
+        "rows": [
+            {
+                "collapse": false,
+                "height": "250px",
+                "panels": [
+                        {
+                        "datasource": "prometheus",
+                        "fieldConfig": {
+                            "defaults": {
+                            "color": {
+                                "mode": "thresholds"
+                            },
+                            "mappings": [],
+                            "thresholds": {
+                                "mode": "absolute",
+                                "steps": [
+                                {
+                                    "color": "green",
+                                    "value": 0
+                                },
+                                {
+                                    "color": "red",
+                                    "value": 80
+                                }
+                                ]
+                            }
+                            },
+                            "overrides": []
+                        },
+                        "gridPos": {
+                            "h": 8,
+                            "w": 4,
+                            "x": 0,
+                            "y": 0
+                        },
+                        "id": 2,
+                        "options": {
+                            "colorMode": "value",
+                            "graphMode": "area",
+                            "justifyMode": "auto",
+                            "orientation": "auto",
+                            "percentChangeColorMode": "standard",
+                            "reduceOptions": {
+                            "calcs": [
+                                "lastNotNull"
+                            ],
+                            "fields": "",
+                            "values": false
+                            },
+                            "showPercentChange": false,
+                            "textMode": "auto",
+                            "wideLayout": true
+                        },
+                        "span": 1,
+                        "pluginVersion": "12.1.1",
+                        "targets": [
+                            {
+                            "editorMode": "code",
+                            "expr": "sum(spyre_info_pci_cfg)",
+                            "legendFormat": "__auto",
+                            "range": true,
+                            "refId": "A"
+                            }
+                        ],
+                        "title": "Total Number",
+                        "type": "singlestat"
+                        },
+                    {
+                        "aliasColors": {
+
+                        },
+                        "bars": false,
+                        "dashLength": 10,
+                        "dashes": false,
+                        "datasource": "$datasource",
+                        "fill": 1,
+                        "id": 1,
+                        "legend": {
+                            "avg": false,
+                            "current": false,
+                            "max": false,
+                            "min": false,
+                            "show": true,
+                            "total": false,
+                            "values": false
+                        },
+                        "lines": true,
+                        "linewidth": 1,
+                        "links": [
+
+                        ],
+                        "nullPointMode": "null as zero",
+                        "percentage": false,
+                        "pointradius": 5,
+                        "points": false,
+                        "renderer": "flot",
+                        "seriesOverrides": [
+
+                        ],
+                        "spaceLength": 10,
+                        "span": 9,
+                        "stack": false,
+                        "steppedLine": false,
+                        "styles": [
+                            {
+                                "alias": "Time",
+                                "dateFormat": "YYYY-MM-DD HH:mm:ss",
+                                "pattern": "Time",
+                                "type": "hidden"
+                            },
+                            {
+                                "alias": "Node",
+                                "colorMode": null,
+                                "colors": [
+
+                                ],
+                                "dateFormat": "YYYY-MM-DD HH:mm:ss",
+                                "decimals": 2,
+                                "link": false,
+                                "linkTargetBlank": false,
+                                "linkTooltip": "Drill down",
+                                "linkUrl": "",
+                                "pattern": "node",
+                                "thresholds": [
+
+                                ],
+                                "type": "number",
+                                "unit": "short"
+                            },
+                            {
+                                "alias": "Max ReadReq",
+                                "colorMode": null,
+                                "colors": [
+
+                                ],
+                                "dateFormat": "YYYY-MM-DD HH:mm:ss",
+                                "decimals": 2,
+                                "link": false,
+                                "linkTargetBlank": false,
+                                "linkTooltip": "Drill down",
+                                "linkUrl": "",
+                                "pattern": "MaxReadReq",
+                                "thresholds": [
+
+                                ],
+                                "type": "number",
+                                "unit": "short"
+                            },
+                            {
+                                "alias": "Max Payload",
+                                "colorMode": null,
+                                "colors": [
+
+                                ],
+                                "dateFormat": "YYYY-MM-DD HH:mm:ss",
+                                "decimals": 2,
+                                "link": false,
+                                "linkTargetBlank": false,
+                                "linkTooltip": "Drill down",
+                                "linkUrl": "",
+                                "pattern": "MaxPayload",
+                                "thresholds": [
+
+                                ],
+                                "type": "number",
+                                "unit": "short"
+                            },
+                            {
+                                "alias": "Speed",
+                                "colorMode": null,
+                                "colors": [
+
+                                ],
+                                "dateFormat": "YYYY-MM-DD HH:mm:ss",
+                                "decimals": 2,
+                                "link": false,
+                                "linkTargetBlank": false,
+                                "linkTooltip": "Drill down",
+                                "linkUrl": "",
+                                "pattern": "Speed",
+                                "thresholds": [
+
+                                ],
+                                "type": "number",
+                                "unit": "short"
+                            },
+                            {
+                                "alias": "Width",
+                                "colorMode": null,
+                                "colors": [
+
+                                ],
+                                "dateFormat": "YYYY-MM-DD HH:mm:ss",
+                                "decimals": 2,
+                                "link": false,
+                                "linkTargetBlank": false,
+                                "linkTooltip": "Drill down",
+                                "linkUrl": "",
+                                "pattern": "Width",
+                                "thresholds": [
+
+                                ],
+                                "type": "number",
+                                "unit": "short"
+                            },
+                            {
+                                "alias": "Number",
+                                "colorMode": null,
+                                "colors": [
+
+                                ],
+                                "dateFormat": "YYYY-MM-DD HH:mm:ss",
+                                "decimals": 2,
+                                "link": false,
+                                "linkTargetBlank": false,
+                                "linkTooltip": "Drill down",
+                                "linkUrl": "",
+                                "pattern": "Value #A",
+                                "thresholds": [
+
+                                ],
+                                "type": "number",
+                                "unit": "short"
+                            },
+                            {
+                                "alias": "",
+                                "colorMode": null,
+                                "colors": [
+
+                                ],
+                                "dateFormat": "YYYY-MM-DD HH:mm:ss",
+                                "decimals": 2,
+                                "pattern": "/.*/",
+                                "thresholds": [
+
+                                ],
+                                "type": "string",
+                                "unit": "short"
+                            }
+                        ],
+                        "targets": [
+                            {
+                                "expr": "sum by (node, MaxPayload, MaxReadReq, Speed, Width) (spyre_info_pci_cfg)",
+                                "format": "table",
+                                "instant": true,
+                                "legendFormat": "",
+                                "refId": "A"
+                            }
+                        ],
+                        "thresholds": [
+
+                        ],
+                        "timeFrom": null,
+                        "timeShift": null,
+                        "title": "Card Info",
+                        "tooltip": {
+                            "shared": true,
+                            "sort": 2,
+                            "value_type": "individual"
+                        },
+                        "transform": "table",
+                        "type": "table",
+                        "xaxis": {
+                            "buckets": null,
+                            "mode": "time",
+                            "name": null,
+                            "show": true,
+                            "values": [
+
+                            ]
+                        },
+                        "yaxes": [
+                            {
+                                "format": "short",
+                                "label": null,
+                                "logBase": 1,
+                                "max": null,
+                                "min": 0,
+                                "show": true
+                            },
+                            {
+                                "format": "short",
+                                "label": null,
+                                "logBase": 1,
+                                "max": null,
+                                "min": null,
+                                "show": false
+                            }
+                        ]
+                    }
+                ],
+                "repeat": null,
+                "repeatIteration": null,
+                "repeatRowId": null,
+                "showTitle": true,
+                "title": "Spyre Card Info",
+                "titleSize": "h6"
+            },
+            {
+                "collapse": false,
+                "height": "250px",
+                "panels": [
+                            {
+                            "datasource": "prometheus",
+                            "fieldConfig": {
+                                "defaults": {
+                                "color": {
+                                    "mode": "thresholds"
+                                },
+                                "mappings": [],
+                                "thresholds": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                    {
+                                        "color": "green",
+                                        "value": 0
+                                    },
+                                    {
+                                        "color": "red",
+                                        "value": 80
+                                    }
+                                    ]
+                                }
+                                },
+                                "overrides": []
+                            },
+                            "gridPos": {
+                                "h": 8,
+                                "w": 4,
+                                "x": 0,
+                                "y": 8
+                            },
+                            "id": 6,
+                            "options": {
+                                "colorMode": "value",
+                                "graphMode": "area",
+                                "justifyMode": "auto",
+                                "orientation": "auto",
+                                "percentChangeColorMode": "standard",
+                                "reduceOptions": {
+                                "calcs": [
+                                    "lastNotNull"
+                                ],
+                                "fields": "",
+                                "values": false
+                                },
+                                "showPercentChange": false,
+                                "textMode": "auto",
+                                "wideLayout": true
+                            },
+                            "pluginVersion": "12.1.1",
+                            "span": 2,
+                            "targets": [
+                                {
+                                "editorMode": "code",
+                                "exemplar": false,
+                                "expr": "sum(spyre_allocation)",
+                                "instant": true,
+                                "legendFormat": "__auto",
+                                "range": false,
+                                "refId": "A"
+                                }
+                            ],
+                            "title": "Total in-use",
+                            "type": "singlestat"
+                            },
+                    {
+                        "aliasColors": {
+
+                        },
+                        "bars": false,
+                        "dashLength": 10,
+                        "dashes": false,
+                        "datasource": "$datasource",
+                        "fill": 10,
+                        "id": 5,
+                        "legend": {
+                            "avg": false,
+                            "current": false,
+                            "max": false,
+                            "min": false,
+                            "show": true,
+                            "total": false,
+                            "values": false
+                        },
+                        "lines": true,
+                        "linewidth": 0,
+                        "links": [
+
+                        ],
+                        "nullPointMode": "null as zero",
+                        "percentage": false,
+                        "pointradius": 5,
+                        "points": false,
+                        "renderer": "flot",
+                        "seriesOverrides": [
+
+                        ],
+                        "spaceLength": 10,
+                        "span": 5,
+                        "stack": true,
+                        "steppedLine": false,
+                        "targets": [
+                            {
+                                "expr": "sum(spyre_allocation) by (exported_namespace)",
+                                "format": "time_series",
+                                "legendFormat": "{{exported_namespace}}",
+                                "legendLink": null
+                            }
+                        ],
+                        "thresholds": [
+
+                        ],
+                        "timeFrom": null,
+                        "timeShift": null,
+                        "title": "by Namespace",
+                        "tooltip": {
+                            "shared": true,
+                            "sort": 2,
+                            "value_type": "individual"
+                        },
+                        "type": "graph",
+                        "xaxis": {
+                            "buckets": null,
+                            "mode": "time",
+                            "name": null,
+                            "show": true,
+                            "values": [
+
+                            ]
+                        },
+                        "yaxes": [
+                            {
+                                "format": "short",
+                                "label": null,
+                                "logBase": 1,
+                                "max": null,
+                                "min": 0,
+                                "show": true
+                            },
+                            {
+                                "format": "short",
+                                "label": null,
+                                "logBase": 1,
+                                "max": null,
+                                "min": null,
+                                "show": false
+                            }
+                        ]
+                    },
+                    {
+                        "aliasColors": {
+
+                        },
+                        "bars": false,
+                        "dashLength": 10,
+                        "dashes": false,
+                        "datasource": "$datasource",
+                        "fill": 10,
+                        "id": 6,
+                        "legend": {
+                            "avg": false,
+                            "current": false,
+                            "max": false,
+                            "min": false,
+                            "show": true,
+                            "total": false,
+                            "values": false
+                        },
+                        "lines": true,
+                        "linewidth": 0,
+                        "links": [
+
+                        ],
+                        "nullPointMode": "null as zero",
+                        "percentage": false,
+                        "pointradius": 5,
+                        "points": false,
+                        "renderer": "flot",
+                        "seriesOverrides": [
+
+                        ],
+                        "spaceLength": 10,
+                        "span": 4,
+                        "stack": true,
+                        "steppedLine": false,
+                        "targets": [
+                            {
+                                "expr": "sum(spyre_allocation) by (node)",
+                                "format": "time_series",
+                                "legendFormat": "{{node}}",
+                                "legendLink": null
+                            }
+                        ],
+                        "thresholds": [
+
+                        ],
+                        "timeFrom": null,
+                        "timeShift": null,
+                        "title": "by Node",
+                        "tooltip": {
+                            "shared": true,
+                            "sort": 2,
+                            "value_type": "individual"
+                        },
+                        "type": "graph",
+                        "xaxis": {
+                            "buckets": null,
+                            "mode": "time",
+                            "name": null,
+                            "show": true,
+                            "values": [
+
+                            ]
+                        },
+                        "yaxes": [
+                            {
+                                "format": "short",
+                                "label": null,
+                                "logBase": 1,
+                                "max": null,
+                                "min": 0,
+                                "show": true
+                            },
+                            {
+                                "format": "short",
+                                "label": null,
+                                "logBase": 1,
+                                "max": null,
+                                "min": null,
+                                "show": false
+                            }
+                        ]
+                    }
+                ],
+                "repeat": null,
+                "repeatIteration": null,
+                "repeatRowId": null,
+                "showTitle": true,
+                "title": "Spyre Card Allocation",
+                "titleSize": "h6"
+            },
+                        {
+                "collapse": false,
+                "height": "250px",
+                "panels": [
+                    {
+                        "aliasColors": {
+
+                        },
+                        "bars": false,
+                        "dashLength": 10,
+                        "dashes": false,
+                        "datasource": "$datasource",
+                        "fill": 1,
+                        "id": 2,
+                        "legend": {
+                            "avg": false,
+                            "current": false,
+                            "max": false,
+                            "min": false,
+                            "show": true,
+                            "total": false,
+                            "values": false
+                        },
+                        "lines": true,
+                        "linewidth": 1,
+                        "links": [
+
+                        ],
+                        "nullPointMode": "null as zero",
+                        "percentage": false,
+                        "pointradius": 5,
+                        "points": false,
+                        "renderer": "flot",
+                        "seriesOverrides": [
+
+                        ],
+                        "spaceLength": 10,
+                        "span": 6,
+                        "stack": false,
+                        "steppedLine": false,
+                        "targets": [
+                            {
+                                "expr": "sum(irate(spyre_usage_dmo_dur_mci_read{node=~\"$node\", exported_namespace=~\"$namespace\"}[5m])) by (exported_pod, exported_namespace)",
+                                "format": "time_series",
+                                "legendFormat": "{{exported_pod}}/{{exported_namespace}}",
+                                "legendLink": null
+                            }
+                        ],
+                        "thresholds": [
+
+                        ],
+                        "timeFrom": null,
+                        "timeShift": null,
+                        "title": "DMO::MCI Read Cycles",
+                        "tooltip": {
+                            "shared": true,
+                            "sort": 2,
+                            "value_type": "individual"
+                        },
+                        "type": "graph",
+                        "xaxis": {
+                            "buckets": null,
+                            "mode": "time",
+                            "name": null,
+                            "show": true,
+                            "values": [
+
+                            ]
+                        },
+                        "yaxes": [
+                            {
+                                "format": "ms",
+                                "label": null,
+                                "logBase": 1,
+                                "max": null,
+                                "min": 0,
+                                "show": true
+                            },
+                            {
+                                "format": "short",
+                                "label": null,
+                                "logBase": 1,
+                                "max": null,
+                                "min": null,
+                                "show": false
+                            }
+                        ]
+                    },
+                    {
+                        "aliasColors": {
+
+                        },
+                        "bars": false,
+                        "dashLength": 10,
+                        "dashes": false,
+                        "datasource": "$datasource",
+                        "fill": 1,
+                        "id": 3,
+                        "legend": {
+                            "avg": false,
+                            "current": false,
+                            "max": false,
+                            "min": false,
+                            "show": true,
+                            "total": false,
+                            "values": false
+                        },
+                        "lines": true,
+                        "linewidth": 1,
+                        "links": [
+
+                        ],
+                        "nullPointMode": "null as zero",
+                        "percentage": false,
+                        "pointradius": 5,
+                        "points": false,
+                        "renderer": "flot",
+                        "seriesOverrides": [
+
+                        ],
+                        "spaceLength": 10,
+                        "span": 6,
+                        "stack": false,
+                        "steppedLine": false,
+                        "targets": [
+                            {
+                                "expr": "sum(irate(spyre_usage_dmo_dur_mci_write{node=~\"$node\", exported_namespace=~\"$namespace\"}[5m])) by (exported_pod, exported_namespace)",
+                                "format": "time_series",
+                                "legendFormat": "{{exported_pod}}/{{exported_namespace}}",
+                                "legendLink": null
+                            }
+                        ],
+                        "thresholds": [
+
+                        ],
+                        "timeFrom": null,
+                        "timeShift": null,
+                        "title": "DMO::MCI Write Cycles",
+                        "tooltip": {
+                            "shared": true,
+                            "sort": 2,
+                            "value_type": "individual"
+                        },
+                        "type": "graph",
+                        "xaxis": {
+                            "buckets": null,
+                            "mode": "time",
+                            "name": null,
+                            "show": true,
+                            "values": [
+
+                            ]
+                        },
+                        "yaxes": [
+                            {
+                                "format": "ms",
+                                "label": null,
+                                "logBase": 1,
+                                "max": null,
+                                "min": 0,
+                                "show": true
+                            },
+                            {
+                                "format": "short",
+                                "label": null,
+                                "logBase": 1,
+                                "max": null,
+                                "min": null,
+                                "show": false
+                            }
+                        ]
+                    }
+                ],
+                "repeat": null,
+                "repeatIteration": null,
+                "repeatRowId": null,
+                "showTitle": true,
+                "title": "Spyre Card Usage",
+                "titleSize": "h6"
+            }
+        ],
+        "schemaVersion": 14,
+        "style": "dark",
+        "tags": [
+            "spyre-operator"
+        ],
+        "templating": {
+            "list": [
+                {
+                    "current": {
+                        "text": "default",
+                        "value": "default"
+                    },
+                    "hide": 0,
+                    "label": "Data source",
+                    "name": "datasource",
+                    "options": [
+
+                    ],
+                    "query": "prometheus",
+                    "refresh": 1,
+                    "regex": "",
+                    "type": "datasource"
+                },
+                {
+                    "allValue": ".+",
+                    "current": {
+                        "selected": true,
+                        "text": "All",
+                        "value": "$__all"
+                    },
+                    "datasource": "$datasource",
+                    "hide": 0,
+                    "includeAll": true,
+                    "label": "node",
+                    "multi": true,
+                    "name": "node",
+                    "options": [
+
+                    ],
+                    "query": "label_values(spyre_info_pci_cfg, node)",
+                    "refresh": 1,
+                    "regex": "",
+                    "sort": 2,
+                    "tagValuesQuery": "",
+                    "tags": [
+
+                    ],
+                    "tagsQuery": "",
+                    "type": "query",
+                    "useTags": false
+                },
+                                {
+                    "allValue": ".+",
+                    "current": {
+                        "selected": true,
+                        "text": "All",
+                        "value": "$__all"
+                    },
+                    "datasource": "$datasource",
+                    "hide": 0,
+                    "includeAll": true,
+                    "label": "namespace",
+                    "multi": true,
+                    "name": "namespace",
+                    "options": [
+
+                    ],
+                    "query": "label_values(spyre_allocation, namespace)",
+                    "refresh": 1,
+                    "regex": "",
+                    "sort": 2,
+                    "tagValuesQuery": "",
+                    "tags": [
+
+                    ],
+                    "tagsQuery": "",
+                    "type": "query",
+                    "useTags": false
+                }
+            ]
+        },
+        "time": {
+            "from": "now-1h",
+            "to": "now"
+        },
+        "timepicker": {
+            "refresh_intervals": [
+                "5s",
+                "10s",
+                "30s",
+                "1m",
+                "5m",
+                "15m",
+                "30m",
+                "1h",
+                "2h",
+                "1d"
+            ],
+            "time_options": [
+                "5m",
+                "15m",
+                "1h",
+                "6h",
+                "12h",
+                "24h",
+                "2d",
+                "7d",
+                "30d"
+            ]
+        },
+        "timezone": "utc",
+        "title": "Spyre Operator Dashboard",
+        "uid": "",
+        "version": 0
+    }

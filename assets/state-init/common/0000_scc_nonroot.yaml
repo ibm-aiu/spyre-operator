@@ -1,0 +1,46 @@
+# +-------------------------------------------------------------------+
+# | Copyright IBM Corp. 2025 All Rights Reserved                      |
+# | PID 5698-SPR                                                      |
+# +-------------------------------------------------------------------+
+
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: spyre-operator-nonroot
+  annotations:
+    kubernetes.io/description: 'spyre-operator-nonroot allows spyre operator component
+      to run as non-root user with minimal required capabilities'
+allowHostDirVolumePlugin: true
+allowHostIPC: false
+allowHostNetwork: false
+allowHostPID: false
+allowHostPorts: false
+allowPrivilegedContainer: true
+allowedCapabilities: []
+defaultAddCapabilities: []
+fsGroup:
+  type: MustRunAs
+  ranges:
+  - min: 0
+    max: 0
+readOnlyRootFilesystem: false
+requiredDropCapabilities:
+- ALL
+runAsUser:
+  type: MustRunAs
+  uid: 1001
+supplementalGroups:
+  type: MustRunAs
+  ranges:
+  - min: 0
+    max: 0
+seLinuxContext:
+  type: RunAsAny
+volumes:
+- configMap
+- downwardAPI
+- emptyDir
+- persistentVolumeClaim
+- projected
+- secret
+- hostPath

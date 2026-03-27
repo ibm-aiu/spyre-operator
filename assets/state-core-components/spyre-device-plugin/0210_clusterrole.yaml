@@ -1,0 +1,37 @@
+# +-------------------------------------------------------------------+
+# | Copyright IBM Corp. 2025 All Rights Reserved                      |
+# | PID 5698-SPR                                                      |
+# +-------------------------------------------------------------------+
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: spyre-device-plugin
+rules:
+- apiGroups:
+  - security.openshift.io
+  resources:
+  - securitycontextconstraints
+  verbs:
+  - use
+  resourceNames:
+  - spyre-operator-nonroot
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups: ["spyre.ibm.com"]
+  resources: ["spyrenodestates", "spyrenodestates/status", "spyreclusterpolicies"]
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch

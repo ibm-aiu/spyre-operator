@@ -1,0 +1,16 @@
+# +-------------------------------------------------------------------+
+# | Copyright IBM Corp. 2025 All Rights Reserved                      |
+# | PID 5698-SPR                                                      |
+# +-------------------------------------------------------------------+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: spyre-resources-role-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: spyre-resources
+subjects:
+- kind: ServiceAccount
+  name: secondary-scheduler
+  namespace: openshift-secondary-scheduler-operator

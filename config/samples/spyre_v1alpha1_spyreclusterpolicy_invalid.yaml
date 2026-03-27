@@ -1,0 +1,13 @@
+# +-------------------------------------------------------------------+
+# | Copyright IBM Corp. 2025 All Rights Reserved                      |
+# | PID 5698-SPR                                                      |
+# +-------------------------------------------------------------------+
+#
+#  This file is an example for minimum specification,
+#  which has no optional components and no experimental modes enabled.
+#
+apiVersion: spyre.ibm.com/v1alpha1
+kind: SpyreClusterPolicy
+metadata:
+  name: spyreclusterpolicy
+spec: {}

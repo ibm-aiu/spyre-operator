@@ -1,0 +1,35 @@
+# +-------------------------------------------------------------------+
+# | Copyright IBM Corp. 2025 All Rights Reserved                      |
+# | PID 5698-SPR                                                      |
+# +-------------------------------------------------------------------+
+apiVersion: nfd.openshift.io/v1alpha1
+kind: NodeFeatureRule
+metadata:
+  name: spyre-node-feature-rule
+  namespace: "FILLED BY THE OPERATOR"
+spec:
+  rules:
+  - labels:
+      pci-1014.present: "true"
+    matchFeatures:
+    - feature: pci.device
+      matchExpressions:
+        vendor:
+          op: In
+          value:
+          - "1014"
+    name: "IBM device rule"
+  - labels:
+      pci-06e7_1014.present: "true"
+    matchFeatures:
+    - feature: pci.device
+      matchExpressions:
+        device:
+          op: In
+          value:
+          - "06a7"
+        vendor:
+          op: In
+          value:
+          - "1014"
+    name: "IBM device spyre pf rule"

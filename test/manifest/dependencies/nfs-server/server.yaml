@@ -1,0 +1,97 @@
+# +-------------------------------------------------------------------+
+# | Copyright IBM Corp. 2025 All Rights Reserved                      |
+# +-------------------------------------------------------------------+
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cardmgmt-nfs
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cardmgmt-nfs-server-sa
+  namespace: cardmgmt-nfs
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cardmgmt-nfs-server-cr-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:privileged
+subjects:
+- kind: ServiceAccount
+  name: cardmgmt-nfs-server-sa
+  namespace: cardmgmt-nfs
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: spyre-card-management-nfs
+  namespace: cardmgmt-nfs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cardmgmt-nfs-server
+  template:
+    metadata:
+      name: cardmgmt-nfs-server
+      labels:
+        app: cardmgmt-nfs-server
+    spec:
+      serviceAccount: cardmgmt-nfs-server-sa
+      nodeSelector:
+        "kubernetes.io/os": linux
+      containers:
+      - name: nfs-server
+        image: itsthenetwork/nfs-server-alpine:12
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: SHARED_DIRECTORY
+          value: "/exports"
+        volumeMounts:
+        - mountPath: /exports
+          name: nfs-vol
+        securityContext:
+          privileged: true
+        ports:
+        - name: tcp-2049
+          containerPort: 2049
+          protocol: TCP
+        - name: udp-111
+          containerPort: 111
+          protocol: UDP
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+            ephemeral-storage: 2Gi
+          requests:
+            cpu: 10m
+            memory: 128Mi
+            ephemeral-storage: 1Gi
+      volumes:
+      - name: nfs-vol
+        emptyDir: {}
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: cardmgmt-nfs-server
+  namespace: cardmgmt-nfs
+  labels:
+    app: cardmgmt-nfs-server
+spec:
+  type: ClusterIP # use "LoadBalancer" to get a public ip
+  selector:
+    app: cardmgmt-nfs-server
+  ports:
+  - name: tcp-2049
+    port: 2049
+    protocol: TCP
+  - name: udp-111
+    port: 111
+    protocol: UDP

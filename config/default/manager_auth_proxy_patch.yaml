@@ -1,0 +1,32 @@
+# +-------------------------------------------------------------------+
+# | Copyright IBM Corp. 2025 All Rights Reserved                      |
+# | PID 5698-SPR                                                      |
+# +-------------------------------------------------------------------+
+
+# This patch inject a sidecar container which is a HTTP proxy for the
+# controller manager, it performs RBAC authorization against the Kubernetes API using SubjectAccessReviews.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spyre-operator
+  namespace: system
+spec:
+  template:
+    spec:
+      containers:
+      - name: kube-rbac-proxy
+        image: registry.redhat.io/openshift4/ose-kube-rbac-proxy@sha256:fcb3b8ab93dfb5ef2b290e39ea5899dbb5e0c6d430370b8d281e59e74d94d749
+        args:
+        - "--secure-listen-address=0.0.0.0:8443"
+        - "--upstream=http://127.0.0.1:8080/"
+        - "--logtostderr=true"
+        - "--v=10"
+        ports:
+        - containerPort: 8443
+          protocol: TCP
+          name: https
+      - name: manager
+        args:
+        - "--health-probe-bind-address=:8081"
+        - "--metrics-bind-address=127.0.0.1:8080"
+        - "--leader-elect"

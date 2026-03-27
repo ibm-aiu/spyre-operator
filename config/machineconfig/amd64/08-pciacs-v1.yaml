@@ -1,0 +1,36 @@
+# +-------------------------------------------------------------------+
+# | Copyright IBM Corp. 2025 All Rights Reserved                      |
+# | PID 5698-SPR                                                      |
+# +-------------------------------------------------------------------+
+
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    kubernetes.io/arch: amd64
+    machineconfiguration.openshift.io/role: worker
+  name: 08-pciacs-v1
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      files:
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,IyEvdXNyL2Jpbi9wZXJsCiMgZ3JlcCAtbCAwNmE3IC9zeXMvYnVzL3BjaS9kcml2ZXJzL3ZmaW8tcGNpLyovZGV2aWNlIHwgc2VkIC1lICdzL1wvZGV2aWNlJC8vJyAtZSAncy8uKlwvLy8nCgokaCA9IGBob3N0bmFtZWA7CiNleGl0KDApIGlmKCRoICF+IC9JQk0uUkguSW5zcHVyTTYuSG9zdC8pOwoKcHJpbnQgIlJ1bm5pbmcgcGNpZS1BQ1MgZGlzYWJsZSBvbiAkaCI7CgpAbGlzdCA9IGBncmVwIC1sIDA2YTcgL3N5cy9idXMvcGNpL2RyaXZlcnMvdmZpby1wY2kvKi9kZXZpY2VgOwpAY2FyZHMgPSAoKTsKZm9yICRmaWxlIChAbGlzdCkgewogIGNob21wICRmaWxlOwogICRmaWxlID1+IHMvXC9kZXZpY2UkLy87CiAgJGZpbGUgPX4gcy8uKlwvLy87CiAgcHVzaChAY2FyZHMsICRmaWxlKTsKfQoKZm9yICRjYXJkIChAY2FyZHMpIHsKICAkc3RyaW5nID0gcmVhZGxpbmsoIi9zeXMvYnVzL3BjaS9kcml2ZXJzL3ZmaW8tcGNpLyR7Y2FyZH0iKTsKICAkc3RyaW5nID1+IHMvLipcL2RldmljZXNcL3BjaVswLTlhLWY6XSpcL1swLTlhLWZdKjovLzsKICBAYnJhbmNoID0gc3BsaXQoL1wvWzAtOWEtZl0qOi8sICRzdHJpbmcpOwogIEBicmFuY2ggPSAoIihyb290KSIsIEBicmFuY2gpOwogIHByaW50ICIjIHBhcnNpbmcgYnJhbmNoOiAiLCBqb2luKCIgIiwgQGJyYW5jaCksICJcbiI7CiAgZm9yICRkZXYgKEBicmFuY2gpIHsKICAgICsrJGNvdW50ZXJ7JGRldn07CiAgfQp9CgojIFNldCBhbnkgZGV2aWNlcyB0aGF0IGNvbnRhaW4gY2FyZHMKZm9yICRkZXYgKGtleXMoJWNvdW50ZXIpKSB7CiAgaWYgKCAkZGV2ID1+IC9bMC05YS1mXVswLTlhLWZdOlswLTlhLWZdWzAtOWEtZl1cLlswLTlhLWZdLyApIHsKICAgIHByaW50ICIjID09PT09PT09ICRkZXYgOiB3aXRoICRjb3VudGVyeyRkZXZ9IGNhcmRzXG4iOwoKICAgIHByaW50ICIxLiBkb2VzIHRoaXMgZGV2IGhhdmUgYSBTcmNWYWxpZD9cbiI7CiAgICAkc2V0dGluZ3MgPSBgc3VkbyAvdXNyL3NiaW4vbHNwY2kgLXZ2diAtcyAkZGV2IDI+L2Rldi9udWxsYDsKICAgIGlmICgkc2V0dGluZ3MgPX4gL0FDU0N0bDouKlNyY1ZhbGlkXC0vKSB7CiAgICAgIHByaW50ICI6OiBBQ1NDdGw6IFNyY1ZhbGlkLSBhbHJlYWR5IHNldCwgbm8gY2hhbmdlIG5lZWRlZFxuIjsKICAgIH0gZWxzaWYgKCRzZXR0aW5ncyA9fiAvQUNTQ3RsOi4qU3JjVmFsaWRcKy8pIHsKICAgICAgcHJpbnQgIjo6IEFDU0N0bDogU3JjVmFsaWQrIGN1cnJlbnRseSBzZXQsIHRyeWluZyB1bnNldFxuIjsKICAgICAgIyBwcmludCAiMi4gcXVlcnkgYmVmb3JlIHNldCwgb24gZGV2ICRkZXZcbiI7CiAgICAgICRjbWQgPSAic3VkbyAvc2Jpbi9zZXRwY2kgLXYgLXMgJGRldiBlY2FwX2FjcysweDYudyI7CiAgICAgIHN5c3RlbSAiJGNtZCI7CiAgICAgIHByaW50ICIzLiBzZXQsIG9uIGRldiAkZGV2XG4iOwogICAgICAkY21kID0gInN1ZG8gL3NiaW4vc2V0cGNpIC1zICRkZXYgZWNhcF9hY3MrMHg2Lnc9MDAwMCI7CiAgICAgIHN5c3RlbSAiJGNtZCI7CiAgICAgIHByaW50ICI0LiBxdWVyeSBhZnRlciBzZXQsIG9uIGRldiAkZGV2XG4iOwogICAgICAkY21kID0gInN1ZG8gL3NiaW4vc2V0cGNpIC12IC1zICRkZXYgZWNhcF9hY3MrMHg2LnciOwogICAgICBzeXN0ZW0gIiRjbWQiOwogICAgICBwcmludCAiNS4gZnVsbCB0ZXh0IGxzcGNpLCBvbiBkZXYgJGRldlxuIjsKICAgICAgIyAkY21kID0gInN1ZG8gL3NiaW4vbHNwY2kgLXZ2diAtcyAkZGV2IjsKICAgICAgc3lzdGVtICIkY21kIjsKICAgIH0gZWxzZSB7CiAgICAgIHByaW50ICI6OiBubyBTcmNWYWxpZCBzZXR0aW5nIHNlZW4sIG5vIGNoYW5nZSBuZWVkZWRcbiI7CiAgICB9CiAgfQp9CgojIFNhdmUgYW4gbHNwY2kgLXZ2diBvdXRwdXQgc28gd2UgY2FuIHNlZSBpZiB3ZSBnb3QgdGhlIHJlc3VsdHMgd2Ugd2FudGVkCiMkY21kID0gInN1ZG8gL3NiaW4vbHNwY2kgLXZ2diI7CiNwcmludCAiUnVubmluZyA6ICRjbWRcbiI7CiNzeXN0ZW0gIiRjbWQiOwo=
+        mode: 700
+        overwrite: true
+        path: /usr/local/bin/pciacs.pl
+    systemd:
+      units:
+      - contents: |
+          [Unit]
+          Description=Performing PCIe switch configuration
+          After=kubelet.service
+          [Service]
+          Type=simple
+          ExecStart=/bin/bash -c "/bin/sleep 330; /usr/local/bin/pciacs.pl"
+          [Install]
+          WantedBy=multi-user.target
+        enabled: true
+        name: pcieacs.service

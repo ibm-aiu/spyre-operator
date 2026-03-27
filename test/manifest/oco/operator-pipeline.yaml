@@ -1,0 +1,18 @@
+# +-------------------------------------------------------------------+
+# | Copyright IBM Corp. 2025 All Rights Reserved                      |
+# | PID 5698-SPR                                                      |
+# +-------------------------------------------------------------------+
+
+apiVersion: certification.redhat.com/v1alpha1
+kind: OperatorPipeline
+metadata:
+  name: spyre-operator-pipeline
+  namespace: oco
+spec:
+  applyCIPipeline: true
+  applyHostedPipeline: false
+  applyReleasePipeline: false
+  gitHubSecretName: github-api-token
+  kubeconfigSecretName: kubeconfig
+  operatorPipelinesRelease: main
+  pyxisSecretName: pyxis-api-secret

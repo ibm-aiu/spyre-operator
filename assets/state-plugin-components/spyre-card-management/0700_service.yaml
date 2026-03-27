@@ -1,0 +1,23 @@
+# +-------------------------------------------------------------------+
+# | Copyright IBM Corp. 2025 All Rights Reserved                      |
+# | PID 5698-SPR                                                      |
+# +-------------------------------------------------------------------+
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: cardmgmt
+  name: cardmgmt-svc
+  namespace: "FILLED BY THE OPERATOR"
+spec:
+  selector:
+    app: cardmgmt
+  ports:
+  - name: pflistener
+    protocol: TCP
+    port: 65500
+    targetPort: 65500
+  - name: vflistener
+    protocol: TCP
+    port: 65501
+    targetPort: 65501

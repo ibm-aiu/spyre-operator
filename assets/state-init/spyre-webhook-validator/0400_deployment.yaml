@@ -1,0 +1,69 @@
+# +-------------------------------------------------------------------+
+# | Copyright IBM Corp. 2025 All Rights Reserved                      |
+# | PID 5698-SPR                                                      |
+# +-------------------------------------------------------------------+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spyre-webhook-validator
+  namespace: "FILLED BY THE OPERATOR"
+  labels:
+    app: spyre-webhook-validator
+    app.kubernetes.io/part-of: spyre
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spyre-webhook-validator
+  template:
+    metadata:
+      labels:
+        app: spyre-webhook-validator
+    spec:
+      serviceAccountName: spyre-webhook-validator
+      containers:
+      - name: spyre-webhook-validator
+        image: "FILLED BY THE OPERATOR"
+        imagePullPolicy: Always
+        env:
+        - name: SCHEDULER_ENABLED
+          value: "true"
+        - name: LOGLEVEL
+          value: "debug"
+        ports:
+        - name: webhook
+          containerPort: 8443
+        - name: probes
+          containerPort: 8081
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 30
+          periodSeconds: 20
+          timeoutSeconds: 5
+          failureThreshold: 3
+        volumeMounts:
+        - name: certs
+          mountPath: /etc/webhook/certs
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+            ephemeral-storage: 1M
+          requests:
+            cpu: 10m
+            memory: 64Mi
+            ephemeral-storage: 0.5M
+      volumes:
+      - name: certs
+        secret:
+          secretName: spyre-validator-webhook-secret

@@ -1,0 +1,45 @@
+# +-------------------------------------------------------------------+
+# | Copyright IBM Corp. 2025 All Rights Reserved                      |
+# | PID 5698-SPR                                                      |
+# +-------------------------------------------------------------------+
+
+variant: openshift
+version: 4.18.0
+metadata:
+  name: 05-aiu-kernel-commandline
+  labels:
+    machineconfiguration.openshift.io/role: worker
+    kubernetes.io/arch: amd64
+openshift:
+  kernel_arguments:
+  - intel_iommu=on
+  - amd_iommu=on
+  - iommu=pt
+storage:
+  files:
+  - path: /etc/modprobe.d/vfio-pci.conf
+    mode: 0644
+    contents:
+      inline: |
+        options vfio-pci ids=1014:06a7,1014:06a8
+        options vfio-pci enable_sriov=1
+        options vfio-pci disable_idle_d3=1
+  - path: /etc/modules-load.d/vfio-pci.conf
+    mode: 0644
+    contents:
+      inline: |
+        vfio-pci
+        vfio_iommu_type1
+  - path: /etc/crio/crio.conf.d/10-custom
+    mode: 0644
+    contents:
+      inline: |
+        [crio.runtime]
+        default_ulimits = [
+          "memlock=-1:-1"
+        ]
+  - path: /etc/udev/rules.d/90-vfio-3.rules
+    mode: 0644
+    contents:
+      inline: |
+        SUBSYSTEM=="vfio", MODE="0666"

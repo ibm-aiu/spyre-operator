@@ -1,0 +1,49 @@
+# +-------------------------------------------------------------------+
+# | Copyright IBM Corp. 2025 All Rights Reserved                      |
+# | PID 5698-SPR                                                      |
+# +-------------------------------------------------------------------+
+
+variant: openshift
+version: 4.18.0
+metadata:
+  name: 09-vfstart
+  labels:
+    machineconfiguration.openshift.io/role: vf
+    kubernetes.io/arch: amd64
+storage:
+  files:
+  - contents:
+      inline: |
+        #!/bin/sh
+        BUS_ID_LIST=$(lspci -D | grep 06a7 | grep 'rev 02' | cut -f 1 -d ' ' | sed -z 's/\n/ /g')
+        ddBUS_ID=$1
+        NUM_VFS=2
+        for BUS_ID in $BUS_ID_LIST
+        do
+          echo "starting vfio_id=$BUS_ID num_vfs=$NUM_VFS "
+          PCI_DEV_PATH="/sys/bus/pci/devices/$BUS_ID"
+          echo " echo 1 > $PCI_DEV_PATH/driver/module/parameters/enable_sriov"
+          echo 1 > $PCI_DEV_PATH/driver/module/parameters/enable_sriov
+          echo " echo $NUM_VFS > $PCI_DEV_PATH/sriov_numvfs"
+          echo $NUM_VFS > $PCI_DEV_PATH/sriov_numvfs
+        done
+        echo " chmod a+wr -Rf /dev/vfio/*"
+        chmod a+wr -Rf /dev/vfio/*
+    mode: 0700
+    overwrite: true
+    path: /usr/local/bin/vfio_start.sh
+systemd:
+  units:
+  - contents: |
+        [Unit]
+        Description=Create Spyre virtual functions
+        After=kubelet.service
+
+        [Service]
+        Type=simple
+        ExecStart=/bin/bash -c "/bin/sleep 300; /usr/local/bin/vfio_start.sh"
+
+        [Install]
+        WantedBy=multi-user.target
+    enabled: true
+    name: vfstart.service

@@ -1,0 +1,38 @@
+# +-------------------------------------------------------------------+
+# | Copyright IBM Corp. 2025 All Rights Reserved                      |
+# | PID 5698-SPR                                                      |
+# +-------------------------------------------------------------------+
+
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    kubernetes.io/arch: amd64
+    machineconfiguration.openshift.io/role: vf
+  name: 09-vfstart
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      files:
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,IyEvYmluL3NoCkJVU19JRF9MSVNUPSQobHNwY2kgLUQgfCBncmVwIC1lICdJQk0gU3B5cmUnIC1lICcwNmE3JyB8IGdyZXAgJ3JldiAwMicgfCBjdXQgLWYgMSAtZCAnICcgfCBzZWQgLXogJ3MvXG4vIC9nJykKIyAwMDAwOjI5OjAwLjAgUHJvY2Vzc2luZyBhY2NlbGVyYXRvcnM6IElCTSBTcHlyZSBBY2NlbGVyYXRvciAocmV2IDAyKQojIDAwMDA6Mjk6MDAuMSBQcm9jZXNzaW5nIGFjY2VsZXJhdG9yczogSUJNIFNweXJlIEFjY2VsZXJhdG9yIFZpcnR1YWwgRnVuY3Rpb24gKHJldiAwMikKZGRCVVNfSUQ9JDEKTlVNX1ZGUz0yCmZvciBCVVNfSUQgaW4gJEJVU19JRF9MSVNUCmRvCiAgZWNobyAic3RhcnRpbmcgdmZpb19pZD0kQlVTX0lEIG51bV92ZnM9JE5VTV9WRlMgIgogIFBDSV9ERVZfUEFUSD0iL3N5cy9idXMvcGNpL2RldmljZXMvJEJVU19JRCIKICBlY2hvICIgZWNobyAxID4gJFBDSV9ERVZfUEFUSC9kcml2ZXIvbW9kdWxlL3BhcmFtZXRlcnMvZW5hYmxlX3NyaW92IgogIGVjaG8gMSA+ICRQQ0lfREVWX1BBVEgvZHJpdmVyL21vZHVsZS9wYXJhbWV0ZXJzL2VuYWJsZV9zcmlvdgogIGVjaG8gIiBlY2hvICROVU1fVkZTID4gJFBDSV9ERVZfUEFUSC9zcmlvdl9udW12ZnMiCiAgZWNobyAkTlVNX1ZGUyA+ICRQQ0lfREVWX1BBVEgvc3Jpb3ZfbnVtdmZzCmRvbmUKZWNobyAiIGNobW9kIGErd3IgLVJmIC9kZXYvdmZpby8qIgpjaG1vZCBhK3dyIC1SZiAvZGV2L3ZmaW8vKgo=
+        mode: 700
+        overwrite: true
+        path: /usr/local/bin/vfio_start.sh
+    systemd:
+      units:
+      - contents: |
+          [Unit]
+          Description=Create Spyre virtual functions
+          After=kubelet.service
+
+          [Service]
+          Type=simple
+          ExecStart=/bin/bash -c "/bin/sleep 300; /usr/local/bin/vfio_start.sh"
+
+          [Install]
+          WantedBy=multi-user.target
+        enabled: true
+        name: vfstart.service
