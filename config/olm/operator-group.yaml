@@ -1,0 +1,8 @@
+# Copyright (c) 2025, 2026 IBM Corp.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: spyre-operator-group
+  namespace: spyre-operator

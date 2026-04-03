@@ -1,0 +1,5 @@
+[codespell]
+skip = go.*,*.gen.*,
+     *.jpeg,*.png,*.png,*.svg,*.drawio,*.bu,
+     assets/**/*.yaml
+ignore-words-list = AfterAll,bu,IST,te,tru,fpr

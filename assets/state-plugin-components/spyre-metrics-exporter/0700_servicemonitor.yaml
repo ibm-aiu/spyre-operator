@@ -1,0 +1,16 @@
+# Copyright (c) 2025, 2026 IBM Corp.
+# SPDX-License-Identifier: Apache-2.0
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: spyre-metrics-exporter
+  namespace: "FILLED BY THE OPERATOR"
+  labels:
+    k8s-app: spyre-metrics-monitor
+spec:
+  endpoints:
+  - interval: 30s
+    port: spyre-metrics
+    scheme: http
+  selector:
+    matchLabels: {}

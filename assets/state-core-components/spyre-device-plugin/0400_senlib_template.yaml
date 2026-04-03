@@ -1,0 +1,22 @@
+# Copyright (c) 2025, 2026 IBM Corp.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: senlib-config-template
+  namespace: "FILLED BY THE OPERATOR"
+data:
+  senlib_config.json: |
+    {
+        "GENERAL": {
+            "target": "SOC",
+            "sen_bus_id": []
+        },
+        "METRICS": {
+            "general": {
+                "enable": false,
+                "port": 8082
+            }
+        }
+    }

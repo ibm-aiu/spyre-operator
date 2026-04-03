@@ -1,0 +1,21 @@
+# +-------------------------------------------------------------------+
+# | Copyright (c) 2025, 2026 IBM Corp.                                |
+# | SPDX-License-Identifier: Apache-2.0                               |
+# +-------------------------------------------------------------------+
+
+name: Ensure Pre-commit
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+    - main
+
+permissions: read-all
+
+env:
+  GOTOOLCHAIN: auto
+
+jobs:
+  pre-commit:
+    uses: karthikeyan-balakrishnan-ibm/spyre-operator-actions/.github/workflows/pre-commit.yaml@main

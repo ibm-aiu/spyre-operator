@@ -1,0 +1,27 @@
+# Copyright (c) 2025, 2026 IBM Corp.
+# SPDX-License-Identifier: Apache-2.0
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- manager.yaml
+generatorOptions:
+  disableNameSuffixHash: true
+replacements:
+- source:
+    fieldPath: spec.template.spec.containers.[name=manager].image
+    kind: Deployment
+    name: spyre-operator
+  targets:
+  - fieldPaths:
+    - spec.template.spec.containers.[name=manager].env.[name=RELATED_IMAGE_SPYRE_OPERATOR].value
+    select:
+      kind: Deployment
+      name: spyre-operator
+images:
+- name: controller
+  newName: docker.io/spyre-operator/spyre-operator
+  newTag: 1.3.0-dev
+labels:
+- includeSelectors: true
+  pairs:
+    operator-version: 1.3.0-dev

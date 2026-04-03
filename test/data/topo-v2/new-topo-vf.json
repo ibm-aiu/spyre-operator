@@ -1,0 +1,1274 @@
+{
+    "devices": null,
+    "nic_devices": null,
+    "nic_num_devices": 0,
+    "num_devices": 0,
+    "nvme_devices": {
+        "0000:49:00.0": {
+            "class_id": "NVMExp",
+            "cpu affinity": "0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 ",
+            "device_id": "51c3",
+            "is_pf": true,
+            "linkspeed": " 7.88 GB/s",
+            "name": "NVME Device 51c3 (rev 01)",
+            "nic_peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": null
+            },
+            "numanode": 0,
+            "nvme_peers": {
+                "peers_0": {
+                    "0000:4a:00.0": 4
+                },
+                "peers_1": null,
+                "peers_2": null
+            },
+            "peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": null
+            },
+            "revision": 1,
+            "spyre_vf_peers": {
+                "peers_0": null,
+                "peers_1": {
+                    "0000:2a:00.2": 8,
+                    "0000:2b:00.1": 8,
+                    "0000:2b:00.2": 8,
+                    "0000:3b:00.2": 8,
+                    "0000:3c:00.2": 8
+                },
+                "peers_2": {
+                    "0000:aa:00.1": 100,
+                    "0000:aa:00.2": 100,
+                    "0000:ac:00.1": 100,
+                    "0000:ac:00.2": 100,
+                    "0000:ba:00.1": 100,
+                    "0000:ba:00.2": 100,
+                    "0000:bb:00.1": 100,
+                    "0000:bb:00.2": 100
+                }
+            },
+            "vendor_id": "OTHER"
+        },
+        "0000:4a:00.0": {
+            "class_id": "NVMExp",
+            "cpu affinity": "0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 ",
+            "device_id": "51c3",
+            "is_pf": true,
+            "linkspeed": " 7.88 GB/s",
+            "name": "NVME Device 51c3 (rev 01)",
+            "nic_peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": null
+            },
+            "numanode": 0,
+            "nvme_peers": {
+                "peers_0": {
+                    "0000:49:00.0": 4
+                },
+                "peers_1": null,
+                "peers_2": null
+            },
+            "peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": null
+            },
+            "revision": 1,
+            "spyre_vf_peers": {
+                "peers_0": null,
+                "peers_1": {
+                    "0000:2a:00.2": 8,
+                    "0000:2b:00.1": 8,
+                    "0000:2b:00.2": 8,
+                    "0000:3b:00.2": 8,
+                    "0000:3c:00.2": 8
+                },
+                "peers_2": {
+                    "0000:aa:00.1": 100,
+                    "0000:aa:00.2": 100,
+                    "0000:ac:00.1": 100,
+                    "0000:ac:00.2": 100,
+                    "0000:ba:00.1": 100,
+                    "0000:ba:00.2": 100,
+                    "0000:bb:00.1": 100,
+                    "0000:bb:00.2": 100
+                }
+            },
+            "vendor_id": "OTHER"
+        }
+    },
+    "nvme_num_devices": 2,
+    "server": "aiu-vf-bzltd",
+    "spyre_vf_devices": {
+        "0000:2a:00.2": {
+            "class_id": "ProcessingAccelerator",
+            "cpu affinity": "0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 ",
+            "device_id": "06a8",
+            "is_pf": false,
+            "linkspeed": " 0.00 GB/s",
+            "name": "AIU VF Device 06a8 (rev 02)",
+            "nic_peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": null
+            },
+            "numanode": 0,
+            "nvme_peers": {
+                "peers_0": null,
+                "peers_1": {
+                    "0000:49:00.0": 8,
+                    "0000:4a:00.0": 8
+                },
+                "peers_2": null
+            },
+            "peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": null
+            },
+            "protocol": {
+                "0000:2b:00.1": [
+                    "P2PDMA",
+                    "HDMA"
+                ],
+                "0000:2b:00.2": [
+                    "P2PDMA",
+                    "HDMA"
+                ],
+                "0000:3b:00.2": [
+                    "HDMA"
+                ],
+                "0000:3c:00.2": [
+                    "HDMA"
+                ],
+                "0000:aa:00.1": [
+                    "HDMA"
+                ],
+                "0000:aa:00.2": [
+                    "HDMA"
+                ],
+                "0000:ac:00.1": [
+                    "HDMA"
+                ],
+                "0000:ac:00.2": [
+                    "HDMA"
+                ],
+                "0000:ba:00.1": [
+                    "HDMA"
+                ],
+                "0000:ba:00.2": [
+                    "HDMA"
+                ],
+                "0000:bb:00.1": [
+                    "HDMA"
+                ],
+                "0000:bb:00.2": [
+                    "HDMA"
+                ]
+            },
+            "revision": 2,
+            "spyre_vf_peers": {
+                "peers_0": {
+                    "0000:2b:00.1": 4,
+                    "0000:2b:00.2": 4
+                },
+                "peers_1": {
+                    "0000:3b:00.2": 10,
+                    "0000:3c:00.2": 10
+                },
+                "peers_2": {
+                    "0000:aa:00.1": 100,
+                    "0000:aa:00.2": 100,
+                    "0000:ac:00.1": 100,
+                    "0000:ac:00.2": 100,
+                    "0000:ba:00.1": 100,
+                    "0000:ba:00.2": 100,
+                    "0000:bb:00.1": 100,
+                    "0000:bb:00.2": 100
+                }
+            },
+            "vendor_id": "IBM"
+        },
+        "0000:2b:00.1": {
+            "class_id": "ProcessingAccelerator",
+            "cpu affinity": "0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 ",
+            "device_id": "06a8",
+            "is_pf": false,
+            "linkspeed": " 0.00 GB/s",
+            "name": "AIU VF Device 06a8 (rev 02)",
+            "nic_peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": null
+            },
+            "numanode": 0,
+            "nvme_peers": {
+                "peers_0": null,
+                "peers_1": {
+                    "0000:49:00.0": 8,
+                    "0000:4a:00.0": 8
+                },
+                "peers_2": null
+            },
+            "peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": null
+            },
+            "protocol": {
+                "0000:2a:00.2": [
+                    "P2PDMA",
+                    "HDMA"
+                ],
+                "0000:2b:00.2": [
+                    "P2PDMA",
+                    "HDMA"
+                ],
+                "0000:3b:00.2": [
+                    "HDMA"
+                ],
+                "0000:3c:00.2": [
+                    "HDMA"
+                ],
+                "0000:aa:00.1": [
+                    "HDMA"
+                ],
+                "0000:aa:00.2": [
+                    "HDMA"
+                ],
+                "0000:ac:00.1": [
+                    "HDMA"
+                ],
+                "0000:ac:00.2": [
+                    "HDMA"
+                ],
+                "0000:ba:00.1": [
+                    "HDMA"
+                ],
+                "0000:ba:00.2": [
+                    "HDMA"
+                ],
+                "0000:bb:00.1": [
+                    "HDMA"
+                ],
+                "0000:bb:00.2": [
+                    "HDMA"
+                ]
+            },
+            "revision": 2,
+            "spyre_vf_peers": {
+                "peers_0": {
+                    "0000:2a:00.2": 4,
+                    "0000:2b:00.2": 2
+                },
+                "peers_1": {
+                    "0000:3b:00.2": 10,
+                    "0000:3c:00.2": 10
+                },
+                "peers_2": {
+                    "0000:aa:00.1": 100,
+                    "0000:aa:00.2": 100,
+                    "0000:ac:00.1": 100,
+                    "0000:ac:00.2": 100,
+                    "0000:ba:00.1": 100,
+                    "0000:ba:00.2": 100,
+                    "0000:bb:00.1": 100,
+                    "0000:bb:00.2": 100
+                }
+            },
+            "vendor_id": "IBM"
+        },
+        "0000:2b:00.2": {
+            "class_id": "ProcessingAccelerator",
+            "cpu affinity": "0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 ",
+            "device_id": "06a8",
+            "is_pf": false,
+            "linkspeed": " 0.00 GB/s",
+            "name": "AIU VF Device 06a8 (rev 02)",
+            "nic_peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": null
+            },
+            "numanode": 0,
+            "nvme_peers": {
+                "peers_0": null,
+                "peers_1": {
+                    "0000:49:00.0": 8,
+                    "0000:4a:00.0": 8
+                },
+                "peers_2": null
+            },
+            "peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": null
+            },
+            "protocol": {
+                "0000:2a:00.2": [
+                    "P2PDMA",
+                    "HDMA"
+                ],
+                "0000:2b:00.1": [
+                    "P2PDMA",
+                    "HDMA"
+                ],
+                "0000:3b:00.2": [
+                    "HDMA"
+                ],
+                "0000:3c:00.2": [
+                    "HDMA"
+                ],
+                "0000:aa:00.1": [
+                    "HDMA"
+                ],
+                "0000:aa:00.2": [
+                    "HDMA"
+                ],
+                "0000:ac:00.1": [
+                    "HDMA"
+                ],
+                "0000:ac:00.2": [
+                    "HDMA"
+                ],
+                "0000:ba:00.1": [
+                    "HDMA"
+                ],
+                "0000:ba:00.2": [
+                    "HDMA"
+                ],
+                "0000:bb:00.1": [
+                    "HDMA"
+                ],
+                "0000:bb:00.2": [
+                    "HDMA"
+                ]
+            },
+            "revision": 2,
+            "spyre_vf_peers": {
+                "peers_0": {
+                    "0000:2a:00.2": 4,
+                    "0000:2b:00.1": 2
+                },
+                "peers_1": {
+                    "0000:3b:00.2": 10,
+                    "0000:3c:00.2": 10
+                },
+                "peers_2": {
+                    "0000:aa:00.1": 100,
+                    "0000:aa:00.2": 100,
+                    "0000:ac:00.1": 100,
+                    "0000:ac:00.2": 100,
+                    "0000:ba:00.1": 100,
+                    "0000:ba:00.2": 100,
+                    "0000:bb:00.1": 100,
+                    "0000:bb:00.2": 100
+                }
+            },
+            "vendor_id": "IBM"
+        },
+        "0000:3b:00.2": {
+            "class_id": "ProcessingAccelerator",
+            "cpu affinity": "0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 ",
+            "device_id": "06a8",
+            "is_pf": false,
+            "linkspeed": " 0.00 GB/s",
+            "name": "AIU VF Device 06a8 (rev 02)",
+            "nic_peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": null
+            },
+            "numanode": 0,
+            "nvme_peers": {
+                "peers_0": null,
+                "peers_1": {
+                    "0000:49:00.0": 8,
+                    "0000:4a:00.0": 8
+                },
+                "peers_2": null
+            },
+            "peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": null
+            },
+            "protocol": {
+                "0000:2a:00.2": [
+                    "HDMA"
+                ],
+                "0000:2b:00.1": [
+                    "HDMA"
+                ],
+                "0000:2b:00.2": [
+                    "HDMA"
+                ],
+                "0000:3c:00.2": [
+                    "P2PDMA",
+                    "HDMA"
+                ],
+                "0000:aa:00.1": [
+                    "HDMA"
+                ],
+                "0000:aa:00.2": [
+                    "HDMA"
+                ],
+                "0000:ac:00.1": [
+                    "HDMA"
+                ],
+                "0000:ac:00.2": [
+                    "HDMA"
+                ],
+                "0000:ba:00.1": [
+                    "HDMA"
+                ],
+                "0000:ba:00.2": [
+                    "HDMA"
+                ],
+                "0000:bb:00.1": [
+                    "HDMA"
+                ],
+                "0000:bb:00.2": [
+                    "HDMA"
+                ]
+            },
+            "revision": 2,
+            "spyre_vf_peers": {
+                "peers_0": {
+                    "0000:3c:00.2": 4
+                },
+                "peers_1": {
+                    "0000:2a:00.2": 10,
+                    "0000:2b:00.1": 10,
+                    "0000:2b:00.2": 10
+                },
+                "peers_2": {
+                    "0000:aa:00.1": 100,
+                    "0000:aa:00.2": 100,
+                    "0000:ac:00.1": 100,
+                    "0000:ac:00.2": 100,
+                    "0000:ba:00.1": 100,
+                    "0000:ba:00.2": 100,
+                    "0000:bb:00.1": 100,
+                    "0000:bb:00.2": 100
+                }
+            },
+            "vendor_id": "IBM"
+        },
+        "0000:3c:00.2": {
+            "class_id": "ProcessingAccelerator",
+            "cpu affinity": "0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 ",
+            "device_id": "06a8",
+            "is_pf": false,
+            "linkspeed": " 0.00 GB/s",
+            "name": "AIU VF Device 06a8 (rev 02)",
+            "nic_peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": null
+            },
+            "numanode": 0,
+            "nvme_peers": {
+                "peers_0": null,
+                "peers_1": {
+                    "0000:49:00.0": 8,
+                    "0000:4a:00.0": 8
+                },
+                "peers_2": null
+            },
+            "peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": null
+            },
+            "protocol": {
+                "0000:2a:00.2": [
+                    "HDMA"
+                ],
+                "0000:2b:00.1": [
+                    "HDMA"
+                ],
+                "0000:2b:00.2": [
+                    "HDMA"
+                ],
+                "0000:3b:00.2": [
+                    "P2PDMA",
+                    "HDMA"
+                ],
+                "0000:aa:00.1": [
+                    "HDMA"
+                ],
+                "0000:aa:00.2": [
+                    "HDMA"
+                ],
+                "0000:ac:00.1": [
+                    "HDMA"
+                ],
+                "0000:ac:00.2": [
+                    "HDMA"
+                ],
+                "0000:ba:00.1": [
+                    "HDMA"
+                ],
+                "0000:ba:00.2": [
+                    "HDMA"
+                ],
+                "0000:bb:00.1": [
+                    "HDMA"
+                ],
+                "0000:bb:00.2": [
+                    "HDMA"
+                ]
+            },
+            "revision": 2,
+            "spyre_vf_peers": {
+                "peers_0": {
+                    "0000:3b:00.2": 4
+                },
+                "peers_1": {
+                    "0000:2a:00.2": 10,
+                    "0000:2b:00.1": 10,
+                    "0000:2b:00.2": 10
+                },
+                "peers_2": {
+                    "0000:aa:00.1": 100,
+                    "0000:aa:00.2": 100,
+                    "0000:ac:00.1": 100,
+                    "0000:ac:00.2": 100,
+                    "0000:ba:00.1": 100,
+                    "0000:ba:00.2": 100,
+                    "0000:bb:00.1": 100,
+                    "0000:bb:00.2": 100
+                }
+            },
+            "vendor_id": "IBM"
+        },
+        "0000:aa:00.1": {
+            "class_id": "ProcessingAccelerator",
+            "cpu affinity": "48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 ",
+            "device_id": "06a8",
+            "is_pf": false,
+            "linkspeed": " 0.00 GB/s",
+            "name": "AIU VF Device 06a8 (rev 02)",
+            "nic_peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": null
+            },
+            "numanode": 1,
+            "nvme_peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": {
+                    "0000:49:00.0": 100,
+                    "0000:4a:00.0": 100
+                }
+            },
+            "peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": null
+            },
+            "protocol": {
+                "0000:2a:00.2": [
+                    "HDMA"
+                ],
+                "0000:2b:00.1": [
+                    "HDMA"
+                ],
+                "0000:2b:00.2": [
+                    "HDMA"
+                ],
+                "0000:3b:00.2": [
+                    "HDMA"
+                ],
+                "0000:3c:00.2": [
+                    "HDMA"
+                ],
+                "0000:aa:00.2": [
+                    "P2PDMA",
+                    "HDMA"
+                ],
+                "0000:ac:00.1": [
+                    "P2PDMA",
+                    "HDMA"
+                ],
+                "0000:ac:00.2": [
+                    "P2PDMA",
+                    "HDMA"
+                ],
+                "0000:ba:00.1": [
+                    "HDMA"
+                ],
+                "0000:ba:00.2": [
+                    "HDMA"
+                ],
+                "0000:bb:00.1": [
+                    "HDMA"
+                ],
+                "0000:bb:00.2": [
+                    "HDMA"
+                ]
+            },
+            "revision": 2,
+            "spyre_vf_peers": {
+                "peers_0": {
+                    "0000:aa:00.2": 2,
+                    "0000:ac:00.1": 4,
+                    "0000:ac:00.2": 4
+                },
+                "peers_1": {
+                    "0000:ba:00.1": 10,
+                    "0000:ba:00.2": 10,
+                    "0000:bb:00.1": 10,
+                    "0000:bb:00.2": 10
+                },
+                "peers_2": {
+                    "0000:2a:00.2": 100,
+                    "0000:2b:00.1": 100,
+                    "0000:2b:00.2": 100,
+                    "0000:3b:00.2": 100,
+                    "0000:3c:00.2": 100
+                }
+            },
+            "vendor_id": "IBM"
+        },
+        "0000:aa:00.2": {
+            "class_id": "ProcessingAccelerator",
+            "cpu affinity": "48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 ",
+            "device_id": "06a8",
+            "is_pf": false,
+            "linkspeed": " 0.00 GB/s",
+            "name": "AIU VF Device 06a8 (rev 02)",
+            "nic_peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": null
+            },
+            "numanode": 1,
+            "nvme_peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": {
+                    "0000:49:00.0": 100,
+                    "0000:4a:00.0": 100
+                }
+            },
+            "peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": null
+            },
+            "protocol": {
+                "0000:2a:00.2": [
+                    "HDMA"
+                ],
+                "0000:2b:00.1": [
+                    "HDMA"
+                ],
+                "0000:2b:00.2": [
+                    "HDMA"
+                ],
+                "0000:3b:00.2": [
+                    "HDMA"
+                ],
+                "0000:3c:00.2": [
+                    "HDMA"
+                ],
+                "0000:aa:00.1": [
+                    "P2PDMA",
+                    "HDMA"
+                ],
+                "0000:ac:00.1": [
+                    "P2PDMA",
+                    "HDMA"
+                ],
+                "0000:ac:00.2": [
+                    "P2PDMA",
+                    "HDMA"
+                ],
+                "0000:ba:00.1": [
+                    "HDMA"
+                ],
+                "0000:ba:00.2": [
+                    "HDMA"
+                ],
+                "0000:bb:00.1": [
+                    "HDMA"
+                ],
+                "0000:bb:00.2": [
+                    "HDMA"
+                ]
+            },
+            "revision": 2,
+            "spyre_vf_peers": {
+                "peers_0": {
+                    "0000:aa:00.1": 2,
+                    "0000:ac:00.1": 4,
+                    "0000:ac:00.2": 4
+                },
+                "peers_1": {
+                    "0000:ba:00.1": 10,
+                    "0000:ba:00.2": 10,
+                    "0000:bb:00.1": 10,
+                    "0000:bb:00.2": 10
+                },
+                "peers_2": {
+                    "0000:2a:00.2": 100,
+                    "0000:2b:00.1": 100,
+                    "0000:2b:00.2": 100,
+                    "0000:3b:00.2": 100,
+                    "0000:3c:00.2": 100
+                }
+            },
+            "vendor_id": "IBM"
+        },
+        "0000:ac:00.1": {
+            "class_id": "ProcessingAccelerator",
+            "cpu affinity": "48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 ",
+            "device_id": "06a8",
+            "is_pf": false,
+            "linkspeed": " 0.00 GB/s",
+            "name": "AIU VF Device 06a8 (rev 02)",
+            "nic_peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": null
+            },
+            "numanode": 1,
+            "nvme_peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": {
+                    "0000:49:00.0": 100,
+                    "0000:4a:00.0": 100
+                }
+            },
+            "peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": null
+            },
+            "protocol": {
+                "0000:2a:00.2": [
+                    "HDMA"
+                ],
+                "0000:2b:00.1": [
+                    "HDMA"
+                ],
+                "0000:2b:00.2": [
+                    "HDMA"
+                ],
+                "0000:3b:00.2": [
+                    "HDMA"
+                ],
+                "0000:3c:00.2": [
+                    "HDMA"
+                ],
+                "0000:aa:00.1": [
+                    "P2PDMA",
+                    "HDMA"
+                ],
+                "0000:aa:00.2": [
+                    "P2PDMA",
+                    "HDMA"
+                ],
+                "0000:ac:00.2": [
+                    "P2PDMA",
+                    "HDMA"
+                ],
+                "0000:ba:00.1": [
+                    "HDMA"
+                ],
+                "0000:ba:00.2": [
+                    "HDMA"
+                ],
+                "0000:bb:00.1": [
+                    "HDMA"
+                ],
+                "0000:bb:00.2": [
+                    "HDMA"
+                ]
+            },
+            "revision": 2,
+            "spyre_vf_peers": {
+                "peers_0": {
+                    "0000:aa:00.1": 4,
+                    "0000:aa:00.2": 4,
+                    "0000:ac:00.2": 2
+                },
+                "peers_1": {
+                    "0000:ba:00.1": 10,
+                    "0000:ba:00.2": 10,
+                    "0000:bb:00.1": 10,
+                    "0000:bb:00.2": 10
+                },
+                "peers_2": {
+                    "0000:2a:00.2": 100,
+                    "0000:2b:00.1": 100,
+                    "0000:2b:00.2": 100,
+                    "0000:3b:00.2": 100,
+                    "0000:3c:00.2": 100
+                }
+            },
+            "vendor_id": "IBM"
+        },
+        "0000:ac:00.2": {
+            "class_id": "ProcessingAccelerator",
+            "cpu affinity": "48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 ",
+            "device_id": "06a8",
+            "is_pf": false,
+            "linkspeed": " 0.00 GB/s",
+            "name": "AIU VF Device 06a8 (rev 02)",
+            "nic_peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": null
+            },
+            "numanode": 1,
+            "nvme_peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": {
+                    "0000:49:00.0": 100,
+                    "0000:4a:00.0": 100
+                }
+            },
+            "peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": null
+            },
+            "protocol": {
+                "0000:2a:00.2": [
+                    "HDMA"
+                ],
+                "0000:2b:00.1": [
+                    "HDMA"
+                ],
+                "0000:2b:00.2": [
+                    "HDMA"
+                ],
+                "0000:3b:00.2": [
+                    "HDMA"
+                ],
+                "0000:3c:00.2": [
+                    "HDMA"
+                ],
+                "0000:aa:00.1": [
+                    "P2PDMA",
+                    "HDMA"
+                ],
+                "0000:aa:00.2": [
+                    "P2PDMA",
+                    "HDMA"
+                ],
+                "0000:ac:00.1": [
+                    "P2PDMA",
+                    "HDMA"
+                ],
+                "0000:ba:00.1": [
+                    "HDMA"
+                ],
+                "0000:ba:00.2": [
+                    "HDMA"
+                ],
+                "0000:bb:00.1": [
+                    "HDMA"
+                ],
+                "0000:bb:00.2": [
+                    "HDMA"
+                ]
+            },
+            "revision": 2,
+            "spyre_vf_peers": {
+                "peers_0": {
+                    "0000:aa:00.1": 4,
+                    "0000:aa:00.2": 4,
+                    "0000:ac:00.1": 2
+                },
+                "peers_1": {
+                    "0000:ba:00.1": 10,
+                    "0000:ba:00.2": 10,
+                    "0000:bb:00.1": 10,
+                    "0000:bb:00.2": 10
+                },
+                "peers_2": {
+                    "0000:2a:00.2": 100,
+                    "0000:2b:00.1": 100,
+                    "0000:2b:00.2": 100,
+                    "0000:3b:00.2": 100,
+                    "0000:3c:00.2": 100
+                }
+            },
+            "vendor_id": "IBM"
+        },
+        "0000:ba:00.1": {
+            "class_id": "ProcessingAccelerator",
+            "cpu affinity": "48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 ",
+            "device_id": "06a8",
+            "is_pf": false,
+            "linkspeed": " 0.00 GB/s",
+            "name": "AIU VF Device 06a8 (rev 02)",
+            "nic_peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": null
+            },
+            "numanode": 1,
+            "nvme_peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": {
+                    "0000:49:00.0": 100,
+                    "0000:4a:00.0": 100
+                }
+            },
+            "peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": null
+            },
+            "protocol": {
+                "0000:2a:00.2": [
+                    "HDMA"
+                ],
+                "0000:2b:00.1": [
+                    "HDMA"
+                ],
+                "0000:2b:00.2": [
+                    "HDMA"
+                ],
+                "0000:3b:00.2": [
+                    "HDMA"
+                ],
+                "0000:3c:00.2": [
+                    "HDMA"
+                ],
+                "0000:aa:00.1": [
+                    "HDMA"
+                ],
+                "0000:aa:00.2": [
+                    "HDMA"
+                ],
+                "0000:ac:00.1": [
+                    "HDMA"
+                ],
+                "0000:ac:00.2": [
+                    "HDMA"
+                ],
+                "0000:ba:00.2": [
+                    "P2PDMA",
+                    "HDMA"
+                ],
+                "0000:bb:00.1": [
+                    "P2PDMA",
+                    "HDMA"
+                ],
+                "0000:bb:00.2": [
+                    "P2PDMA",
+                    "HDMA"
+                ]
+            },
+            "revision": 2,
+            "spyre_vf_peers": {
+                "peers_0": {
+                    "0000:ba:00.2": 2,
+                    "0000:bb:00.1": 4,
+                    "0000:bb:00.2": 4
+                },
+                "peers_1": {
+                    "0000:aa:00.1": 10,
+                    "0000:aa:00.2": 10,
+                    "0000:ac:00.1": 10,
+                    "0000:ac:00.2": 10
+                },
+                "peers_2": {
+                    "0000:2a:00.2": 100,
+                    "0000:2b:00.1": 100,
+                    "0000:2b:00.2": 100,
+                    "0000:3b:00.2": 100,
+                    "0000:3c:00.2": 100
+                }
+            },
+            "vendor_id": "IBM"
+        },
+        "0000:ba:00.2": {
+            "class_id": "ProcessingAccelerator",
+            "cpu affinity": "48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 ",
+            "device_id": "06a8",
+            "is_pf": false,
+            "linkspeed": " 0.00 GB/s",
+            "name": "AIU VF Device 06a8 (rev 02)",
+            "nic_peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": null
+            },
+            "numanode": 1,
+            "nvme_peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": {
+                    "0000:49:00.0": 100,
+                    "0000:4a:00.0": 100
+                }
+            },
+            "peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": null
+            },
+            "protocol": {
+                "0000:2a:00.2": [
+                    "HDMA"
+                ],
+                "0000:2b:00.1": [
+                    "HDMA"
+                ],
+                "0000:2b:00.2": [
+                    "HDMA"
+                ],
+                "0000:3b:00.2": [
+                    "HDMA"
+                ],
+                "0000:3c:00.2": [
+                    "HDMA"
+                ],
+                "0000:aa:00.1": [
+                    "HDMA"
+                ],
+                "0000:aa:00.2": [
+                    "HDMA"
+                ],
+                "0000:ac:00.1": [
+                    "HDMA"
+                ],
+                "0000:ac:00.2": [
+                    "HDMA"
+                ],
+                "0000:ba:00.1": [
+                    "P2PDMA",
+                    "HDMA"
+                ],
+                "0000:bb:00.1": [
+                    "P2PDMA",
+                    "HDMA"
+                ],
+                "0000:bb:00.2": [
+                    "P2PDMA",
+                    "HDMA"
+                ]
+            },
+            "revision": 2,
+            "spyre_vf_peers": {
+                "peers_0": {
+                    "0000:ba:00.1": 2,
+                    "0000:bb:00.1": 4,
+                    "0000:bb:00.2": 4
+                },
+                "peers_1": {
+                    "0000:aa:00.1": 10,
+                    "0000:aa:00.2": 10,
+                    "0000:ac:00.1": 10,
+                    "0000:ac:00.2": 10
+                },
+                "peers_2": {
+                    "0000:2a:00.2": 100,
+                    "0000:2b:00.1": 100,
+                    "0000:2b:00.2": 100,
+                    "0000:3b:00.2": 100,
+                    "0000:3c:00.2": 100
+                }
+            },
+            "vendor_id": "IBM"
+        },
+        "0000:bb:00.1": {
+            "class_id": "ProcessingAccelerator",
+            "cpu affinity": "48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 ",
+            "device_id": "06a8",
+            "is_pf": false,
+            "linkspeed": " 0.00 GB/s",
+            "name": "AIU VF Device 06a8 (rev 02)",
+            "nic_peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": null
+            },
+            "numanode": 1,
+            "nvme_peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": {
+                    "0000:49:00.0": 100,
+                    "0000:4a:00.0": 100
+                }
+            },
+            "peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": null
+            },
+            "protocol": {
+                "0000:2a:00.2": [
+                    "HDMA"
+                ],
+                "0000:2b:00.1": [
+                    "HDMA"
+                ],
+                "0000:2b:00.2": [
+                    "HDMA"
+                ],
+                "0000:3b:00.2": [
+                    "HDMA"
+                ],
+                "0000:3c:00.2": [
+                    "HDMA"
+                ],
+                "0000:aa:00.1": [
+                    "HDMA"
+                ],
+                "0000:aa:00.2": [
+                    "HDMA"
+                ],
+                "0000:ac:00.1": [
+                    "HDMA"
+                ],
+                "0000:ac:00.2": [
+                    "HDMA"
+                ],
+                "0000:ba:00.1": [
+                    "P2PDMA",
+                    "HDMA"
+                ],
+                "0000:ba:00.2": [
+                    "P2PDMA",
+                    "HDMA"
+                ],
+                "0000:bb:00.2": [
+                    "P2PDMA",
+                    "HDMA"
+                ]
+            },
+            "revision": 2,
+            "spyre_vf_peers": {
+                "peers_0": {
+                    "0000:ba:00.1": 4,
+                    "0000:ba:00.2": 4,
+                    "0000:bb:00.2": 2
+                },
+                "peers_1": {
+                    "0000:aa:00.1": 10,
+                    "0000:aa:00.2": 10,
+                    "0000:ac:00.1": 10,
+                    "0000:ac:00.2": 10
+                },
+                "peers_2": {
+                    "0000:2a:00.2": 100,
+                    "0000:2b:00.1": 100,
+                    "0000:2b:00.2": 100,
+                    "0000:3b:00.2": 100,
+                    "0000:3c:00.2": 100
+                }
+            },
+            "vendor_id": "IBM"
+        },
+        "0000:bb:00.2": {
+            "class_id": "ProcessingAccelerator",
+            "cpu affinity": "48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 ",
+            "device_id": "06a8",
+            "is_pf": false,
+            "linkspeed": " 0.00 GB/s",
+            "name": "AIU VF Device 06a8 (rev 02)",
+            "nic_peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": null
+            },
+            "numanode": 1,
+            "nvme_peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": {
+                    "0000:49:00.0": 100,
+                    "0000:4a:00.0": 100
+                }
+            },
+            "peers": {
+                "peers_0": null,
+                "peers_1": null,
+                "peers_2": null
+            },
+            "protocol": {
+                "0000:2a:00.2": [
+                    "HDMA"
+                ],
+                "0000:2b:00.1": [
+                    "HDMA"
+                ],
+                "0000:2b:00.2": [
+                    "HDMA"
+                ],
+                "0000:3b:00.2": [
+                    "HDMA"
+                ],
+                "0000:3c:00.2": [
+                    "HDMA"
+                ],
+                "0000:aa:00.1": [
+                    "HDMA"
+                ],
+                "0000:aa:00.2": [
+                    "HDMA"
+                ],
+                "0000:ac:00.1": [
+                    "HDMA"
+                ],
+                "0000:ac:00.2": [
+                    "HDMA"
+                ],
+                "0000:ba:00.1": [
+                    "P2PDMA",
+                    "HDMA"
+                ],
+                "0000:ba:00.2": [
+                    "P2PDMA",
+                    "HDMA"
+                ],
+                "0000:bb:00.1": [
+                    "P2PDMA",
+                    "HDMA"
+                ]
+            },
+            "revision": 2,
+            "spyre_vf_peers": {
+                "peers_0": {
+                    "0000:ba:00.1": 4,
+                    "0000:ba:00.2": 4,
+                    "0000:bb:00.1": 2
+                },
+                "peers_1": {
+                    "0000:aa:00.1": 10,
+                    "0000:aa:00.2": 10,
+                    "0000:ac:00.1": 10,
+                    "0000:ac:00.2": 10
+                },
+                "peers_2": {
+                    "0000:2a:00.2": 100,
+                    "0000:2b:00.1": 100,
+                    "0000:2b:00.2": 100,
+                    "0000:3b:00.2": 100,
+                    "0000:3c:00.2": 100
+                }
+            },
+            "vendor_id": "IBM"
+        }
+    },
+    "spyre_vf_num_devices": 13,
+    "timestamp": "Thu Jun 19 14:46:21 2025",
+    "version": 2.0
+}

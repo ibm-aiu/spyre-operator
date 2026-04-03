@@ -1,0 +1,107 @@
+#  Copyright (c) 2025, 2026 IBM Corp.
+#  SPDX-License-Identifier: Apache-2.0
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: spyre-health-checker
+  name: spyre-health-checker
+  namespace: "FILLED BY THE OPERATOR"
+spec:
+  selector:
+    matchLabels:
+      app: spyre-health-checker
+  template:
+    metadata:
+      labels:
+        app: spyre-health-checker
+    spec:
+      containers:
+      - image: "FILLED BY THE OPERATOR"
+        args:
+        - --timer
+        - $(CHECK_INTERVAL)
+        - --socket
+        - $(SPYRE_HEALTH_SOCK)
+        imagePullPolicy: Always
+        name: checker
+        securityContext:
+          runAsUser: 1001
+          runAsGroup: 0
+          runAsNonRoot: true
+          privileged: false
+          seLinuxOptions:
+            type: spc_t
+        env:
+        - name: SPYRE_HEALTH_SOCK
+          value: /usr/local/etc/device-plugins/spyre-sockets/health-checker.sock
+        - name: CHECK_INTERVAL
+          value: "30s"
+        - name: "NODE_NAME"
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: "NAMESPACE"
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: "POD_NAME"
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        volumeMounts:
+        - name: device-plugin-sockets
+          mountPath: /usr/local/etc/device-plugins/spyre-sockets
+          readOnly: false
+        resources:
+          requests:
+            cpu: 100m
+            memory: 10Mi
+          limits:
+            cpu: 500m
+            memory: 500Mi
+        ports:
+        - name: health
+          containerPort: 8080
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: health
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: health
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /healthz
+            port: health
+          initialDelaySeconds: 0
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 30
+      nodeSelector:
+        ibm.com/spyre.present: "true"
+      tolerations:
+      - key: ibm.com/spyre
+        operator: Exists
+        effect: NoSchedule
+      priorityClassName: system-node-critical
+      serviceAccountName: spyre-health-checker
+      volumes:
+      - name: device-plugin-sockets
+        hostPath:
+          path: /usr/local/etc/device-plugins/spyre-sockets
+          type: DirectoryOrCreate

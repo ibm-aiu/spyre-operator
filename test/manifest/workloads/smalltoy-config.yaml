@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: small-toy-config
+data:
+  entry.sh: |
+    #!/bin/bash
+    cd /home/senuser
+    # Using default packages on the workload packages
+    pip install ibm-fms aiu-fms-testing-utils --no-deps
+    git clone https://github.com/foundation-model-stack/aiu-fms-testing-utils.git
+    jq -s '.[0] * .[1]' /etc/aiu/senlib_config.json /tmp/dd2.json > /tmp/senlib_config.json
+    export SENLIB_DEVEL_CONFIG_FILE=/tmp/senlib_config.json
+    export FLEX_HDMA_MODE_FULL=1
+    [ ! -z ${AIU_WORLD_SIZE} ] && torchrun --nproc-per-node ${AIU_WORLD_SIZE} aiu-fms-testing-utils/scripts/small-toy.py --backend aiu
+  dd2.json: |
+    {
+    "SNT_MCI": {
+      "DCR": {
+        "MCI_CTRL": {
+          "ENABLE_RISCV": "0x0"
+        }
+      }
+    },
+    "GENERAL": {
+      "doom": true
+    },
+    "METRICS": {
+      "general": {
+        "enable": true
+        }
+      }
+    }

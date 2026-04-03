@@ -1,0 +1,93 @@
+# +-------------------------------------------------------------------+
+# | Copyright (c) 2025, 2026 IBM Corp.                                |
+# | SPDX-License-Identifier: Apache-2.0                               |
+# +-------------------------------------------------------------------+
+
+variant: openshift
+version: 4.18.0
+metadata:
+  name: 08-pciacs-v1
+  labels:
+    machineconfiguration.openshift.io/role: worker
+    kubernetes.io/arch: amd64
+storage:
+  files:
+  - contents:
+      inline: |
+        #!/usr/bin/perl
+        # grep -l 06a7 /sys/bus/pci/drivers/vfio-pci/*/device | sed -e 's/\/device$//' -e 's/.*\///'
+
+        $h = `hostname`;
+        #exit(0) if($h !~ /IBM.RH.InspurM6.Host/);
+
+        print "Running pcie-ACS disable on $h";
+
+        @list = `grep -l 06a7 /sys/bus/pci/drivers/vfio-pci/*/device`;
+        @cards = ();
+        for $file (@list) {
+          chomp $file;
+          $file =~ s/\/device$//;
+          $file =~ s/.*\///;
+          push(@cards, $file);
+        }
+
+        for $card (@cards) {
+          $string = readlink("/sys/bus/pci/drivers/vfio-pci/${card}");
+          $string =~ s/.*\/devices\/pci[0-9a-f:]*\/[0-9a-f]*://;
+          @branch = split(/\/[0-9a-f]*:/, $string);
+          @branch = ("(root)", @branch);
+          print "# parsing branch: ", join(" ", @branch), "\n";
+          for $dev (@branch) {
+            ++$counter{$dev};
+          }
+        }
+
+        # Set any devices that contain cards
+        for $dev (keys(%counter)) {
+          if ( $dev =~ /[0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]\.[0-9a-f]/ ) {
+            print "# ======== $dev : with $counter{$dev} cards\n";
+
+            print "1. does this dev have a SrcValid?\n";
+            $settings = `sudo /usr/sbin/lspci -vvv -s $dev 2>/dev/null`;
+            if ($settings =~ /ACSCtl:.*SrcValid\-/) {
+              print ":: ACSCtl: SrcValid- already set, no change needed\n";
+            } elsif ($settings =~ /ACSCtl:.*SrcValid\+/) {
+              print ":: ACSCtl: SrcValid+ currently set, trying unset\n";
+              # print "2. query before set, on dev $dev\n";
+              $cmd = "sudo /sbin/setpci -v -s $dev ecap_acs+0x6.w";
+              system "$cmd";
+              print "3. set, on dev $dev\n";
+              $cmd = "sudo /sbin/setpci -s $dev ecap_acs+0x6.w=0000";
+              system "$cmd";
+              print "4. query after set, on dev $dev\n";
+              $cmd = "sudo /sbin/setpci -v -s $dev ecap_acs+0x6.w";
+              system "$cmd";
+              print "5. full text lspci, on dev $dev\n";
+              # $cmd = "sudo /sbin/lspci -vvv -s $dev";
+              system "$cmd";
+            } else {
+              print ":: no SrcValid setting seen, no change needed\n";
+            }
+          }
+        }
+
+        # Save an lspci -vvv output so we can see if we got the results we wanted
+        #$cmd = "sudo /sbin/lspci -vvv";
+        #print "Running : $cmd\n";
+        #system "$cmd";
+    mode: 0700
+    overwrite: true
+    path: /usr/local/bin/pciacs.pl
+systemd:
+  units:
+  - contents: |
+          [Unit]
+          Description=Performing PCIe switch configuration
+          After=kubelet.service
+          [Service]
+          Type=simple
+          ExecStart=/bin/bash -c "/bin/sleep 330; /usr/local/bin/pciacs.pl"
+          [Install]
+          WantedBy=multi-user.target
+    enabled: true
+    name: pcieacs.service

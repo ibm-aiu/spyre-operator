@@ -1,0 +1,152 @@
+# Copyright (c) 2025, 2026 IBM Corp.
+# SPDX-License-Identifier: Apache-2.0
+
+kind: Pod
+apiVersion: v1
+metadata:
+  name: multipod-spyre
+spec:
+  restartPolicy: Always
+  initContainers:
+  - resources:
+      limits:
+        cpu: 10m
+        memory: 15Mi
+      requests:
+        cpu: 10m
+        memory: 15Mi
+    name: init
+    securityContext:
+      capabilities:
+        drop:
+        - ALL
+      runAsUser: 1001120000
+      runAsNonRoot: true
+      allowPrivilegeEscalation: false
+    imagePullPolicy: IfNotPresent
+    image: "registry.access.redhat.com/ubi9-minimal:9.6"
+    args:
+    - sh
+    - "-c"
+    - "sleep 5"
+  serviceAccountName: default
+  priority: 0
+  schedulerName: spyre-scheduler
+  terminationGracePeriodSeconds: 300
+  shareProcessNamespace: true
+  preemptionPolicy: PreemptLowerPriority
+  securityContext:
+    seLinuxOptions:
+      level: "s0:c33,c32"
+    fsGroup: 1001120000
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+  - resources:
+      limits:
+        ibm.com/spyre_vf: "1"
+      requests:
+        ibm.com/spyre_vf: "1"
+    terminationMessagePath: /dev/termination-log
+    name: kserve-container
+    command:
+    - /bin/bash
+    - "-e"
+    - "-c"
+    securityContext:
+      capabilities:
+        drop:
+        - ALL
+      runAsUser: 1001120000
+      runAsNonRoot: true
+      allowPrivilegeEscalation: false
+    imagePullPolicy: IfNotPresent
+    image: "registry.access.redhat.com/ubi9-minimal:9.6"
+    args:
+    - "sleep infinity"
+  - resources:
+      requests:
+        cpu: 25m
+    name: queue-proxy
+    securityContext:
+      capabilities:
+        drop:
+        - ALL
+      runAsUser: 1001120000
+      runAsNonRoot: true
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+    imagePullPolicy: IfNotPresent
+    terminationMessagePolicy: File
+    image: "registry.access.redhat.com/ubi9-minimal:9.6"
+    args:
+    - sh
+    - "-c"
+    - sleep infinity
+  - resources:
+      limits:
+        cpu: 10m
+        memory: 15Mi
+      requests:
+        cpu: 10m
+        memory: 15Mi
+    terminationMessagePath: /dev/termination-log
+    name: modelcar
+    securityContext:
+      capabilities:
+        drop:
+        - ALL
+      runAsUser: 1001120000
+      runAsNonRoot: true
+      allowPrivilegeEscalation: false
+    imagePullPolicy: IfNotPresent
+    terminationMessagePolicy: FallbackToLogsOnError
+    image: "registry.access.redhat.com/ubi9-minimal:9.6"
+    args:
+    - sh
+    - "-c"
+    - sleep infinity
+  - resources:
+      limits:
+        cpu: "2"
+        memory: 1Gi
+      requests:
+        cpu: 10m
+        memory: 128Mi
+    terminationMessagePath: /dev/termination-log
+    name: istio-proxy
+    securityContext:
+      capabilities:
+        drop:
+        - ALL
+        - KILL
+        - MKNOD
+        - SETGID
+        - SETUID
+      privileged: false
+      runAsUser: 1001120001
+      runAsGroup: 1001120001
+      runAsNonRoot: true
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+    imagePullPolicy: IfNotPresent
+    image: "registry.access.redhat.com/ubi9-minimal:9.6"
+    args:
+    - sh
+    - "-c"
+    - sleep infinity
+  tolerations:
+  - key: ibm.com/spyre_pf
+    operator: Exists
+    effect: NoSchedule
+  - key: node.kubernetes.io/not-ready
+    operator: Exists
+    effect: NoExecute
+    tolerationSeconds: 300
+  - key: node.kubernetes.io/unreachable
+    operator: Exists
+    effect: NoExecute
+    tolerationSeconds: 300
+  - key: node.kubernetes.io/memory-pressure
+    operator: Exists
+    effect: NoSchedule
