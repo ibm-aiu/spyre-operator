@@ -1,0 +1,10 @@
+formatter:
+  type: basic
+  indentless_arrays: true
+  retain_line_breaks: true
+  max_line_length: 80
+exclude:
+  - document/**
+  - test/prometheus-helm-charts
+  - test/cluster-nfd-operator
+  - assets/state-plugin-components/spyre-card-management/0600_configmap.yaml

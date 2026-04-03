@@ -1,0 +1,40 @@
+# Copyright (c) 2025, 2026 IBM Corp.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    kubernetes.io/arch: amd64
+    machineconfiguration.openshift.io/role: worker
+  name: 05-aiu-kernel-commandline
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      files:
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,dmZpby1wY2kKdmZpb19pb21tdV90eXBlMQo=
+        mode: 420
+        overwrite: true
+        path: /etc/modules-load.d/vfio-pci.conf
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,b3B0aW9ucyB2ZmlvLXBjaSBpZHM9MTAxNDowNmE3LDEwMTQ6MDZhOApvcHRpb25zIHZmaW8tcGNpIGVuYWJsZV9zcmlvdj0xCm9wdGlvbnMgdmZpby1wY2kgZGlzYWJsZV9pZGxlX2QzPTEK
+        mode: 420
+        overwrite: true
+        path: /etc/modprobe.d/vfio.conf
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,U1VCU1lTVEVNPT0idmZpbyIsIE1PREU9IjA2NjYiCg==
+        mode: 420
+        overwrite: true
+        path: /etc/udev/rules.d/90-vfio-3.rules
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,W2NyaW8ucnVudGltZV0KZGVmYXVsdF91bGltaXRzID0gWwogICAgICAgICJtZW1sb2NrPS0xOi0xIgpdCg==
+        mode: 420
+        overwrite: true
+        path: /etc/crio/crio.conf.d/10-custom
+  kernelArguments:
+  - intel_iommu=on
+  - amd_iommu=on
+  - iommu=pt

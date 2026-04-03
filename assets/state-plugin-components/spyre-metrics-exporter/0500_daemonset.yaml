@@ -1,0 +1,69 @@
+# Copyright (c) 2025, 2026 IBM Corp.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: spyre-metrics-exporter
+  namespace: "FILLED BY THE OPERATOR"
+  labels:
+    app: spyre-metrics-exporter
+    app.kubernetes.io/part-of: spyre
+spec:
+  selector:
+    matchLabels:
+      app: spyre-metrics-exporter
+      app.kubernetes.io/part-of: spyre
+  template:
+    metadata:
+      labels:
+        app: spyre-metrics-exporter
+        app.kubernetes.io/part-of: spyre
+    spec:
+      nodeSelector:
+        ibm.com/spyre.present: "true"
+      tolerations:
+      - key: ibm.com/spyre
+        operator: Exists
+        effect: NoSchedule
+      priorityClassName: system-node-critical
+      serviceAccount: spyre-metrics-exporter
+      containers:
+      - image: "FILLED BY THE OPERATOR"
+        name: spyre-metrics-exporter
+        ports:
+        - name: spyre-metrics
+          containerPort: 8082
+          protocol: TCP
+        env:
+        - name: MONITOR_PORT
+          value: "8082"
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+          request:
+            cpu: 50m
+            memory: 128Mi
+        volumeMounts:
+        - name: spyre-config
+          mountPath: /tmp/spyre-config
+        - name: spyre-metrics
+          mountPath: /tmp/spyre-metrics
+        securityContext:
+          privileged: true
+      volumes:
+      - name: spyre-config
+        hostPath:
+          path: /usr/local/etc/device-plugins/spyre-config
+          type: DirectoryOrCreate
+      - name: spyre-metrics
+        hostPath:
+          path: /usr/local/etc/device-plugins/spyre-metrics
+          type: DirectoryOrCreate

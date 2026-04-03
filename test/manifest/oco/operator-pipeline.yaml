@@ -1,0 +1,16 @@
+# Copyright (c) 2025, 2026 IBM Corp.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: certification.redhat.com/v1alpha1
+kind: OperatorPipeline
+metadata:
+  name: spyre-operator-pipeline
+  namespace: oco
+spec:
+  applyCIPipeline: true
+  applyHostedPipeline: false
+  applyReleasePipeline: false
+  gitHubSecretName: github-api-token
+  kubeconfigSecretName: kubeconfig
+  operatorPipelinesRelease: main
+  pyxisSecretName: pyxis-api-secret

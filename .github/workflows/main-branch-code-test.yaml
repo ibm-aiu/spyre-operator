@@ -1,0 +1,26 @@
+# +-------------------------------------------------------------------+
+# | Copyright (c) 2025, 2026 IBM Corp.                                |
+# | SPDX-License-Identifier: Apache-2.0                               |
+# +-------------------------------------------------------------------+
+
+name: Source Code Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+    - main
+    paths:
+    - cmd/**
+    - pkg/**
+    - test/**
+    - go.mod
+    - go.sum
+    - Makefile
+    - images/**
+
+permissions: read-all
+
+jobs:
+  unit-test:
+    uses: ibm-aiu/spyre-operator-actions/.github/workflows/unit-test.yaml@main

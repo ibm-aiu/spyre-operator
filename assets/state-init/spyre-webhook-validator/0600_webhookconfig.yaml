@@ -1,0 +1,148 @@
+# Copyright (c) 2025, 2026 IBM Corp.
+# SPDX-License-Identifier: Apache-2.0
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: spyre-webhook-validator
+  annotations:
+    service.beta.openshift.io/inject-cabundle: "true"
+webhooks:
+- name: spyre-cluster-policy-validator.k8s.io
+  clientConfig:
+    service:
+      name: spyre-webhook-validator
+      namespace: "FILLED BY THE OPERATOR"
+      path: "/validate-clusterpolicy"
+  rules:
+  - operations: ["CREATE", "UPDATE"]
+    apiGroups: ["spyre.ibm.com"]
+    apiVersions: ["v1alpha1"]
+    resources: ["spyreclusterpolicies", "spyreclusterpolicies/status"]
+  admissionReviewVersions: ["v1"]
+  sideEffects: None
+- name: spyre-pod-validator.k8s.io
+  clientConfig:
+    service:
+      name: spyre-webhook-validator
+      namespace: "FILLED BY THE OPERATOR"
+      path: "/validate-pods"
+  rules:
+  - operations: ["CREATE"]
+    apiGroups: [""]
+    apiVersions: ["v1"]
+    resources: ["pods"]
+  admissionReviewVersions: ["v1"]
+  sideEffects: None
+  namespaceSelector:
+    matchExpressions:
+    - key: kubernetes.io/metadata.name
+      operator: NotIn
+      values: ["spyre-operator", "cert-manager", "cert-manager-operator", "kube-node-lease",
+        "kube-public", "kube-system", "openshift-apiserver", "openshift-apiserver-operator",
+        "openshift-authentication", "openshift-authentication-operator", "openshift-cloud-controller-manager",
+        "openshift-cloud-controller-manager-operator", "openshift-cloud-credential-operator",
+        "openshift-cloud-network-config-controller", "openshift-cluster-csi-drivers",
+        "openshift-cluster-machine-approver", "openshift-cluster-node-tuning-operator",
+        "openshift-cluster-samples-operator", "openshift-cluster-storage-operator",
+        "openshift-cluster-version", "openshift-config", "openshift-config-managed",
+        "openshift-config-operator", "openshift-console", "openshift-console-operator",
+        "openshift-console-user-settings", "openshift-controller-manager", "openshift-controller-manager-operator",
+        "openshift-debug-7thtz", "openshift-debug-c6hp2", "openshift-dns", "openshift-dns-operator",
+        "openshift-etcd", "openshift-etcd-operator", "openshift-host-network", "openshift-image-registry",
+        "openshift-infra", "openshift-ingress", "openshift-ingress-canary", "openshift-ingress-operator",
+        "openshift-insights", "openshift-kni-infra", "openshift-kube-apiserver", "openshift-kube-apiserver-operator",
+        "openshift-kube-controller-manager", "openshift-kube-controller-manager-operator",
+        "openshift-kube-scheduler", "openshift-kube-scheduler-operator", "openshift-kube-storage-version-migrator",
+        "openshift-kube-storage-version-migrator-operator", "openshift-machine-api",
+        "openshift-machine-config-operator", "openshift-marketplace", "openshift-monitoring",
+        "openshift-multus", "openshift-must-gather-46n72", "openshift-network-diagnostics",
+        "openshift-network-operator", "openshift-nfd", "openshift-node", "openshift-nutanix-infra",
+        "openshift-oauth-apiserver", "openshift-openstack-infra", "openshift-operator-lifecycle-manager",
+        "openshift-operators", "openshift-ovirt-infra", "openshift-ovn-kubernetes",
+        "openshift-pipelines", "openshift-route-controller-manager", "openshift-secondary-scheduler-operator",
+        "openshift-service-ca", "openshift-service-ca-operator", "openshift-user-workload-monitoring",
+        "openshift-virtualization-os-images", "openshift-vsphere-infra"]
+- name: spyre-deployment-validator.k8s.io
+  clientConfig:
+    service:
+      name: spyre-webhook-validator
+      namespace: "FILLED BY THE OPERATOR"
+      path: "/validate-deployments"
+  rules:
+  - operations: ["CREATE"]
+    apiGroups: ["apps"]
+    apiVersions: ["v1"]
+    resources: ["deployments"]
+  admissionReviewVersions: ["v1"]
+  sideEffects: None
+  namespaceSelector:
+    matchExpressions:
+    - key: kubernetes.io/metadata.name
+      operator: NotIn
+      values: ["spyre-operator", "cert-manager", "cert-manager-operator", "kube-node-lease",
+        "kube-public", "kube-system", "openshift-apiserver", "openshift-apiserver-operator",
+        "openshift-authentication", "openshift-authentication-operator", "openshift-cloud-controller-manager",
+        "openshift-cloud-controller-manager-operator", "openshift-cloud-credential-operator",
+        "openshift-cloud-network-config-controller", "openshift-cluster-csi-drivers",
+        "openshift-cluster-machine-approver", "openshift-cluster-node-tuning-operator",
+        "openshift-cluster-samples-operator", "openshift-cluster-storage-operator",
+        "openshift-cluster-version", "openshift-config", "openshift-config-managed",
+        "openshift-config-operator", "openshift-console", "openshift-console-operator",
+        "openshift-console-user-settings", "openshift-controller-manager", "openshift-controller-manager-operator",
+        "openshift-debug-7thtz", "openshift-debug-c6hp2", "openshift-dns", "openshift-dns-operator",
+        "openshift-etcd", "openshift-etcd-operator", "openshift-host-network", "openshift-image-registry",
+        "openshift-infra", "openshift-ingress", "openshift-ingress-canary", "openshift-ingress-operator",
+        "openshift-insights", "openshift-kni-infra", "openshift-kube-apiserver", "openshift-kube-apiserver-operator",
+        "openshift-kube-controller-manager", "openshift-kube-controller-manager-operator",
+        "openshift-kube-scheduler", "openshift-kube-scheduler-operator", "openshift-kube-storage-version-migrator",
+        "openshift-kube-storage-version-migrator-operator", "openshift-machine-api",
+        "openshift-machine-config-operator", "openshift-marketplace", "openshift-monitoring",
+        "openshift-multus", "openshift-must-gather-46n72", "openshift-network-diagnostics",
+        "openshift-network-operator", "openshift-nfd", "openshift-node", "openshift-nutanix-infra",
+        "openshift-oauth-apiserver", "openshift-openstack-infra", "openshift-operator-lifecycle-manager",
+        "openshift-operators", "openshift-ovirt-infra", "openshift-ovn-kubernetes",
+        "openshift-pipelines", "openshift-route-controller-manager", "openshift-secondary-scheduler-operator",
+        "openshift-service-ca", "openshift-service-ca-operator", "openshift-user-workload-monitoring",
+        "openshift-virtualization-os-images", "openshift-vsphere-infra"]
+- name: spyre-job-validator.k8s.io
+  clientConfig:
+    service:
+      name: spyre-webhook-validator
+      namespace: "FILLED BY THE OPERATOR"
+      path: "/validate-jobs"
+  rules:
+  - operations: ["CREATE"]
+    apiGroups: ["batch"]
+    apiVersions: ["v1"]
+    resources: ["jobs"]
+  admissionReviewVersions: ["v1"]
+  sideEffects: None
+  namespaceSelector:
+    matchExpressions:
+    - key: kubernetes.io/metadata.name
+      operator: NotIn
+      values: ["spyre-operator", "cert-manager", "cert-manager-operator", "kube-node-lease",
+        "kube-public", "kube-system", "openshift-apiserver", "openshift-apiserver-operator",
+        "openshift-authentication", "openshift-authentication-operator", "openshift-cloud-controller-manager",
+        "openshift-cloud-controller-manager-operator", "openshift-cloud-credential-operator",
+        "openshift-cloud-network-config-controller", "openshift-cluster-csi-drivers",
+        "openshift-cluster-machine-approver", "openshift-cluster-node-tuning-operator",
+        "openshift-cluster-samples-operator", "openshift-cluster-storage-operator",
+        "openshift-cluster-version", "openshift-config", "openshift-config-managed",
+        "openshift-config-operator", "openshift-console", "openshift-console-operator",
+        "openshift-console-user-settings", "openshift-controller-manager", "openshift-controller-manager-operator",
+        "openshift-debug-7thtz", "openshift-debug-c6hp2", "openshift-dns", "openshift-dns-operator",
+        "openshift-etcd", "openshift-etcd-operator", "openshift-host-network", "openshift-image-registry",
+        "openshift-infra", "openshift-ingress", "openshift-ingress-canary", "openshift-ingress-operator",
+        "openshift-insights", "openshift-kni-infra", "openshift-kube-apiserver", "openshift-kube-apiserver-operator",
+        "openshift-kube-controller-manager", "openshift-kube-controller-manager-operator",
+        "openshift-kube-scheduler", "openshift-kube-scheduler-operator", "openshift-kube-storage-version-migrator",
+        "openshift-kube-storage-version-migrator-operator", "openshift-machine-api",
+        "openshift-machine-config-operator", "openshift-marketplace", "openshift-monitoring",
+        "openshift-multus", "openshift-must-gather-46n72", "openshift-network-diagnostics",
+        "openshift-network-operator", "openshift-nfd", "openshift-node", "openshift-nutanix-infra",
+        "openshift-oauth-apiserver", "openshift-openstack-infra", "openshift-operator-lifecycle-manager",
+        "openshift-operators", "openshift-ovirt-infra", "openshift-ovn-kubernetes",
+        "openshift-pipelines", "openshift-route-controller-manager", "openshift-secondary-scheduler-operator",
+        "openshift-service-ca", "openshift-service-ca-operator", "openshift-user-workload-monitoring",
+        "openshift-virtualization-os-images", "openshift-vsphere-infra"]

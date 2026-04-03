@@ -1,0 +1,72 @@
+# +-------------------------------------------------------------------+
+# | Copyright (c) 2025, 2026 IBM Corp.                                |
+# | SPDX-License-Identifier: Apache-2.0                               |
+# +-------------------------------------------------------------------+
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: spyre-card-management
+  namespace: "FILLED BY THE OPERATOR"
+  labels:
+    app: cardmgmt
+spec:
+  selector:
+    matchLabels:
+      app: cardmgmt
+  template:
+    metadata:
+      labels:
+        app: cardmgmt
+    spec:
+      nodeSelector:
+        ibm.com/spyre.present: "true"
+      schedulerName: spyre-scheduler
+      serviceAccountName: spyre-card-management
+      priorityClassName: system-node-critical
+      securityContext:
+        runAsUser: 0
+      volumes:
+      - name: configs
+        configMap:
+          name: spyre-cardmgmt-config
+          optional: true
+      - name: imagepullsecret
+        secret:
+          secretName: registry-dockerconfig-secret
+      containers:
+      - name: app
+        image: "FILLED BY THE OPERATOR"
+        imagePullPolicy: Always
+        command: ["/opt/ibm/spyre/aiucardmgmt/bin/aiucardmgmt/platform/openshift/run_cardmgmt.sh"]
+        securityContext:
+          privileged: true
+        env:
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        - name: AIUPLATFORM
+          value: openshift
+        - name: CARDMGMT_SVC_SERVICE_PORT_PFLISTENER
+          value: "65500"
+        - name: CARDMGMT_SVC_SERVICE_PORT_VFLISTENER
+          value: "65501"
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 512Mi
+          requests:
+            cpu: 30m
+            memory: 64Mi
+        ports:
+        - containerPort: 65500
+        - containerPort: 65501
+        volumeMounts:
+        - name: configs
+          mountPath: /etc/ibm/spyre
+        - name: imagepullsecret
+          mountPath: /var/imagepullsecret
+          readOnly: true

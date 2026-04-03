@@ -1,0 +1,100 @@
+# Copyright (c) 2025, 2026 IBM Corp.
+# SPDX-License-Identifier: Apache-2.0
+
+run:
+  timeout: 10m
+  allow-parallel-runners: true
+  modules-download-mode: vendor
+issues:
+  # Which dirs to exclude: issues from them won't be reported.
+  # Can use regexp here: `generated.*`, regexp is applied on full path,
+  # including the path prefix if one is set.
+  # Default dirs are skipped independently of this option's value (see exclude-dirs-use-default).
+  # "/" will be replaced by current OS file path separator to properly work on Windows.
+  # Default: []
+  exclude-dirs:
+  - test/cluster-nfd-operator
+  - test/prometheus-helm-charts
+  # don't exclude the default set of lint
+  exclude-use-default: false
+  exclude-rules:
+  - path: (.+)_test\.go
+    linters:
+    - lll
+    - errcheck
+  - path: "test/*"
+    linters:
+    - goconst
+    - lll
+    - unparam
+  - path: "controllers/*"
+    linters:
+    - lll
+  - path: "api/*"
+    linters:
+    - lll
+  - path: "const/*"
+    linters:
+    - lll
+
+linters:
+  disable-all: false
+  # For descriptions of the linters and configuration,
+  # see: https://golangci-lint.run/usage/linters/
+  enable:
+  - dupl
+  - goconst
+  - gocyclo
+  - gofmt
+  - goimports
+  - gosimple
+  - govet
+  - ineffassign
+  - lll
+  - misspell
+  - nakedret
+  - prealloc
+  - staticcheck
+  - typecheck
+  - unconvert
+  - unparam
+  - unused
+  - gocritic
+  # TODO: enable this later  - stylecheck
+  - errcheck
+  # TODO: enable this later - err113 # See: https://github.com/Djarvur/go-err113
+  # TODO: enable this later - errorlint # See: https://github.com/polyfloyd/go-errorlint
+  - wrapcheck # See: https://github.com/tomarrell/wrapcheck
+  - nilnil
+  - nilerr
+  - whitespace
+  - copyloopvar
+  - grouper
+linters-settings:
+  lll:
+    line-length: 140
+  staticcheck:
+    # SAxxxx checks in https://staticcheck.io/docs/configuration/options/#checks
+    # Default: ["*"]
+    checks: ["all"]
+  stylecheck:
+    # STxxxx checks in https://staticcheck.io/docs/configuration/options/#checks
+    # Default: ["*"]
+    checks: ["all"]
+    # https://staticcheck.io/docs/configuration/options/#dot_import_whitelist
+    # Default: ["github.com/mmcloughlin/avo/build", "github.com/mmcloughlin/avo/operand", "github.com/mmcloughlin/avo/reg"]
+    dot-import-whitelist:
+    - fmt
+    - github.com/onsi/gomega
+    - github.com/onsi/ginkgo/v2
+    # https://staticcheck.io/docs/configuration/options/#initialisms
+    # Default: ["ACL", "API", "ASCII", "CPU", "CSS", "DNS", "EOF", "GUID", "HTML", "HTTP", "HTTPS", "ID", "IP", "JSON", "QPS", "RAM", "RPC", "SLA", "SMTP", "SQL", "SSH", "TCP", "TLS", "TTL", "UDP", "UI", "GID", "UID", "UUID", "URI", "URL", "UTF8", "VM", "XML", "XMPP", "XSRF", "XSS", "SIP", "RTP", "AMQP", "DB", "TS"]
+    initialisms: ["ACL", "API", "ASCII", "CPU", "CSS", "DNS", "EOF", "GUID", "HTML",
+      "HTTP", "HTTPS", "IP", "JSON", "QPS", "RAM", "RPC", "SLA", "SMTP", "SQL", "SSH",
+      "TCP", "TLS", "TTL", "UDP", "UI", "GID", "UID", "UUID", "URI", "URL", "UTF8",
+      "VM", "XML", "XMPP", "XSRF", "XSS", "SIP", "RTP", "AMQP", "DB", "TS"]
+    # https://staticcheck.io/docs/configuration/options/#http_status_code_whitelist
+    # Default: ["200", "400", "404", "500"]
+    http-status-code-whitelist: ["200", "400", "404", "500"]
+# TODO: enable this later gocritic:
+# TODO: enable this later   enable-all: true

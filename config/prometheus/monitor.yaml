@@ -1,0 +1,23 @@
+# Copyright (c) 2025, 2026 IBM Corp.
+# SPDX-License-Identifier: Apache-2.0
+
+
+# Prometheus Monitor Service (Metrics)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    control-plane: spyre-operator
+  name: spyre-operator-metrics-monitor
+  namespace: system
+spec:
+  endpoints:
+  - path: /metrics
+    port: https
+    scheme: https
+    #      bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    tlsConfig:
+      insecureSkipVerify: true
+  selector:
+    matchLabels:
+      control-plane: spyre-operator

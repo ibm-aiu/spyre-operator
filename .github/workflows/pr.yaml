@@ -1,0 +1,55 @@
+# +-------------------------------------------------------------------+
+# | Copyright (c) 2025, 2026 IBM Corp.                                |
+# | SPDX-License-Identifier: Apache-2.0                               |
+# +-------------------------------------------------------------------+
+
+name: Pull Request Workflow
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions: read-all
+
+jobs:
+  pre-commit:
+    uses: ibm-aiu/spyre-operator-actions/.github/workflows/pre-commit.yaml@main
+
+  check-api-docs:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Check if api folder changed
+      id: check-api
+      run: |
+        if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q '^api/'; then
+          echo "api_changed=true" >> $GITHUB_OUTPUT
+        else
+          echo "api_changed=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Set up Go
+      if: steps.check-api.outputs.api_changed == 'true'
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: 'go.mod'
+
+    - name: Generate API docs
+      if: steps.check-api.outputs.api_changed == 'true'
+      run: make api-docs
+
+    - name: Check for uncommitted changes
+      if: steps.check-api.outputs.api_changed == 'true'
+      run: |
+        if ! git diff --exit-code docs/api/; then
+          echo "::error::API documentation is out of date. Please run 'make api-docs' and commit the changes."
+          exit 1
+        fi
+
+  unit-test:
+    needs: pre-commit
+    uses: ibm-aiu/spyre-operator-actions/.github/workflows/unit-test.yaml@main

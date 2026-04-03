@@ -1,0 +1,7 @@
+# Copyright (c) 2025, 2026 IBM Corp.
+# SPDX-License-Identifier: Apache-2.0
+resources:
+- certificate.yaml
+
+configurations:
+- kustomizeconfig.yaml
