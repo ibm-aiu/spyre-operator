@@ -15,6 +15,8 @@ const (
 	DeviceConfigFileNameKey = "CONFIG_FILENAME"
 	// MetricsContainerPathKey defines metrics file path at each container
 	MetricsContainerPathKey = "SPYRE_METRIC_FILEPATH"
+	// MetricsExportKey defines whether metric exporter enabled (true) or disabled (false)
+	MetricsExportKey = "SPYRE_METRIC_EXPORT"
 	// SpyreHealthSocketEnvKey defines socket path of health checker service
 	SpyreHealthSocketEnvKey = "SPYRE_HEALTH_SOCK"
 
