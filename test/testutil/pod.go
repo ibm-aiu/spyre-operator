@@ -505,12 +505,14 @@ func waitForEnvUpdate(ctx context.Context, k8sClientset *kubernetes.Clientset, n
 	}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
 }
 
-func CheckPodListFilesLog(ctx context.Context, k8sClient *kubernetes.Clientset, pod *v1.Pod, expectedTopologyFile bool) {
+func CheckPodListFilesLog(ctx context.Context, k8sClient *kubernetes.Clientset, pod *v1.Pod, expectedTopologyFile, expectedPodName bool) {
 	Eventually(func(g Gomega) { //nolint:dupl
 		log, err := GetPodLog(ctx, k8sClient, pod.Spec.Containers[0].Name, *pod)
 		g.Expect(err).To(BeNil())
-		found := strings.Contains(log, pod.Name)
-		g.Expect(found).To(BeTrue())
+		if expectedPodName {
+			found := strings.Contains(log, pod.Name)
+			g.Expect(found).To(BeTrue())
+		}
 		if !expectedTopologyFile {
 			// topology keyword: num_devices
 			// this keyword must not present in the other testing files.
