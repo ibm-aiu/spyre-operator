@@ -432,8 +432,6 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 			commonPaths := []string{
 				"/etc/aiu/senlib_config.json",
 				"/etc/aiu/resource_pool",
-				"/data/POD_NAME",
-				"/data/POD_NAMESPACE",
 			}
 			if expectedTopologyFile {
 				expectedPaths = []string{"/etc/aiu/topo.json"}
@@ -447,7 +445,7 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 			By("waiting for pod running")
 			WaitForPodRunning(ctx, k8sClientset, pod)
 			By("testing files must found")
-			CheckPodListFilesLog(ctx, k8sClientset, pod, expectedTopologyFile)
+			CheckPodListFilesLog(ctx, k8sClientset, pod, expectedTopologyFile, false)
 			By("deleting pod")
 			DeletePod(ctx, k8sClientset, pod)
 		},
@@ -741,8 +739,11 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 			expectedPaths := []string{
 				"/etc/ibm/spyre/senlib_config.json",
 				"/etc/ibm/spyre/resource_pool",
+				// TODO: remove the following two lines after merge updated device plugin
 				"/tmp/data/POD_NAME",
 				"/tmp/data/POD_NAMESPACE",
+				"/etc/ibm/spyre/POD_NAME",
+				"/etc/ibm/spyre/POD_NAMESPACE",
 			}
 			By("changing config/metrics path in the cluster policy")
 			clusterPolicy.Spec.DevicePlugin.ConfigPath = configPath
@@ -761,7 +762,7 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 			By("waiting for pod running")
 			WaitForPodRunning(ctx, k8sClientset, pod)
 			By("testing files must found")
-			CheckPodListFilesLog(ctx, k8sClientset, pod, false)
+			CheckPodListFilesLog(ctx, k8sClientset, pod, false, true)
 			By("deleting pod")
 			DeletePod(ctx, k8sClientset, pod)
 			By("reverting SpyreClusterPolicy")
