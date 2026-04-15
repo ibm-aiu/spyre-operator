@@ -215,6 +215,9 @@ func transformDevicePluginPath(obj *appsv1.DaemonSet, config *spyrev1alpha1.Spyr
 		setContainerEnv(&obj.Spec.Template.Spec.Containers[0],
 			spyreconst.MetricsContainerPathKey, config.MetricsExporter.MetricsPath)
 	}
+
+	setContainerEnv(&obj.Spec.Template.Spec.Containers[0],
+		spyreconst.MetricsExportKey, fmt.Sprintf("%v", config.MetricsExporter.Enabled))
 }
 
 // transformDevicePluginInitContainer transforms the init container for device plugin.

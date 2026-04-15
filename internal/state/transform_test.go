@@ -189,13 +189,13 @@ var _ = Describe("Transform", func() {
 		Expect(env).To(HaveLen(expectedEnvNum))
 		Expect(env[0].Name).To(Equal("IGNORE_EXTERNAL_METADATA"))
 		Expect(env[0].Value).To(Equal("true"), "without init container, must ignore external metadata")
-		if expectedEnvNum == 3 {
-			Expect(env[2].Name).To(Equal("P2PDMA"))
-			Expect(env[2].Value).To(Equal(expectedValue))
+		if expectedEnvNum == 4 {
+			Expect(env[3].Name).To(Equal("P2PDMA"))
+			Expect(env[3].Value).To(Equal(expectedValue))
 		}
 	},
-		Entry("P2PDMA=false", false, 2, ""),
-		Entry("P2PDMA=true", true, 3, "1"),
+		Entry("P2PDMA=false", false, 3, ""),
+		Entry("P2PDMA=true", true, 4, "1"),
 	)
 
 	Context("init container", func() {
@@ -400,6 +400,7 @@ var _ = Describe("Transform", func() {
 			cpSpec := &spyrev1alpha1.SpyreClusterPolicySpec{
 				MetricsExporter: spyrev1alpha1.MetricsExporterSpec{
 					MetricsPath: expectedMetricsPath,
+					Enabled:     true,
 				},
 				DevicePlugin: spyrev1alpha1.DevicePluginSpec{
 					DeviceConfigSpec: spyrev1alpha1.DeviceConfigSpec{
@@ -420,6 +421,9 @@ var _ = Describe("Transform", func() {
 			val, found = devicePluginEnvs[spyreconst.DeviceConfigFileNameKey]
 			Expect(found).To(BeTrue())
 			Expect(val).To(Equal(expectedConfigName))
+			val, found = devicePluginEnvs[spyreconst.MetricsExportKey]
+			Expect(found).To(BeTrue())
+			Expect(val).To(Equal("true"))
 			By("checking metrics exporter")
 			TransformMetricsExporter(metricsExporter, cpSpec, DefaultArchitecture)
 			exporterEnvs := make(map[string]string)
