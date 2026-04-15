@@ -34,7 +34,6 @@ repos:
   rev: v0.21.0
   hooks:
   - id: yamlfmt
-    exclude: ^\.github/workflows/
     args: ["-dstar", "-conf=.yamlfmt"]
 - repo: https://github.com/pre-commit/pre-commit-hooks
   rev: v6.0.0

@@ -1,14 +1,18 @@
 name: Test s390x Runner
 
-on: [push]
+on:
+  push:
+    branches: [main]
+    paths:
+    - ".github/workflows/end-to-end-test-s390x.yaml"
 
 jobs:
   test:
-    runs-on: self-hosted
+    runs-on: [self-hosted, linux, S390X]
 
     steps:
-      - name: Check architecture
-        run: uname -m
+    - name: Check architecture
+      run: uname -m
 
-      - name: Check OS
-        run: cat /etc/os-release
+    - name: Check OS
+      run: cat /etc/os-release
