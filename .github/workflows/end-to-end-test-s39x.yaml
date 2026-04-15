@@ -1,0 +1,14 @@
+name: Test s390x Runner
+
+on: [push]
+
+jobs:
+  test:
+    runs-on: [self-hosted, S390X]
+
+    steps:
+      - name: Check architecture
+        run: uname -m
+
+      - name: Check OS
+        run: cat /etc/os-release
