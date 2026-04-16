@@ -1,0 +1,39 @@
+name: Self-Hosted Hello World
+
+on:
+  workflow_dispatch:  # Allows manual triggering
+  push:  # Triggers on push to any branch
+  pull_request:  # Triggers on pull request to any branch
+
+jobs:
+  hello-world:
+    name: Hello World on Self-Hosted Runner
+    runs-on: [self-hosted, S390X]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Print Hello World
+        run: |
+          echo "=========================================="
+          echo "Hello World from Self-Hosted Runner!"
+          echo "=========================================="
+          echo "Runner name: $RUNNER_NAME"
+          echo "Runner OS: $RUNNER_OS"
+          echo "Runner architecture: $RUNNER_ARCH"
+          echo "Workspace: $GITHUB_WORKSPACE"
+          echo "Repository: $GITHUB_REPOSITORY"
+          echo "=========================================="
+      
+      - name: Display system information
+        run: |
+          echo "System Information:"
+          uname -a
+          echo ""
+          echo "Current directory:"
+          pwd
+          echo ""
+          echo "Current user:"
+          whoami
+
