@@ -739,9 +739,6 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 			expectedPaths := []string{
 				"/etc/ibm/spyre/senlib_config.json",
 				"/etc/ibm/spyre/resource_pool",
-				// TODO: remove the following two lines after merge updated device plugin
-				"/tmp/data/POD_NAME",
-				"/tmp/data/POD_NAMESPACE",
 				"/etc/ibm/spyre/POD_NAME",
 				"/etc/ibm/spyre/POD_NAMESPACE",
 			}
