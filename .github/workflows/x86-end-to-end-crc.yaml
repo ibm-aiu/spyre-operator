@@ -2,7 +2,8 @@ name: CRC Pipeline
 
 on:
   workflow_dispatch:
-
+  push:
+    branches: [ main ]
 jobs:
   crc:
     runs-on: ubuntu-latest
