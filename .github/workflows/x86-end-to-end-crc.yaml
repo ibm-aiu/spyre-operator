@@ -2,6 +2,9 @@ jobs:
   crc:
     runs-on: ubuntu-latest
 
+    on:
+      workflow_dispatch:
+
     steps:
     - name: Install dependencies
       run: |
