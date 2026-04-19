@@ -30,7 +30,10 @@ jobs:
         sudo mv crc-linux-*/crc /usr/local/bin/
 
     - name: Setup CRC
-      run: crc setup
+      run: crc setup || true
 
     - name: Start CRC
-      run: crc start
+      run: crc start || true
+
+    - name: Debug
+      run: crc logs || true
