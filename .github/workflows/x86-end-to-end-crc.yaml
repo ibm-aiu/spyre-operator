@@ -17,8 +17,18 @@ jobs:
         sudo apt install -y libvirt-daemon qemu-kvm
 
     - name: Install CRC
-      run: "curl -L -o crc.tar.xz https://developers.redhat.com/... \ntar -xvf crc.tar.xz\nsudo
-        mv crc /usr/local/bin/\n#magic___^_^___line\n"
+      run: |
+        curl -L -o crc.tar.xz https://mirror.openshift.com/pub/openshift-v4/clients/crc/latest/crc-linux-amd64.tar.xz
+
+    - name: Verify download
+      run: |
+        ls -lh crc.tar.xz
+
+    - name: Extract CRC
+      run: |
+        tar -xvf crc.tar.xz
+        sudo mv crc-linux-*/crc /usr/local/bin/
+
     - name: Setup CRC
       run: crc setup
 
