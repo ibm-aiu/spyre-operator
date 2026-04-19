@@ -8,35 +8,44 @@ jobs:
   crc:
     runs-on: ubuntu-latest
 
+    # steps:
+    # - name: Confirm new workflow
+    #   run: echo "NEW WORKFLOW RUNNING"
+    # - name: Install dependencies
+    #   run: |
+    #     sudo apt update
+    #     sudo apt install -y libvirt-daemon qemu-kvm
+
+    # - name: Install CRC
+    #   run: |
+    #     curl -L -o crc.tar.xz https://mirror.openshift.com/pub/openshift-v4/clients/crc/latest/crc-linux-amd64.tar.xz
+
+    # - name: Verify download
+    #   run: |
+    #     ls -lh crc.tar.xz
+
+    # - name: Extract CRC
+    #   run: |
+    #     tar -xvf crc.tar.xz
+    #     sudo mv crc-linux-*/crc /usr/local/bin/
+
+    # - name: Setup CRC
+    #   run: sudo crc setup || true
+    # - name: Force libvirt group
+    #   run: |
+    #     sudo usermod -aG libvirt $USER
+    #     sg libvirt -c "crc setup" || true
+    # - name: Start CRC
+    #   run: sudo crc start || true
+
+    # - name: Debug
+    #   run: crc logs || true
     steps:
-    - name: Confirm new workflow
-      run: echo "NEW WORKFLOW RUNNING"
-    - name: Install dependencies
-      run: |
-        sudo apt update
-        sudo apt install -y libvirt-daemon qemu-kvm
+      - uses: actions/checkout@v4
 
-    - name: Install CRC
-      run: |
-        curl -L -o crc.tar.xz https://mirror.openshift.com/pub/openshift-v4/clients/crc/latest/crc-linux-amd64.tar.xz
+      - name: Setup CRC via Action
+        uses: crc-org/crc-github-action@v1
+        with:
+          pull-secret: ${{ secrets.CRC_PULL_SECRET }}
+          preset: microshift   # or openshift / okd
 
-    - name: Verify download
-      run: |
-        ls -lh crc.tar.xz
-
-    - name: Extract CRC
-      run: |
-        tar -xvf crc.tar.xz
-        sudo mv crc-linux-*/crc /usr/local/bin/
-
-    - name: Setup CRC
-      run: sudo crc setup || true
-    - name: Force libvirt group
-      run: |
-        sudo usermod -aG libvirt $USER
-        sg libvirt -c "crc setup" || true
-    - name: Start CRC
-      run: sudo crc start || true
-
-    - name: Debug
-      run: crc logs || true
