@@ -3,19 +3,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Install dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y libvirt-daemon qemu-kvm
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y libvirt-daemon qemu-kvm
 
-      - name: Install CRC
-        run: |
-          curl -L -o crc.tar.xz https://developers.redhat.com/... 
-          tar -xvf crc.tar.xz
-          sudo mv crc /usr/local/bin/
+    - name: Install CRC
+      run: "curl -L -o crc.tar.xz https://developers.redhat.com/... \ntar -xvf crc.tar.xz\nsudo
+        mv crc /usr/local/bin/\n#magic___^_^___line\n"
+    - name: Setup CRC
+      run: crc setup
 
-      - name: Setup CRC
-        run: crc setup
-
-      - name: Start CRC
-        run: crc start
+    - name: Start CRC
+      run: crc start
