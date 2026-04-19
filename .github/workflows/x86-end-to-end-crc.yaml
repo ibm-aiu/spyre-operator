@@ -30,10 +30,13 @@ jobs:
         sudo mv crc-linux-*/crc /usr/local/bin/
 
     - name: Setup CRC
-      run: crc setup || true
-
+      run: sudo crc setup || true
+    - name: Force libvirt group
+      run: |
+        sudo usermod -aG libvirt $USER
+        sg libvirt -c "crc setup" || true
     - name: Start CRC
-      run: crc start || true
+      run: sudo crc start || true
 
     - name: Debug
       run: crc logs || true
