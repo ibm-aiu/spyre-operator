@@ -47,5 +47,5 @@ jobs:
         uses: crc-org/crc-github-action@v1
         with:
           pull-secret: ${{ secrets.CRC_PULL_SECRET }}
-          preset: microshift   # or openshift / okd
+          preset: openshift   # or openshift / okd
 
