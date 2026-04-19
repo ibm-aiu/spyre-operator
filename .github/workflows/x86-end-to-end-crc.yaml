@@ -1,9 +1,11 @@
+name: CRC Pipeline
+
+on:
+  workflow_dispatch:
+
 jobs:
   crc:
     runs-on: ubuntu-latest
-
-    on:
-      workflow_dispatch:
 
     steps:
     - name: Install dependencies
