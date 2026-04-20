@@ -48,4 +48,3 @@ jobs:
         with:
           pull-secret: ${{ secrets.CRC_PULL_SECRET }}
           preset: openshift   # or openshift / okd
-
