@@ -48,3 +48,11 @@ jobs:
         with:
           pull-secret: ${{ secrets.CRC_PULL_SECRET }}
           preset: openshift   # or openshift / okd
+
+      - name: Login to openshift
+        run: |
+          eval $(crc oc-env)
+          CREDS=$(crc console --credentials)
+          USER=$(echo "$CREDS" | awk '{print $1}')
+          PASS=$(echo "$CREDS" | awk '{print $2}')
+          oc login -u $USER -p $PASS https://api.crc.testing:6443 --insecure-skip-tls-verify
