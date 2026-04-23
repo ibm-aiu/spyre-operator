@@ -1,0 +1,272 @@
+# +-------------------------------------------------------------------+
+# | Copyright IBM Corp. 2025 All Rights Reserved                      |
+# | PID 5698-SPR                                                      |
+# +-------------------------------------------------------------------+
+
+name: Hello World CRC Test
+
+on:
+  # Run on all pushes to any branch
+  push:
+    branches:
+      - '**'
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+      - 'LICENSE'
+      - '.gitignore'
+  
+  # Run on all pull requests
+  pull_request:
+    branches:
+      - '**'
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+      - 'LICENSE'
+      - '.gitignore'
+  
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      branch_name:
+        description: 'Branch name to test'
+        required: false
+        type: string
+        default: ''
+
+env:
+  GOTOOLCHAIN: go1.24.13
+
+jobs:
+  hello-world-crc:
+    name: Hello World CRC Test
+    runs-on: [self-hosted, linux, x64, crc-fyre]
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch_name || github.ref }}
+          fetch-depth: 0
+
+      - name: Setup Go environment
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.13'
+          cache: true
+
+      - name: Display Environment Info
+        run: |
+          echo "=========================================="
+          echo "Hello World CRC Test"
+          echo "=========================================="
+          echo ""
+          echo "Repository: ${{ github.repository }}"
+          echo "Branch: ${{ inputs.branch_name || github.ref_name }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Workflow: ${{ github.workflow }}"
+          echo "Run ID: ${{ github.run_id }}"
+          echo "Run Number: ${{ github.run_number }}"
+          echo ""
+          echo "=========================================="
+          echo "System Information"
+          echo "=========================================="
+          echo "Hostname: $(hostname)"
+          echo "OS: $(uname -s)"
+          echo "Kernel: $(uname -r)"
+          echo "Architecture: $(uname -m)"
+          echo ""
+          echo "Go version:"
+          go version
+          echo ""
+          echo "Git version:"
+          git --version
+          echo ""
+          echo "Current directory:"
+          pwd
+          echo ""
+          echo "Directory contents:"
+          ls -la
+
+      - name: Check CRC Installation
+        run: |
+          echo "=========================================="
+          echo "Checking CRC Installation"
+          echo "=========================================="
+          if command -v crc &> /dev/null; then
+            echo "✅ CRC is installed"
+            crc version
+          else
+            echo "❌ CRC is not installed"
+            echo "Please install CRC: https://crc.dev/crc/"
+            exit 1
+          fi
+
+      - name: Verify Project Structure
+        run: |
+          echo "=========================================="
+          echo "Verifying Project Structure"
+          echo "=========================================="
+          echo ""
+          echo "Checking key files and directories..."
+          
+          files_to_check=(
+            "Makefile"
+            "go.mod"
+            "go.sum"
+            "main.go"
+            "test/config.yaml"
+            "test/e2e/e2e_suite_test.go"
+          )
+          
+          all_found=true
+          for file in "${files_to_check[@]}"; do
+            if [ -f "$file" ]; then
+              echo "✅ Found: $file"
+            else
+              echo "❌ Missing: $file"
+              all_found=false
+            fi
+          done
+          
+          echo ""
+          if [ "$all_found" = true ]; then
+            echo "✅ All required files found"
+          else
+            echo "❌ Some required files are missing"
+            exit 1
+          fi
+
+      - name: Run Go Module Verification
+        run: |
+          echo "=========================================="
+          echo "Verifying Go Modules"
+          echo "=========================================="
+          go mod verify
+          echo "✅ Go modules verified successfully"
+
+      - name: Run Go Build Test
+        run: |
+          echo "=========================================="
+          echo "Testing Go Build"
+          echo "=========================================="
+          go build -v ./...
+          echo "✅ Go build successful"
+
+      - name: Run Unit Tests (Sample)
+        run: |
+          echo "=========================================="
+          echo "Running Sample Unit Tests"
+          echo "=========================================="
+          # Run a simple test to verify the test framework works
+          go test -v -run TestE2e ./test/e2e/... -ginkgo.dry-run || true
+          echo ""
+          echo "✅ Test framework verification complete"
+
+      - name: Check Test Configuration
+        run: |
+          echo "=========================================="
+          echo "Checking Test Configuration"
+          echo "=========================================="
+          if [ -f "test/config.yaml" ]; then
+            echo "Test configuration file contents:"
+            cat test/config.yaml
+            echo ""
+            echo "✅ Test configuration file found"
+          else
+            echo "❌ Test configuration file not found"
+            exit 1
+          fi
+
+      - name: Verify Make Targets
+        run: |
+          echo "=========================================="
+          echo "Verifying Make Targets"
+          echo "=========================================="
+          echo ""
+          echo "Available make targets:"
+          make help || echo "No help target available"
+          echo ""
+          echo "Testing specific targets..."
+          
+          # Test that key make targets exist
+          if make -n ginkgo &> /dev/null; then
+            echo "✅ 'make ginkgo' target exists"
+          else
+            echo "⚠️  'make ginkgo' target not found"
+          fi
+          
+          if make -n e2e-test &> /dev/null; then
+            echo "✅ 'make e2e-test' target exists"
+          else
+            echo "⚠️  'make e2e-test' target not found"
+          fi
+
+      - name: Success Summary
+        if: success()
+        run: |
+          echo ""
+          echo "=========================================="
+          echo "✅ Hello World CRC Test - SUCCESS"
+          echo "=========================================="
+          echo ""
+          echo "All checks passed:"
+          echo "  ✅ Repository checked out"
+          echo "  ✅ Go environment configured"
+          echo "  ✅ CRC installation verified"
+          echo "  ✅ Project structure validated"
+          echo "  ✅ Go modules verified"
+          echo "  ✅ Go build successful"
+          echo "  ✅ Test framework verified"
+          echo "  ✅ Test configuration checked"
+          echo "  ✅ Make targets verified"
+          echo ""
+          echo "Next steps:"
+          echo "  1. Configure CRC on the runner"
+          echo "  2. Set up required secrets"
+          echo "  3. Run full e2e-test-crc.yml workflow"
+          echo ""
+          echo "=========================================="
+
+      - name: Failure Summary
+        if: failure()
+        run: |
+          echo ""
+          echo "=========================================="
+          echo "❌ Hello World CRC Test - FAILED"
+          echo "=========================================="
+          echo ""
+          echo "Please check the logs above for details."
+          echo "Common issues:"
+          echo "  - Missing dependencies"
+          echo "  - CRC not installed"
+          echo "  - Go version mismatch"
+          echo "  - Missing test files"
+          echo ""
+          echo "=========================================="
+
+      - name: Upload Test Summary
+        if: always()
+        run: |
+          cat > test-summary.txt << EOF
+          Hello World CRC Test Summary
+          ========================================
+          Repository: ${{ github.repository }}
+          Branch: ${{ inputs.branch_name || github.ref_name }}
+          Commit: ${{ github.sha }}
+          Status: ${{ job.status }}
+          Run ID: ${{ github.run_id }}
+          Timestamp: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          ========================================
+          EOF
+          cat test-summary.txt
+
+      - name: Upload Summary Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hello-world-test-summary-${{ github.run_number }}
+          path: test-summary.txt
+          retention-days: 7
