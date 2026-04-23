@@ -8,7 +8,7 @@ on:
 jobs:
   hello-world:
     name: Hello World on Self-Hosted Runner
-    runs-on: [self-hosted, S390X]
+    runs-on: [self-hosted, S390X, X64]
     
     steps:
       - name: Checkout code
