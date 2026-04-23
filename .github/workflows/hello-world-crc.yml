@@ -41,7 +41,7 @@ env:
 jobs:
   hello-world-crc:
     name: Hello World CRC Test
-    runs-on: [self-hosted, linux, x64, crc-fyre]
+    runs-on: [self-hosted, X64]
     timeout-minutes: 30
     
     steps:
