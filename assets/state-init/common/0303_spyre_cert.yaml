@@ -3,9 +3,25 @@
 # | PID 5698-SPR                                                      |
 # +-------------------------------------------------------------------+
 apiVersion: cert-manager.io/v1
-kind: Issuer
+kind: Certificate
 metadata:
-  name: spyre-selfsigned-issuer
+  name: spyre-cert
   namespace: "FILLED BY THE OPERATOR"
 spec:
-  selfSigned: {}
+  secretName: spyre-cert
+  duration: 8760h
+  renewBefore: 720h
+  commonName: spyre-components
+  isCA: false
+  privateKey:
+    algorithm: RSA
+    encoding: PKCS1
+    size: 2048
+  usages:
+  - digital signature
+  - key encipherment
+  - client auth
+  - server auth
+  issuerRef:
+    name: spyre-ca-issuer
+    kind: Issuer

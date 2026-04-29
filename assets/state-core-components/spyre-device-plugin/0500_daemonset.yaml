@@ -105,7 +105,7 @@ spec:
           readOnly: false
         - name: senlib-config-template
           mountPath: "/etc/senlib-config-template"
-        - name: spyre-device-plugin-cert
+        - name: spyre-cert
           mountPath: /etc/device-plugin/certs
           readOnly: true
         - name: crio-socket
@@ -136,9 +136,9 @@ spec:
       - name: senlib-config-template
         configMap:
           name: senlib-config-template
-      - name: spyre-device-plugin-cert
+      - name: spyre-cert
         secret:
-          secretName: spyre-device-plugin-cert
+          secretName: spyre-cert
           optional: true
       - name: crio-socket
         hostPath:
