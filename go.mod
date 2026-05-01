@@ -7,7 +7,7 @@ require (
 	github.com/go-logr/logr v1.4.3
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/onsi/ginkgo/v2 v2.28.1
-	github.com/onsi/gomega v1.39.1
+	github.com/onsi/gomega v1.40.0
 	github.com/openshift/api v0.0.0-20251217143335-482f1b56dcc4
 	github.com/openshift/cluster-nfd-operator v0.0.0-20250608084427-c57e91e1a0c8
 	github.com/openshift/secondary-scheduler-operator v0.0.0-20220308123520-e9a43b481448
