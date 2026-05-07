@@ -420,7 +420,7 @@ lint: golangci-lint vendor ## Run golangci-lint against code.
 
 .PHONY: lint-fix
 lint-fix: golangci-lint vendor ## Run golangci-lint against code.
-	$(GOLANGCI_LINT) run --fix --config $(REPO_ROOT)/.golangci.yaml --go $(GOLANG_VERSION)
+	$(GOLANGCI_LINT) run --fix --config $(REPO_ROOT)/.golangci.yaml
 
 .PHONY: vulcheck
 vulcheck: govulncheck ## Scan for golang vulnerabilities
