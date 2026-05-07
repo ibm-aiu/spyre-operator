@@ -102,19 +102,19 @@ func (c *StateController) Sync(ctx context.Context,
 	if !initSuccess {
 		return spyrev1alpha1.NotReady, fmt.Sprintf("%v", initMessage), nil
 	}
-	if !c.ClusterState.hasNFD {
+	if !c.hasNFD {
 		return spyrev1alpha1.NoNFD, "no node feature discovery labels", nil
 	}
-	if c.ClusterState.nodeArchitecture == "" {
+	if c.nodeArchitecture == "" {
 		return spyrev1alpha1.NoSpyreNodes, "no Spyre nodes found", nil
 	}
-	if err := c.SpyreNodeStateState.UpdateSpyreNodeStates(ctx, clusterPolicy); err != nil {
+	if err := c.UpdateSpyreNodeStates(ctx, clusterPolicy); err != nil {
 		message := fmt.Sprintf("failed to update SpyreNodeState: %v", err)
 		return spyrev1alpha1.NotReady, message, errors.New(message)
 	}
-	if !c.ClusterState.PseudoDeviceMode.Load() {
-		if !slices.Contains(supportedArchitectures, c.ClusterState.nodeArchitecture) {
-			message := fmt.Sprintf("%s unsupported. supported architectures: %v", c.ClusterState.nodeArchitecture, supportedArchitectures) //nolint:lll
+	if !c.PseudoDeviceMode.Load() {
+		if !slices.Contains(supportedArchitectures, c.nodeArchitecture) {
+			message := fmt.Sprintf("%s unsupported. supported architectures: %v", c.nodeArchitecture, supportedArchitectures) //nolint:lll
 			return spyrev1alpha1.NoSpyreNodes, message, errors.New(message)
 		}
 	}

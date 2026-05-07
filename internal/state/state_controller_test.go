@@ -72,7 +72,7 @@ var _ = Describe("StateController", Ordered, func() {
 			cm := transformAndSyncInit(stateController, ctx, cp)
 			Expect(cm.OwnerReferences[0].UID).To(BeEquivalentTo(firstUUID))
 			By("checking second uuid")
-			cp.ObjectMeta.UID = secondUUID
+			cp.UID = secondUUID
 			cm = transformAndSyncInit(stateController, ctx, cp)
 			Expect(cm.OwnerReferences[0].UID).To(BeEquivalentTo(secondUUID))
 			err := K8sClient.Delete(ctx, cm)
@@ -160,7 +160,7 @@ func newStateController(ctx context.Context) *StateController {
 
 func transformAndSyncInit(stateController *StateController,
 	ctx context.Context, cp *spyrev1alpha1.SpyreClusterPolicy) *corev1.ConfigMap {
-	namespace := stateController.ClusterState.OperatorNamespace
+	namespace := stateController.OperatorNamespace
 	overallStatus, message, err := stateController.InitState.TransformAndSync(ctx, cp, stateController.ClusterState)
 	Expect(overallStatus).To(BeTrue(), fmt.Sprintf("%v", message))
 	Expect(message).To(HaveLen(0))

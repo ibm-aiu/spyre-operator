@@ -15,7 +15,6 @@ import (
 	"strconv"
 
 	spyrev1alpha1 "github.com/ibm-aiu/spyre-operator/api/v1alpha1"
-	spyrev2 "github.com/ibm-aiu/spyre-operator/api/v1alpha1"
 	spyreconst "github.com/ibm-aiu/spyre-operator/const"
 	"github.com/ibm-aiu/spyre-operator/internal/state"
 	. "github.com/ibm-aiu/spyre-operator/internal/state"
@@ -25,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -176,10 +174,10 @@ var _ = Describe("ControlledComponent", Ordered, func() {
 			nodeName := "dummy"
 			By("creating dummy nodestate")
 			nodeState := &spyrev1alpha1.SpyreNodeState{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: nodeName,
 				},
-				Spec: spyrev2.SpyreNodeStateSpec{
+				Spec: spyrev1alpha1.SpyreNodeStateSpec{
 					Pcitopo: "topo",
 					SpyreInterfaces: []spyrev1alpha1.SpyreInterface{
 						{PciAddress: "00"}},

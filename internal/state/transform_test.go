@@ -748,7 +748,7 @@ var _ = Describe("Transform", func() {
 
 	DescribeTable("ApplyExperimentalModes",
 		func(existingEnv map[string]string, enabledModes []spyrev1alpha1.SpyreClusterPolicyExperimentalMode, expectedEnvLen int) {
-			containerEnv := []corev1.EnvVar{}
+			containerEnv := make([]corev1.EnvVar, 0, len(existingEnv))
 			for key, value := range existingEnv {
 				containerEnv = append(containerEnv, corev1.EnvVar{Name: key, Value: value})
 			}
