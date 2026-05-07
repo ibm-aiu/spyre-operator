@@ -1,6 +1,6 @@
 module github.com/ibm-aiu/spyre-operator
 
-go 1.24.13
+go 1.25.8
 
 require (
 	github.com/dustinkirkland/golang-petname v0.0.0-20240428194347-eebcea082ee0
