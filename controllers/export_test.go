@@ -20,5 +20,5 @@ func (rec *SpyreClusterPolicyReconciler) SetStateController(stateController *sta
 }
 
 func (rec *SpyreClusterPolicyReconciler) ApplyLogLevel(logLevel zapcore.Level) {
-	rec.stateController.ClusterState.SetLogLevel(logLevel)
+	rec.stateController.SetLogLevel(logLevel)
 }

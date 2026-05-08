@@ -23,7 +23,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,7 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (tc *TestCase) TestSinglePod(ctx context.Context, k8sClientset *kubernetes.Clientset, spyreV2Client client.Client, expectedAllocatedDevice []string, expectedPodPhase v1.PodPhase) {
+func (tc *TestCase) TestSinglePod(ctx context.Context, k8sClientset *kubernetes.Clientset, spyreV2Client client.Client, expectedAllocatedDevice []string, expectedPodPhase corev1.PodPhase) {
 	// create expectedAllocation
 	expectedAllocation := make(map[string]bool)
 	for _, dev := range expectedAllocatedDevice {
@@ -43,7 +42,7 @@ func (tc *TestCase) TestSinglePod(ctx context.Context, k8sClientset *kubernetes.
 	}
 	By("deploying pod")
 	testPods := BuildPods(1, tc.Prefix, tc.TestNamespace, tc.ResourceName, tc.Quantity, tc.NodeName, true)
-	deployedPods := deployPods(ctx, k8sClientset, testPods, map[v1.PodPhase]int{expectedPodPhase: 1})
+	deployedPods := deployPods(ctx, k8sClientset, testPods, map[corev1.PodPhase]int{expectedPodPhase: 1})
 	Expect(deployedPods).To(HaveLen(1))
 
 	By(fmt.Sprintf("checking Spyre node state, expect %v", expectedAllocatedDevice))
@@ -60,9 +59,9 @@ func (tc *TestCase) TestSinglePod(ctx context.Context, k8sClientset *kubernetes.
 	checkSpyreNodeState(ctx, spyreV2Client, map[string]bool{}, tc.NodeName)
 }
 
-func (tc *TestCase) TestNSpyrePfPod(ctx context.Context, k8sClientset *kubernetes.Clientset, spyreV2Client client.Client, n int, expectedPodPhase map[v1.PodPhase]int) {
+func (tc *TestCase) TestNSpyrePfPod(ctx context.Context, k8sClientset *kubernetes.Clientset, spyreV2Client client.Client, n int, expectedPodPhase map[corev1.PodPhase]int) {
 	// create expectedAllocation
-	expectedAdded := expectedPodPhase[v1.PodRunning] * int(tc.Quantity)
+	expectedAdded := expectedPodPhase[corev1.PodRunning] * int(tc.Quantity)
 	By("deploying pod")
 	testPods := BuildPods(n, tc.Prefix, tc.TestNamespace, tc.ResourceName, tc.Quantity, tc.NodeName, true)
 	deployedPods := deployPods(ctx, k8sClientset, testPods, expectedPodPhase)
@@ -81,9 +80,9 @@ func (tc *TestCase) TestNSpyrePfPod(ctx context.Context, k8sClientset *kubernete
 	checkSpyreNodeState(ctx, spyreV2Client, map[string]bool{}, tc.NodeName)
 }
 
-func (tc *MixedResourceTestCase) TestDeployPods(ctx context.Context, k8sClientset *kubernetes.Clientset, spyreV2Client client.Client, expectedPodPhase map[v1.PodPhase]int) []*v1.Pod {
+func (tc *MixedResourceTestCase) TestDeployPods(ctx context.Context, k8sClientset *kubernetes.Clientset, spyreV2Client client.Client, expectedPodPhase map[corev1.PodPhase]int) []*corev1.Pod {
 	By("building pods")
-	testPods := []*v1.Pod{}
+	testPods := []*corev1.Pod{}
 	requestIndex := 0
 	for request, n := range tc.Requests {
 		prefix := fmt.Sprintf("%s%d", tc.Prefix, requestIndex)
@@ -99,12 +98,12 @@ func (tc *MixedResourceTestCase) TestDeployPods(ctx context.Context, k8sClientse
 	return deployedPods
 }
 
-func (tc *MixedResourceTestCase) DeleteRunningPodAndExpectPendingRunIfExists(ctx context.Context, k8sClientset *kubernetes.Clientset, spyreV2Client client.Client, testPods []*v1.Pod, expectedPodPhase map[v1.PodPhase]int) ([]*v1.Pod, map[v1.PodPhase]int) {
-	remainingPods := []*v1.Pod{}
+func (tc *MixedResourceTestCase) DeleteRunningPodAndExpectPendingRunIfExists(ctx context.Context, k8sClientset *kubernetes.Clientset, spyreV2Client client.Client, testPods []*corev1.Pod, expectedPodPhase map[corev1.PodPhase]int) ([]*corev1.Pod, map[corev1.PodPhase]int) {
+	remainingPods := []*corev1.Pod{}
 	deleted := false
 	for _, testPod := range testPods {
 		pod, err := k8sClientset.CoreV1().Pods(testPod.Namespace).Get(ctx, testPod.Name, metav1.GetOptions{})
-		if !deleted && err == nil && pod.Status.Phase == v1.PodRunning {
+		if !deleted && err == nil && pod.Status.Phase == corev1.PodRunning {
 			By("deleting running pod")
 			err = k8sClientset.CoreV1().Pods(testPod.Namespace).Delete(ctx, testPod.Name, metav1.DeleteOptions{})
 			Expect(err).To(BeNil())
@@ -115,17 +114,17 @@ func (tc *MixedResourceTestCase) DeleteRunningPodAndExpectPendingRunIfExists(ctx
 	}
 	Expect(deleted).To(BeTrue())
 
-	_, found := expectedPodPhase[v1.PodRunning]
+	_, found := expectedPodPhase[corev1.PodRunning]
 	Expect(found).To(BeTrue())
-	if count, found := expectedPodPhase[v1.PodPending]; found && count > 0 {
-		expectedPodPhase[v1.PodPending] -= 1
-		if expectedPodPhase[v1.PodPending] == 0 {
-			delete(expectedPodPhase, v1.PodPending)
+	if count, found := expectedPodPhase[corev1.PodPending]; found && count > 0 {
+		expectedPodPhase[corev1.PodPending] -= 1
+		if expectedPodPhase[corev1.PodPending] == 0 {
+			delete(expectedPodPhase, corev1.PodPending)
 		}
 	} else {
-		expectedPodPhase[v1.PodRunning] -= 1
-		if expectedPodPhase[v1.PodRunning] == 0 {
-			delete(expectedPodPhase, v1.PodRunning)
+		expectedPodPhase[corev1.PodRunning] -= 1
+		if expectedPodPhase[corev1.PodRunning] == 0 {
+			delete(expectedPodPhase, corev1.PodRunning)
 		}
 	}
 	By(fmt.Sprintf("Checking pod phases %v", expectedPodPhase))
@@ -133,8 +132,8 @@ func (tc *MixedResourceTestCase) DeleteRunningPodAndExpectPendingRunIfExists(ctx
 	return remainingPods, expectedPodPhase
 }
 
-func BuildPods(n int, prefix string, namespace string, resourceName string, quantity int64, nodeName string, schedulerEnabled bool) []*v1.Pod {
-	pods := []*v1.Pod{}
+func BuildPods(n int, prefix string, namespace string, resourceName string, quantity int64, nodeName string, schedulerEnabled bool) []*corev1.Pod {
+	pods := []*corev1.Pod{}
 	for i := 0; i < n; i++ {
 		name := fmt.Sprintf("%s-%d", prefix, i)
 		if n == 1 {
@@ -147,7 +146,7 @@ func BuildPods(n int, prefix string, namespace string, resourceName string, quan
 	return pods
 }
 
-func deployPods(ctx context.Context, k8sClientset *kubernetes.Clientset, pods []*v1.Pod, expectedPodPhase map[v1.PodPhase]int) []*v1.Pod {
+func deployPods(ctx context.Context, k8sClientset *kubernetes.Clientset, pods []*corev1.Pod, expectedPodPhase map[corev1.PodPhase]int) []*corev1.Pod {
 	for _, pod := range pods {
 		Eventually(func(g Gomega) {
 			_, err := k8sClientset.CoreV1().Pods(pod.Namespace).Create(ctx, pod, metav1.CreateOptions{})
@@ -162,7 +161,7 @@ func deployPods(ctx context.Context, k8sClientset *kubernetes.Clientset, pods []
 	By("checking pod phases")
 	checkPodPhases(ctx, k8sClientset, pods, expectedPodPhase)
 
-	deployedPods := make([]*v1.Pod, len(pods))
+	deployedPods := make([]*corev1.Pod, len(pods))
 	for i, pod := range pods {
 		deployedPod, err := k8sClientset.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 		Expect(err).To(BeNil())
@@ -172,7 +171,7 @@ func deployPods(ctx context.Context, k8sClientset *kubernetes.Clientset, pods []
 	return deployedPods
 }
 
-func deletePods(ctx context.Context, k8sClientset *kubernetes.Clientset, pods []*v1.Pod) {
+func deletePods(ctx context.Context, k8sClientset *kubernetes.Clientset, pods []*corev1.Pod) {
 	for _, pod := range pods {
 		Eventually(func(g Gomega) {
 			err := k8sClientset.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
@@ -185,7 +184,7 @@ func deletePods(ctx context.Context, k8sClientset *kubernetes.Clientset, pods []
 }
 
 func GetSenlibConfig(ctx context.Context, k8sClientset *kubernetes.Clientset, name, namespace string) controllers.SenlibConfig {
-	req := k8sClientset.CoreV1().Pods(namespace).GetLogs(name, &v1.PodLogOptions{Container: "app"})
+	req := k8sClientset.CoreV1().Pods(namespace).GetLogs(name, &corev1.PodLogOptions{Container: "app"})
 	podLog, err := req.Stream(ctx)
 	Expect(err).To(BeNil())
 
@@ -217,7 +216,7 @@ func checkPodLog(ctx context.Context, k8sClientset *kubernetes.Clientset, name, 
 
 func checkPodsLogFromAllocationList(ctx context.Context, k8sClientset *kubernetes.Clientset, allocationList []spyrev1alpha1.Allocation) {
 	for _, allocation := range allocationList {
-		req := k8sClientset.CoreV1().Pods(allocation.Pod.Namespace).GetLogs(allocation.Pod.Name, &v1.PodLogOptions{Container: "app"})
+		req := k8sClientset.CoreV1().Pods(allocation.Pod.Namespace).GetLogs(allocation.Pod.Name, &corev1.PodLogOptions{Container: "app"})
 		podLog, err := req.Stream(ctx)
 		Expect(err).To(BeNil())
 
@@ -232,7 +231,7 @@ func checkPodsLogFromAllocationList(ctx context.Context, k8sClientset *kubernete
 	}
 }
 
-func GetPodsWithLabels(ctx context.Context, k8sClientset *kubernetes.Clientset, g Gomega, namespace, label string, nodeName string) []v1.Pod {
+func GetPodsWithLabels(ctx context.Context, k8sClientset *kubernetes.Clientset, g Gomega, namespace, label string, nodeName string) []corev1.Pod {
 	listOptions := metav1.ListOptions{
 		LabelSelector: label,
 	}
@@ -254,29 +253,29 @@ func EnsureDeletedPodWithLabels(ctx context.Context, k8sClientset *kubernetes.Cl
 	g.Expect(len(pods.Items)).To(Equal(0))
 }
 
-func BuildPod(name, namespace string, resourceName string, quantity int64, nodeName string, schedulerEnabled bool) *v1.Pod {
+func BuildPod(name, namespace string, resourceName string, quantity int64, nodeName string, schedulerEnabled bool) *corev1.Pod {
 	arg0 := "cat /etc/aiu/senlib_config.json;tail -f /dev/null"
 	return buildPod(name, namespace, resourceName, quantity, nodeName, arg0, schedulerEnabled)
 }
 
-func BuildMockUserPod(exporterPort int, testConfig TestConfig, name, namespace string, numOfSpyre int64, nodeName string) *v1.Pod {
-	var True bool = true
+func BuildMockUserPod(exporterPort int, testConfig TestConfig, name, namespace string, numOfSpyre int64, nodeName string) *corev1.Pod {
+	var True = true
 	copyData := "./user-copy.sh"
 	sleepAndRunGetMetric := fmt.Sprintf("sleep 20; curl http://%s.%s:%d; sleep 1000", metricsExporterName, OperatorNamespace, exporterPort)
 	arg0 := fmt.Sprintf("%s;%s", copyData, sleepAndRunGetMetric)
 	pod := buildPod(name, namespace, "ibm.com/spyre_pf", numOfSpyre, nodeName, arg0, true)
-	pod.Spec.RestartPolicy = v1.RestartPolicyOnFailure
+	pod.Spec.RestartPolicy = corev1.RestartPolicyOnFailure
 	pod.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{
 		Privileged: &True,
 	}
 	pod.Spec.Containers[0].Image = testConfig.ExporterMockUser.GetImage()
-	pod.Spec.Containers[0].ImagePullPolicy = v1.PullAlways
-	pod.Spec.DNSPolicy = v1.DNSClusterFirst
+	pod.Spec.Containers[0].ImagePullPolicy = corev1.PullAlways
+	pod.Spec.DNSPolicy = corev1.DNSClusterFirst
 	return pod
 }
 
-func BuildPodListFiles(name, namespace, resourceName string, paths []string, nodeName string, schedulerEnabled bool) *v1.Pod {
-	args := []string{}
+func BuildPodListFiles(name, namespace, resourceName string, paths []string, nodeName string, schedulerEnabled bool) *corev1.Pod {
+	args := make([]string, 0, len(paths))
 	for _, path := range paths {
 		args = append(args, fmt.Sprintf("while [ ! -f %s ]; do echo 'wait for %s';sleep 1; done; cat %s", path, path, path))
 	}
@@ -285,43 +284,43 @@ func BuildPodListFiles(name, namespace, resourceName string, paths []string, nod
 	return pod
 }
 
-func buildPod(name, namespace string, resourceName string, quantity int64, nodeName string, arg0 string, schedulerEnabled bool) *v1.Pod {
-	resourceRequest := make(v1.ResourceList)
-	resourceLimit := make(v1.ResourceList)
-	resourceRequest[v1.ResourceName(resourceName)] = *resource.NewQuantity(quantity, resource.DecimalSI)
-	resourceLimit[v1.ResourceName(resourceName)] = *resource.NewQuantity(quantity, resource.DecimalSI)
+func buildPod(name, namespace string, resourceName string, quantity int64, nodeName string, arg0 string, schedulerEnabled bool) *corev1.Pod {
+	resourceRequest := make(corev1.ResourceList)
+	resourceLimit := make(corev1.ResourceList)
+	resourceRequest[corev1.ResourceName(resourceName)] = *resource.NewQuantity(quantity, resource.DecimalSI)
+	resourceLimit[corev1.ResourceName(resourceName)] = *resource.NewQuantity(quantity, resource.DecimalSI)
 	annotations := make(map[string]string)
-	monitorVolume := v1.Volume{
+	monitorVolume := corev1.Volume{
 		Name: monitorVolumeName,
-		VolumeSource: v1.VolumeSource{
-			EmptyDir: &v1.EmptyDirVolumeSource{},
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
 		},
 	}
 	zeroGracePeriod := int64(0)
-	pod := &v1.Pod{
+	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
 			Namespace:   namespace,
 			Annotations: annotations,
 		},
-		Spec: v1.PodSpec{
+		Spec: corev1.PodSpec{
 			NodeSelector: map[string]string{"kubernetes.io/hostname": nodeName},
-			Containers: []v1.Container{
+			Containers: []corev1.Container{
 				{
 					Name:            "app",
 					Image:           containerTestImage,
-					ImagePullPolicy: v1.PullIfNotPresent,
+					ImagePullPolicy: corev1.PullIfNotPresent,
 					Command: []string{
 						"/bin/bash", "-c",
 					},
 					Args: []string{arg0},
-					Resources: v1.ResourceRequirements{
+					Resources: corev1.ResourceRequirements{
 						Requests: resourceRequest,
 						Limits:   resourceLimit,
 					},
 				},
 			},
-			Volumes:                       []v1.Volume{monitorVolume},
+			Volumes:                       []corev1.Volume{monitorVolume},
 			TerminationGracePeriodSeconds: &zeroGracePeriod,
 		},
 	}
@@ -331,12 +330,12 @@ func buildPod(name, namespace string, resourceName string, quantity int64, nodeN
 	return pod
 }
 
-func checkPodPhases(ctx context.Context, k8sClientset *kubernetes.Clientset, pods []*v1.Pod, expectedStateNum map[v1.PodPhase]int) {
+func checkPodPhases(ctx context.Context, k8sClientset *kubernetes.Clientset, pods []*corev1.Pod, expectedStateNum map[corev1.PodPhase]int) {
 	if len(expectedStateNum) > 0 {
 		namespace := pods[0].Namespace
 		By(fmt.Sprintf("Waiting for %v", expectedStateNum))
 		Eventually(func(g Gomega) {
-			count := make(map[v1.PodPhase]int)
+			count := make(map[corev1.PodPhase]int)
 			for _, pod := range pods {
 				pod, err := k8sClientset.CoreV1().Pods(namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 				g.Expect(err).To(BeNil())
@@ -347,8 +346,8 @@ func checkPodPhases(ctx context.Context, k8sClientset *kubernetes.Clientset, pod
 				message := getPodMessage(*pod)
 				By(fmt.Sprintf("Getting pod count: %s - %s %s", pod.Name, pod.Status.Phase, message))
 				if len(pod.OwnerReferences) > 0 {
-					g.Expect(pod.Status.Phase).NotTo(Equal(v1.PodFailed))
-				} else if pod.Status.Phase == v1.PodFailed {
+					g.Expect(pod.Status.Phase).NotTo(Equal(corev1.PodFailed))
+				} else if pod.Status.Phase == corev1.PodFailed {
 					By(fmt.Sprintf("recreating failed pod %s", pod.Name))
 					DeletePod(ctx, k8sClientset, pod)
 					recreatePod(ctx, k8sClientset, pod)
@@ -366,7 +365,7 @@ func checkPodPhases(ctx context.Context, k8sClientset *kubernetes.Clientset, pod
 	}
 }
 
-func recreatePod(ctx context.Context, k8sClientset *kubernetes.Clientset, pod *v1.Pod) {
+func recreatePod(ctx context.Context, k8sClientset *kubernetes.Clientset, pod *corev1.Pod) {
 	pod.ObjectMeta = metav1.ObjectMeta{
 		Name:      pod.Name,
 		Namespace: pod.Namespace,
@@ -377,25 +376,25 @@ func recreatePod(ctx context.Context, k8sClientset *kubernetes.Clientset, pod *v
 			annotations[key] = val
 		}
 	}
-	pod.ObjectMeta.Annotations = annotations
+	pod.Annotations = annotations
 	pod.Spec.NodeName = ""
 	_, err := k8sClientset.CoreV1().Pods(pod.Namespace).Create(ctx, pod, metav1.CreateOptions{})
 	Expect(err).To(BeNil())
 }
 
-func WaitForPodRunning(ctx context.Context, k8sClientset *kubernetes.Clientset, pod *v1.Pod) {
-	checkPodPhases(ctx, k8sClientset, []*v1.Pod{pod}, map[v1.PodPhase]int{v1.PodRunning: 1})
+func WaitForPodRunning(ctx context.Context, k8sClientset *kubernetes.Clientset, pod *corev1.Pod) {
+	checkPodPhases(ctx, k8sClientset, []*corev1.Pod{pod}, map[corev1.PodPhase]int{corev1.PodRunning: 1})
 }
 
-func printMessageIfPodNotRunning(pod v1.Pod) {
-	if pod.Status.Phase != v1.PodRunning {
+func printMessageIfPodNotRunning(pod corev1.Pod) {
+	if pod.Status.Phase != corev1.PodRunning {
 		if message := getPodMessage(pod); message != "" {
 			By(fmt.Sprintf("%s is %s: %s", pod.Name, pod.Status.Phase, message))
 		}
 	}
 }
 
-func getPodMessage(pod v1.Pod) string {
+func getPodMessage(pod corev1.Pod) string {
 	message := ""
 	if len(pod.Status.ContainerStatuses) > 0 {
 		if pod.Status.ContainerStatuses[0].State.Waiting != nil {
@@ -405,7 +404,7 @@ func getPodMessage(pod v1.Pod) string {
 	return message
 }
 
-func DeletePod(ctx context.Context, k8sClientset *kubernetes.Clientset, pod *v1.Pod) {
+func DeletePod(ctx context.Context, k8sClientset *kubernetes.Clientset, pod *corev1.Pod) {
 	err := k8sClientset.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
 	By(fmt.Sprintf("deleting pod %s/%s: %v", pod.Name, pod.Namespace, err))
 	if err != nil {
@@ -436,7 +435,7 @@ func DeletePodsWithLabels(ctx context.Context, k8sClientset *kubernetes.Clientse
 	return nil
 }
 
-func WaitForKeywordInPodLog(ctx context.Context, k8sClientset *kubernetes.Clientset, pod *v1.Pod, container string,
+func WaitForKeywordInPodLog(ctx context.Context, k8sClientset *kubernetes.Clientset, pod *corev1.Pod, container string,
 	getMetricKeyFuncs []func(namespace, name, nodeName string) string, nodeName string) {
 	for _, getMetricFunc := range getMetricKeyFuncs {
 		keyword := getMetricFunc(pod.Namespace, pod.Name, nodeName)
@@ -465,8 +464,8 @@ func WaitUntilNoPod(ctx context.Context, k8sClientset *kubernetes.Clientset, spy
 	}).WithTimeout(3 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
 }
 
-func GetPodLog(ctx context.Context, k8sClientset *kubernetes.Clientset, container string, pod v1.Pod) (string, error) {
-	req := k8sClientset.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, &v1.PodLogOptions{Container: container})
+func GetPodLog(ctx context.Context, k8sClientset *kubernetes.Clientset, container string, pod corev1.Pod) (string, error) {
+	req := k8sClientset.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, &corev1.PodLogOptions{Container: container})
 	podLog, err := req.Stream(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to get pod '%s/%s' log: %w", pod.Namespace, pod.Name, err)
@@ -505,7 +504,7 @@ func waitForEnvUpdate(ctx context.Context, k8sClientset *kubernetes.Clientset, n
 	}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
 }
 
-func CheckPodListFilesLog(ctx context.Context, k8sClient *kubernetes.Clientset, pod *v1.Pod, expectedTopologyFile, expectedPodName bool) {
+func CheckPodListFilesLog(ctx context.Context, k8sClient *kubernetes.Clientset, pod *corev1.Pod, expectedTopologyFile, expectedPodName bool) {
 	Eventually(func(g Gomega) { //nolint:dupl
 		log, err := GetPodLog(ctx, k8sClient, pod.Spec.Containers[0].Name, *pod)
 		g.Expect(err).To(BeNil())
@@ -530,7 +529,7 @@ func GetDevicePluginPod(ctx context.Context, k8sClientset *kubernetes.Clientset,
 
 func ExecCommand(ctx context.Context, config *rest.Config, clientset *kubernetes.Clientset, namespace, podName string, command []string) (string, error) {
 	req := clientset.CoreV1().RESTClient().Post().Resource("pods").Name(podName).Namespace(namespace).SubResource("exec").VersionedParams(
-		&v1.PodExecOptions{
+		&corev1.PodExecOptions{
 			Command: command,
 			Stdin:   false,
 			Stdout:  true,

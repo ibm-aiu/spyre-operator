@@ -261,7 +261,7 @@ func (s *DeploymentState) RemoveZombieAssets(ctx context.Context) int {
 }
 
 func getSkipUpdateComponentNames(skipComponents []spyrev1alpha1.Component) []string {
-	names := []string{}
+	names := make([]string, 0, len(skipComponents))
 	for _, component := range skipComponents {
 		name := componentToName[component]
 		names = append(names, name)

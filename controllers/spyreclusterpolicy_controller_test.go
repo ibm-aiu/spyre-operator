@@ -23,7 +23,6 @@ import (
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8Yaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/discovery"
@@ -200,7 +199,7 @@ var _ = Describe("SpyreclusterpolicyController", func() {
 					if shouldAccept {
 						Expect(err).To(BeNil())
 					} else {
-						Expect(err.(*apiErrors.StatusError).ErrStatus.Reason).Should(Equal(metav1.StatusReasonInvalid))
+						Expect(err.(*errors.StatusError).ErrStatus.Reason).Should(Equal(metav1.StatusReasonInvalid))
 					}
 				},
 				Entry("accept \"debug\"", "debug", true),

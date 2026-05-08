@@ -269,7 +269,7 @@ func GetPodFromDeployment(ctx context.Context, g Gomega, k8sClientset *kubernete
 func getDeployList(ctx context.Context, k8sClientset *kubernetes.Clientset, namespace string) []*appsv1.Deployment {
 	deployList, err := k8sClientset.AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{})
 	Expect(err).To(BeNil())
-	deploys := []*appsv1.Deployment{}
+	deploys := make([]*appsv1.Deployment, 0, len(deployList.Items))
 	for _, deployment := range deployList.Items {
 		deploys = append(deploys, deployment.DeepCopy())
 	}

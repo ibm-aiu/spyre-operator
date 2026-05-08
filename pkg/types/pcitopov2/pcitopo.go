@@ -17,8 +17,8 @@ import (
 )
 
 var (
-	OutOfExpectedTierErr = fmt.Errorf("some device is out of expected tier")
-	DeviceNotFoundErr    = fmt.Errorf("device not found in topology")
+	ErrOutOfExpectedTier = fmt.Errorf("some device is out of expected tier")
+	ErrDeviceNotFound    = fmt.Errorf("device not found in topology")
 )
 
 type Pcitopo struct {
@@ -79,7 +79,7 @@ func (t Pcitopo) ValidateTier(resourceName string, deviceIDs []string) error {
 	refDevice := deviceIDs[0]
 	deviceTopo, found := t.Devices[refDevice]
 	if !found {
-		return DeviceNotFoundErr
+		return ErrDeviceNotFound
 	}
 	tier1 := strings.HasSuffix(resourceName, spyreconst.TierOneResourceNameSuffix)
 	tier2 := strings.HasSuffix(resourceName, spyreconst.TierTwoResourceNameSuffix)
@@ -95,15 +95,15 @@ func (t Pcitopo) ValidateTier(resourceName string, deviceIDs []string) error {
 					continue
 				}
 			}
-			return OutOfExpectedTierErr
+			return ErrOutOfExpectedTier
 		}
-		return OutOfExpectedTierErr
+		return ErrOutOfExpectedTier
 	}
 	return nil
 }
 
 func (t Pcitopo) GetDevices() []string {
-	devices := []string{}
+	devices := make([]string, 0, len(t.Devices))
 	for device := range t.Devices {
 		devices = append(devices, device)
 	}
