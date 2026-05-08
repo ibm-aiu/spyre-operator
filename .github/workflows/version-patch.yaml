@@ -20,6 +20,9 @@ permissions:
   contents: write
   pull-requests: write
 
+env:
+  GOTOOLCHAIN: auto
+
 jobs:
   version-patch:
     uses: ibm-aiu/spyre-operator-actions/.github/workflows/version-patch.yaml@main
