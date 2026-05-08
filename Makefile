@@ -51,6 +51,7 @@ export TEST_CONFIG
 # Integration test configuration variables
 # This LABEL only runs operator related tests
 INTEGRATION_TEST_LABEL ?= "integration && !cardmgmt"
+E2E_TEST_LABEL ?= "e2e && !prep-deps"
 
 # detect-secrets
 DETECT_SECRETS_GIT ?= "https://github.com/ibm/detect-secrets.git@master\#egg=detect-secrets"
@@ -399,7 +400,7 @@ integration-test: ginkgo jq ensure-deps ## Run integration test on the cluster p
 e2e-test: ginkgo jq ensure-deps ## Run e2e test on the cluster pointed to in the current KUBECONFIG (expecting NFD instance running)
 	$(info TEST_CONFIG is set to $(TEST_CONFIG))
 	$(info E2E_KUBECONFIG is set to $(E2E_KUBECONFIG))
-	$(GINKGO) run --timeout=2h --label-filter="e2e" --cover --coverprofile=coverage-report.out -v ./test/e2e/...
+	$(GINKGO) run --timeout=2h --label-filter=$(E2E_TEST_LABEL) --cover --coverprofile=coverage-report.out -v ./test/e2e/...
 
 ##@ Development Targets
 

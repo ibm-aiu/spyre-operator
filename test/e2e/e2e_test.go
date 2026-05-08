@@ -587,7 +587,7 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 		})
 	})
 
-	Context("Metric exporter", Ordered, func() {
+	Context("Metric exporter", Label("prop-deps"), Ordered, func() {
 		ctx := context.Background()
 		mockUserContainer := "app"
 		getMetricsKeyFuncs := []func(namespace, name, nodeName string) string{
@@ -662,6 +662,8 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 	})
 
 	Context("Pod validator", Ordered, func() {
+		podName := "test-validator"
+
 		BeforeAll(func() {
 			By("enabling pod validator in the cluster policy")
 			clusterPolicy := &spyrev1alpha1.SpyreClusterPolicy{}
@@ -673,9 +675,7 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 		})
 
 		It("must allow valid pod creation", func() {
-			podName := "mock-user"
-			exporterPort := GetExporterPort(ctx, k8sClientset)
-			p := BuildMockUserPod(exporterPort, testConfig, podName, testNamespace, singleNumOfSpyre, targetNodeName)
+			p := BuildPod(podName, testNamespace, spyrePf, singleNumOfSpyre, targetNodeName, true)
 			By("creating pod")
 			_, err := k8sClientset.CoreV1().Pods(p.Namespace).Create(ctx, p, metav1.CreateOptions{})
 			Expect(err).To(BeNil())
@@ -687,10 +687,7 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 		})
 
 		It("must deny invalid pod creation (wrong schedulerName)", func() {
-			podName := "mock-user"
-			exporterPort := GetExporterPort(ctx, k8sClientset)
-			p := BuildMockUserPod(exporterPort, testConfig, podName, testNamespace, singleNumOfSpyre, targetNodeName)
-			p.Spec.SchedulerName = ""
+			p := BuildPod(podName, testNamespace, spyrePf, singleNumOfSpyre, targetNodeName, false)
 			By("creating pod")
 			_, err := k8sClientset.CoreV1().Pods(p.Namespace).Create(ctx, p, metav1.CreateOptions{})
 			Expect(err).NotTo(BeNil())
