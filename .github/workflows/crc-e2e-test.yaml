@@ -1,0 +1,296 @@
+# +-------------------------------------------------------------------+
+# | Copyright IBM Corp. 2025,2026                                     |
+# | SPDX-License-Identifier: Apache-2.0                               |
+# +-------------------------------------------------------------------+
+
+name: CRC End to End Test on amd64
+
+on:
+  push:
+  workflow_dispatch:
+    inputs:
+      branch-name:
+        description: "Branch name to checkout from spyre-operator repo"
+        required: false
+        type: string
+        default: "main"
+      registry:
+        description: 'Container registry to push to (e.g., ghcr.io, docker.io)'
+        required: false
+        type: string
+        default: 'ghcr.io/ibm-aiu'
+      operator-version:
+        description: "Operator version"
+        required: false
+        type: string
+      operator-channel:
+        description: "Operator channel"
+        required: false
+        type: string
+      device-plugin-tag:
+        description: "Device Plugin Image Tag to run in test"
+        required: false
+        type: string
+      scheduler-plugin-tag:
+        description: "Spyre scheduler plugin tag to run in test"
+        required: false
+        type: string
+      validator-tag:
+        description: "Spyre pod validator tag to run in test"
+        required: false
+        type: string
+      health-checker-tag:
+        description: "Spyre health checker tag to run in test"
+        required: false
+        type: string
+
+permissions: read-all
+
+jobs:
+  crc-test:
+    runs-on: ubuntu-latest
+    env:
+      REGISTRY: ${{ inputs.registry || 'ghcr.io/ibm-aiu' }}
+    steps:
+      - name: Set branch name
+        id: set-branch
+        run: |
+          # Use input value if provided (workflow_dispatch), otherwise use default
+          BRANCH_NAME="${{ inputs.branch-name }}"
+          
+          # Set default if empty
+          if [ -z "$BRANCH_NAME" ]; then
+            BRANCH_NAME="label-optional-test"
+          fi
+          
+          echo "branch-name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
+          echo "Using branch: ${BRANCH_NAME}"
+
+      - name: Checkout spyre-operator repository
+        uses: actions/checkout@v6
+        with:
+          repository: ibm-aiu/spyre-operator
+          ref: ${{ steps.set-branch.outputs.branch-name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set operator version and channel
+        id: set-params
+        run: |
+          # Use input values if provided (workflow_dispatch), otherwise use defaults (push)
+          OPERATOR_VERSION="${{ inputs.operator-version }}"
+          OPERATOR_CHANNEL="${{ inputs.operator-channel }}"
+          
+          # Set defaults if empty (for push events)
+          if [ -z "$OPERATOR_VERSION" ]; then
+            OPERATOR_VERSION="1.3.0-dev-amd64"
+          fi
+          
+          if [ -z "$OPERATOR_CHANNEL" ]; then
+            OPERATOR_CHANNEL="fast-v1.3"
+          fi
+          
+          echo "operator-version=${OPERATOR_VERSION}" >> $GITHUB_OUTPUT
+          echo "operator-channel=${OPERATOR_CHANNEL}" >> $GITHUB_OUTPUT
+          
+          echo "Using operator version: ${OPERATOR_VERSION}"
+          echo "Using operator channel: ${OPERATOR_CHANNEL}"
+
+      - name: Set component image tags
+        id: set-tags
+        run: |
+          # Use input values if provided (workflow_dispatch), otherwise use defaults (push)
+          DEVICE_PLUGIN_TAG="${{ inputs.device-plugin-tag }}"
+          FEATURE_DISCOVERY_TAG="${{ inputs.feature-discovery-tag }}"
+          SCHEDULER_PLUGIN_TAG="${{ inputs.scheduler-plugin-tag }}"
+          VALIDATOR_TAG="${{ inputs.validator-tag }}"
+          HEALTH_CHECKER_TAG="${{ inputs.health-checker-tag }}"
+          OPERATOR_TAG="${{ inputs.operator-tag }}"
+          
+          # Set defaults if empty (for push events) - using same version as operator
+          DEFAULT_VERSION="${{ steps.set-params.outputs.operator-version }}"
+          
+          if [ -z "$DEVICE_PLUGIN_TAG" ]; then
+            DEVICE_PLUGIN_TAG="${DEFAULT_VERSION}"
+          fi
+          
+          if [ -z "$SCHEDULER_PLUGIN_TAG" ]; then
+            SCHEDULER_PLUGIN_TAG="${DEFAULT_VERSION}"
+          fi
+          
+          if [ -z "$VALIDATOR_TAG" ]; then
+            VALIDATOR_TAG="${DEFAULT_VERSION}"
+          fi
+          
+          if [ -z "$HEALTH_CHECKER_TAG" ]; then
+            HEALTH_CHECKER_TAG="${DEFAULT_VERSION}"
+          fi
+
+          echo "device-plugin-tag=${DEVICE_PLUGIN_TAG}" >> $GITHUB_OUTPUT
+          echo "scheduler-plugin-tag=${SCHEDULER_PLUGIN_TAG}" >> $GITHUB_OUTPUT
+          echo "validator-tag=${VALIDATOR_TAG}" >> $GITHUB_OUTPUT
+          echo "health-checker-tag=${HEALTH_CHECKER_TAG}" >> $GITHUB_OUTPUT
+          
+          echo "Using device plugin tag: ${DEVICE_PLUGIN_TAG}"
+          echo "Using scheduler plugin tag: ${SCHEDULER_PLUGIN_TAG}"
+          echo "Using validator tag: ${VALIDATOR_TAG}"
+          echo "Using health checker tag: ${HEALTH_CHECKER_TAG}"
+
+      - name: Download scripts
+        run: |
+          curl -sSL -o patch-e2e-config.bash https://raw.githubusercontent.com/ibm-aiu/spyre-operator-actions/image-build/scripts/patch-e2e-config.bash
+          curl -sSL -o cature-logs.bash https://raw.githubusercontent.com/ibm-aiu/spyre-operator-actions/image-build/scripts/capture-logs.bash
+          chmod +x patch-e2e-config.bash
+          chmod +x cature-logs.bash
+
+      - name: Install Stern
+        run: |
+          #!/bin/bash -eu
+          
+          # Install stern for log capture
+          STERN_VERSION="1.30.0"
+          curl -L "https://github.com/stern/stern/releases/download/v${STERN_VERSION}/stern_${STERN_VERSION}_linux_amd64.tar.gz" -o stern.tar.gz
+          tar -xzf stern.tar.gz
+          sudo mv stern /usr/local/bin/
+          sudo chmod +x /usr/local/bin/stern
+          rm stern.tar.gz
+          
+          # Verify installation
+          stern --version
+
+      - name: End to end test prep
+        env:
+          DEVICE_PLUGIN_TAG: ${{ steps.set-tags.outputs.device-plugin-tag }}
+          SCHEDULER_PLUGIN_TAG: ${{ steps.set-tags.outputs.scheduler-plugin-tag }}
+          VALIDATOR_TAG: ${{ steps.set-tags.outputs.validator-tag }}
+          HEALTH_CHECKER_TAG: ${{ steps.set-tags.outputs.health-checker-tag }}
+          OPERATOR_TAG: ${{ steps.set-params.outputs.operator-version }}
+          BUNDLE_TAG: ${{ steps.set-params.outputs.operator-version }}
+          CATALOG_TAG: ${{ steps.set-params.outputs.operator-version }}
+          OPERTOR_CHANNEL: ${{ steps.set-params.outputs.operator-channel }}
+        run: |
+          #!/bin/bash -eu
+
+          # Patch e2e config
+          bash patch-e2e-config.bash
+          rm -f patch-e2e-config.bash
+
+          echo "End-to-End Config:"
+          echo "-------------------------------------------------------------------------------------------"
+          yq '.' test/config.yaml
+          echo "-------------------------------------------------------------------------------------------"
+
+      - name: Set up CRC
+        uses: crc-org/crc-github-action@v1
+        with:
+          preset: openshift
+          pull-secret: ${{ secrets.CRC_PULL_SECRET }}
+          memory: 15200
+          cpus: 16
+          disk: 128
+
+      - name: Update global pull secret for ghcr.io
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USERNAME: github.actor
+        run: |
+          # Create temporary files
+          GPS_FILE=$(mktemp)
+          REG_AUTH_FILE=$(mktemp -u)
+          NEW_GPS_FILE=$(mktemp)
+          AUTH_VALUE_FILE=$(mktemp)
+          
+          # Get current global pull secret
+          oc get secret/pull-secret -n openshift-config --template='{{index .data ".dockerconfigjson" | base64decode}}' > ${GPS_FILE}
+          
+          # Create registry auth
+          oc registry login --registry="${REGISTRY}" --auth-basic="${GHCR_USERNAME}:${GHCR_TOKEN}" --to=${REG_AUTH_FILE}
+          
+          # Extract auth value
+          cat ${REG_AUTH_FILE} | jq -r ".auths[\"${REGISTRY}\"].auth" > ${AUTH_VALUE_FILE}
+          
+          # Merge auth into global pull secret
+          jq ".auths |= .+ {\"${REGISTRY}\":{\"auth\": \"$(cat ${AUTH_VALUE_FILE})\"}}" < ${GPS_FILE} > ${NEW_GPS_FILE}
+          
+          # Update global pull secret
+          oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=${NEW_GPS_FILE}
+          # Clean up temporary files
+          rm -f ${GPS_FILE} ${REG_AUTH_FILE} ${NEW_GPS_FILE} ${AUTH_VALUE_FILE}
+          
+          echo "Global pull secret updated successfully"
+          touch stern.barrier
+
+      - name: Apply MachineConfig
+        timeout-minutes: 15
+        run: |
+          #!/bin/bash -eu
+          
+          oc get nodes --show-labels
+
+          echo "Apply MachineConfig"
+          # OKD/CRC uses node-role.kubernetes.io/worker label (with empty value)
+          # The CRC node has worker role, so we need to match that label
+          cat config/machineconfig/amd64/50-spyre-device-plugin-selinux-minimal.yaml | \
+            sed -e 's@machineconfiguration.openshift.io/role: worker@node-role.kubernetes.io/worker: ""@g' | \
+            oc apply -f -
+          
+          echo "Waiting for MachineConfig to be applied..."
+          sleep 180 # Wait for 180 seconds for initial processing
+          
+          # Wait for node to be Ready after applying the machine config
+          echo "Waiting for node to become Ready..."
+          timeout=900  # 15 minutes timeout
+          elapsed=0
+          while [ $elapsed -lt $timeout ]; do
+            # Try to get node status, handle errors gracefully
+            if node_status=$(oc get nodes -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null); then
+              if [ "$node_status" == "True" ]; then
+                echo "Node is Ready."
+                oc get nodes
+                break
+              else
+                echo "Node is not Ready yet. Status: $node_status. Retrying..."
+              fi
+            else
+              echo "Unable to query node status (cluster may be restarting). Retrying..."
+            fi
+            sleep 30
+            elapsed=$((elapsed + 30))
+          done
+
+          if [ $elapsed -ge $timeout ]; then
+            echo "Timeout waiting for node to become Ready"
+            oc get nodes || echo "Failed to get nodes"
+            exit 1
+          fi
+
+      - name: Run E2E tests with log capture
+        timeout-minutes: 45
+        run: |
+          #!/bin/bash -e
+
+          mkdir -p logs
+
+          # Start log capture in background, each component to a separate file
+          stern spyre-operator -n spyre-operator > logs/spyre-operator.log 2>&1 &
+          stern spyre-device-plugin -n spyre-operator > logs/spyre-device-plugin.log 2>&1 &
+          stern spyre-webhook-validator -n spyre-operator > logs/spyre-webhook-validator.log 2>&1 &
+          stern spyre-health-checker -n spyre-operator > logs/spyre-health-checker.log 2>&1 &
+          stern secondary-scheduler -n openshift-secondary-scheduler-operator > logs/secondary-scheduler.log 2>&1 &
+
+          # Run the actual tests
+          make e2e-test
+          E2E_EXIT=$?
+
+          # Stop log capture
+          kill $(jobs -p) 2>/dev/null || true
+          rm -f cature-logs.bash
+
+          exit ${E2E_EXIT}
+
+      - name: Upload component logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: component-logs
+          path: logs/
+          if-no-files-found: ignore
