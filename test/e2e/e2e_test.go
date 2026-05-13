@@ -979,8 +979,29 @@ func getPciTopoFromSpyreNodeState(ctx context.Context) (map[string]interface{}, 
 }
 
 func getNumDevices() int {
-	numDevices := len(allDeviceList)
-	return numDevices
+	// When health checker is enabled, we need to count only healthy devices
+	// Otherwise, return total device count
+	ctx := context.Background()
+	spyrens, err := GetSpyreNodeState(ctx, spyreV2Client, targetNodeName)
+	if err != nil {
+		// Fallback to total device count if we can't get node state
+		return len(allDeviceList)
+	}
+
+	// Count healthy devices
+	healthyCount := 0
+	for _, device := range spyrens.Spec.SpyreInterfaces {
+		if device.Health == spyrev1alpha1.SpyreHealthy {
+			healthyCount++
+		}
+	}
+
+	// If health checker is not reporting health status, return total count
+	if healthyCount == 0 {
+		return len(allDeviceList)
+	}
+
+	return healthyCount
 }
 
 func getDeviceList(ctx context.Context) (deviceList []string) {
