@@ -113,12 +113,46 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 			By("reverting to default modes")
 			enabledModes := DefaultModes()
 			UpdateModes(ctx, spyreV2Client, k8sClientset, len(nodeNames), enabledModes, testConfig.PseudoDeviceMode, spyrev1alpha1.Ready)
+
+			// Re-enable health checker and pod validator if they were enabled in test config
+			needsUpdate := false
+			clusterPolicy := &spyrev1alpha1.SpyreClusterPolicy{}
+			err := spyreV2Client.Get(ctx,
+				client.ObjectKey{Namespace: metav1.NamespaceAll, Name: ClusterPolicyName}, clusterPolicy)
+			Expect(err).To(BeNil())
+
+			if testConfig.HealthChecker.Enabled && !clusterPolicy.Spec.HealthChecker.Enabled {
+				By("re-enabling health checker")
+				clusterPolicy.Spec.HealthChecker.Enabled = true
+				needsUpdate = true
+			}
+			if testConfig.PodValidator.Enabled && !clusterPolicy.Spec.PodValidator.Enabled {
+				By("re-enabling pod validator")
+				clusterPolicy.Spec.PodValidator.Enabled = true
+				needsUpdate = true
+			}
+
+			if needsUpdate {
+				UpdateClusterPolicy(ctx, spyreV2Client, k8sClientset, clusterPolicy, len(nodeNames), spyrev1alpha1.Ready)
+			}
 		})
 
 		It("can set NoSpyreNodes state", func() {
 			if testConfig.HasDevice || !testConfig.PseudoDeviceMode {
 				Skip(requireNoDeviceSkipMessage)
 			}
+			// Disable health checker and pod validator before removing node labels
+			// Health checker requires nodes with ibm.com/spyre.present label to schedule pods
+			// Pod validator must be disabled to allow init state to complete quickly
+			By("disabling health checker and pod validator")
+			clusterPolicy := &spyrev1alpha1.SpyreClusterPolicy{}
+			err := spyreV2Client.Get(ctx,
+				client.ObjectKey{Namespace: metav1.NamespaceAll, Name: ClusterPolicyName}, clusterPolicy)
+			Expect(err).To(BeNil())
+			clusterPolicy.Spec.HealthChecker.Enabled = false
+			clusterPolicy.Spec.PodValidator.Enabled = false
+			UpdateClusterPolicy(ctx, spyreV2Client, k8sClientset, clusterPolicy, len(nodeNames), spyrev1alpha1.Ready)
+
 			CleanUpNode(ctx, k8sClientset, targetNodeName)
 			enabledModes := DefaultModes()
 			UpdateModes(ctx, spyreV2Client, k8sClientset, 0, enabledModes, false, spyrev1alpha1.NoSpyreNodes)
