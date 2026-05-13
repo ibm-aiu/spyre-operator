@@ -159,6 +159,17 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 		})
 
 		It("can use basic mode", func() {
+			// Disable health checker for basic mode test to ensure all devices are available
+			By("disabling health checker for basic mode test")
+			clusterPolicy := &spyrev1alpha1.SpyreClusterPolicy{}
+			err := spyreV2Client.Get(ctx,
+				client.ObjectKey{Namespace: metav1.NamespaceAll, Name: ClusterPolicyName}, clusterPolicy)
+			Expect(err).To(BeNil())
+			if clusterPolicy.Spec.HealthChecker.Enabled {
+				clusterPolicy.Spec.HealthChecker.Enabled = false
+				UpdateClusterPolicy(ctx, spyreV2Client, k8sClientset, clusterPolicy, len(nodeNames), spyrev1alpha1.Ready)
+			}
+
 			enabledModes := []spyrev1alpha1.SpyreClusterPolicyExperimentalMode{}
 			UpdateModes(ctx, spyreV2Client, k8sClientset, len(nodeNames), enabledModes, testConfig.PseudoDeviceMode, spyrev1alpha1.Ready)
 			By("gradually allocate 25 Spyres")
