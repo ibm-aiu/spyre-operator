@@ -464,7 +464,7 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 				}
 				tc.TestSinglePod(ctx, k8sClientset, spyreV2Client, expectedAllocatedDevices, expectedPodPhase)
 			},
-			Entry("no allocation - request all spyre_pf", func() string { return spyrePf }, getNumDevices, func() []string { return allDeviceList }, v1.PodRunning),
+			Entry("no allocation - request all spyre_pf", func() string { return spyrePf }, getNumDevices, func() []string { return getHealthyDeviceList() }, v1.PodRunning),
 			Entry("no allocation - request specific pf", func() string { return specificPf }, func() int { return 1 }, func() []string { return specificDeviceList }, v1.PodRunning),
 		)
 
@@ -1027,6 +1027,32 @@ func getDeviceList(ctx context.Context) (deviceList []string) {
 		deviceList = append(deviceList, device)
 	}
 	return deviceList
+}
+
+// getHealthyDeviceList returns only healthy devices when health checker is enabled
+// Otherwise returns all devices
+func getHealthyDeviceList() []string {
+	ctx := context.Background()
+	spyrens, err := GetSpyreNodeState(ctx, spyreV2Client, targetNodeName)
+	if err != nil {
+		// Fallback to all devices if we can't get node state
+		return allDeviceList
+	}
+
+	// Build list of healthy devices
+	healthyDevices := []string{}
+	for _, device := range spyrens.Spec.SpyreInterfaces {
+		if device.Health == spyrev1alpha1.SpyreHealthy {
+			healthyDevices = append(healthyDevices, device.PciAddress)
+		}
+	}
+
+	// If no health status reported, return all devices
+	if len(healthyDevices) == 0 {
+		return allDeviceList
+	}
+
+	return healthyDevices
 }
 
 func commonAllocationTestCase(ctx context.Context, testNamespace string, schedulerEnabled bool) {
