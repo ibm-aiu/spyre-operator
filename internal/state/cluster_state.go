@@ -75,7 +75,7 @@ func (s *ClusterState) Sync(ctx context.Context, clusterPolicy *spyrev1alpha1.Sp
 	}
 	s.PseudoDeviceMode.Store(clusterPolicy.Spec.ExperimentalModeEnabled(spyrev1alpha1.PseudoDeviceMode))
 	// Node labeling (ibm.com/spyre.present) is handled by NodeLabelerReconciler on node/policy events, not on policy reconcile.
-	hasNFD, nodeArchitecture, err := s.Labeler.GetClusterSpyreLabelInfo(ctx, s.k8sClient)
+	hasNFD, nodeArchitecture, err := s.GetClusterSpyreLabelInfo(ctx, s.k8sClient)
 	if err != nil {
 		return fmt.Errorf("failed to get cluster Spyre label info: %w", err)
 	}
@@ -92,7 +92,7 @@ func (s *ClusterState) Sync(ctx context.Context, clusterPolicy *spyrev1alpha1.Sp
 
 func (s *ClusterState) Clear(ctx context.Context) error {
 	if s.PseudoDeviceMode.Load() {
-		err := s.Labeler.RemoveSpyreNodesLabels(ctx, s.k8sClient)
+		err := s.RemoveSpyreNodesLabels(ctx, s.k8sClient)
 		if err != nil {
 			return fmt.Errorf("failed to remove Spyre labels: %w", err)
 		}
@@ -201,7 +201,7 @@ func ocpEnsureNamespaceMonitoring(ctx context.Context, k8sClient client.Client, 
 		return fmt.Errorf("could not get Namespace %s from client: %w", operatorNamespace, err)
 	}
 
-	val, ok := ns.ObjectMeta.Labels[ocpNamespaceMonitoringLabelKey]
+	val, ok := ns.Labels[ocpNamespaceMonitoringLabelKey]
 	if ok {
 		// label already defined, do not change it
 		var msg string
@@ -222,7 +222,7 @@ func ocpEnsureNamespaceMonitoring(ctx context.Context, k8sClient client.Client, 
 
 	// label not defined, enable monitoring
 	patch := client.MergeFrom(ns.DeepCopy())
-	ns.ObjectMeta.Labels[ocpNamespaceMonitoringLabelKey] = ocpNamespaceMonitoringLabelValue
+	ns.Labels[ocpNamespaceMonitoringLabelKey] = ocpNamespaceMonitoringLabelValue
 	err = k8sClient.Patch(ctx, ns, patch)
 	if err != nil {
 		logger.Error(err, "unable to label namespace for the Spyre Operator monitoring", "namespace", operatorNamespace)

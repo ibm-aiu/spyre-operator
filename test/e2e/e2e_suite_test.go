@@ -16,7 +16,6 @@ import (
 
 	spyrev1alpha1 "github.com/ibm-aiu/spyre-operator/api/v1alpha1"
 	"github.com/ibm-aiu/spyre-operator/test/testutil"
-	testutils "github.com/ibm-aiu/spyre-operator/test/testutil"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	nfdv1alpha1 "github.com/openshift/cluster-nfd-operator/api/v1alpha1"
@@ -39,7 +38,7 @@ var spyreV2Client client.Client
 var nodeNames []string
 var targetNodeName string
 var nodeArchitecture string
-var testConfig testutils.TestConfig
+var testConfig testutil.TestConfig
 
 func TestE2e(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -52,8 +51,8 @@ var _ = BeforeSuite(func() {
 
 	ctx := context.Background()
 
-	kubeconfig, ok := os.LookupEnv(testutils.KubeConfigFilePathKey)
-	Expect(ok).To(BeTrue(), "%s must be set", testutils.KubeConfigFilePathKey)
+	kubeconfig, ok := os.LookupEnv(testutil.KubeConfigFilePathKey)
+	Expect(ok).To(BeTrue(), "%s must be set", testutil.KubeConfigFilePathKey)
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	Expect(err).To(BeNil())
 
@@ -78,10 +77,10 @@ var _ = BeforeSuite(func() {
 	Expect(err).To(BeNil())
 	err = spyrev1alpha1.AddToScheme(scheme)
 	Expect(err).To(BeNil())
-	nodeNames = testutils.GetWorkerNodeNames(ctx, k8sClientset)
+	nodeNames = testutil.GetWorkerNodeNames(ctx, k8sClientset)
 	Expect(len(nodeNames)).Should(BeNumerically(">=", 1))
 
-	testConfig = testutils.LoadTestConfig()
+	testConfig = testutil.LoadTestConfig()
 	if testConfig.NodeName != "" {
 		for _, nodeName := range nodeNames {
 			if nodeName == testConfig.NodeName {
@@ -105,17 +104,17 @@ var _ = BeforeSuite(func() {
 	By(setMsg)
 
 	By("uninstalling the operator if already installed")
-	testutils.UninstallOperator(ctx, k8sClientset, dynClient, spyreV2Client, testConfig.HasDevice, nodeNames)
+	testutil.UninstallOperator(ctx, k8sClientset, dynClient, spyreV2Client, testConfig.HasDevice, nodeNames)
 
 	By("installing operator")
-	testutils.InstallOperator(ctx, testConfig, k8sClientset, dynClient)
+	testutil.InstallOperator(ctx, testConfig, k8sClientset, dynClient)
 
 	By("deploying cluster policy")
 	enabledModes := DefaultModes()
 	if testConfig.PseudoDeviceMode {
 		enabledModes = append(enabledModes, spyrev1alpha1.PseudoDeviceMode)
 	}
-	testutils.DeployClusterPolicy(ctx, testConfig, k8sClientset, spyreV2Client,
+	testutil.DeployClusterPolicy(ctx, testConfig, k8sClientset, spyreV2Client,
 		enabledModes, "", len(nodeNames))
 
 	By("force second scheduler Pod to pull image")
@@ -126,7 +125,7 @@ var _ = BeforeSuite(func() {
 
 var _ = AfterSuite(func() {
 	ctx := context.Background()
-	testutils.UninstallOperator(ctx, k8sClientset, dynClient, spyreV2Client, testConfig.HasDevice, nodeNames)
+	testutil.UninstallOperator(ctx, k8sClientset, dynClient, spyreV2Client, testConfig.HasDevice, nodeNames)
 })
 
 func DefaultModes() []spyrev1alpha1.SpyreClusterPolicyExperimentalMode {

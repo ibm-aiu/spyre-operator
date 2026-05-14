@@ -62,7 +62,7 @@ func (r *NodeLabelerReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 func (r *NodeLabelerReconciler) pseudoDeviceModeFromPolicy(ctx context.Context) bool {
 	list := &spyrev1alpha1.SpyreClusterPolicyList{}
-	if err := r.Client.List(ctx, list); err != nil {
+	if err := r.List(ctx, list); err != nil {
 		log.FromContext(ctx).WithName("node-labeler").Error(err, "failed to list SpyreClusterPolicies; defaulting pseudoMode=false")
 		return false
 	}
