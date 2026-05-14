@@ -32,6 +32,9 @@ on:
 permissions:
   contents: write
 
+env:
+  GOTOOLCHAIN: auto
+
 jobs:
   create-release:
     uses: ibm-aiu/spyre-operator-actions/.github/workflows/create-release.yaml@main
