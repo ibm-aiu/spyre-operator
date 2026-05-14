@@ -5,8 +5,7 @@
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
-  name: spyre-device-plugin-issuer
+  name: root-issuer
   namespace: "FILLED BY THE OPERATOR"
 spec:
-  ca:
-    secretName: spyre-ca-secret
+  selfSigned: {}
