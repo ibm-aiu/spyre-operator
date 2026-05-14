@@ -103,7 +103,7 @@ var _ = Describe("StateController", Ordered, func() {
 					cm := transformAndSyncInit(stateController, ctx, cp)
 					By("removing zombie")
 					deletedCount := stateController.RemoveZombieAssets(ctx)
-					Expect(deletedCount).To(Equal(3)) // config map + feature rule + non-root scc
+					Expect(deletedCount).To(Equal(7)) // config map + feature rule + non-root scc + 4 TLS cert resources
 					namespacedName := types.NamespacedName{Name: cm.GetName(), Namespace: cm.GetNamespace()}
 					Eventually(func(g Gomega) {
 						err := K8sClient.Get(ctx, namespacedName, cm)
@@ -141,7 +141,7 @@ var _ = Describe("StateController", Ordered, func() {
 				Expect(err).To(BeNil())
 				By("removing zombie (without owner)")
 				deletedCount = stateController.RemoveZombieAssets(ctx)
-				Expect(deletedCount).To(Equal(3))
+				Expect(deletedCount).To(Equal(7)) // config map + feature rule + non-root scc + 4 TLS cert resources
 			})
 		})
 	})
