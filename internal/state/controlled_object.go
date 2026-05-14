@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 
+	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/go-logr/logr"
 	spyrev1alpha1 "github.com/ibm-aiu/spyre-operator/api/v1alpha1"
 	spyreconst "github.com/ibm-aiu/spyre-operator/const"
@@ -48,6 +49,8 @@ var (
 		"SecurityContextConstraints":     NewSecurityContextConstraints,
 		"PrometheusRule":                 NewPrometheusRule,
 		"ServiceMonitor":                 NewServiceMonitor,
+		"Issuer":                         NewIssuer,
+		"Certificate":                    NewCertificate,
 		"SecondaryScheduler":             NewSecondScheduler,
 		"ValidatingWebhookConfiguration": NewValidatingWebhookConfiguration,
 		"NodeFeatureRule":                NewNodeFeatureRule,
@@ -1112,6 +1115,86 @@ func (obj *ServiceMonitor) Fetch(ctx context.Context,
 func (obj *ServiceMonitor) Sync(ctx context.Context,
 	k8sClient client.Client) (client.Object, error) {
 	getObj := &promv1.ServiceMonitor{}
+	namespacedName := types.NamespacedName{Name: obj.loadedObj.Name, Namespace: obj.loadedObj.Namespace}
+	err := k8sClient.Get(ctx, namespacedName, getObj)
+	if err != nil {
+		return nil, err //nolint:wrapcheck
+	}
+	obj.syncOwners(&getObj.ObjectMeta)
+	getObj.Spec = obj.loadedObj.Spec
+	return getObj, nil
+}
+
+// Issuer
+type Issuer struct {
+	*DefaultControlledObject
+	loadedObj *certmanagerv1.Issuer
+}
+
+func NewIssuer(defaultObj *DefaultControlledObject,
+	runtimeObj runtime.Object, targetNamespace string) (ControlledObject, error) {
+	if obj, ok := runtimeObj.(*certmanagerv1.Issuer); ok {
+		obj.Namespace = defaultObj.Namespace
+		defaultObj.Object = obj
+		return &Issuer{
+			DefaultControlledObject: defaultObj,
+			loadedObj:               obj,
+		}, nil
+	}
+	return nil, spyreerr.ErrParseFile
+}
+
+func (obj *Issuer) Fetch(ctx context.Context,
+	k8sClient client.Client) (client.Object, error) {
+	fetchObj := &certmanagerv1.Issuer{}
+	namespacedName := types.NamespacedName{Name: obj.loadedObj.Name, Namespace: obj.loadedObj.Namespace}
+	err := k8sClient.Get(ctx, namespacedName, fetchObj)
+	return fetchObj, err //nolint:wrapcheck
+}
+
+func (obj *Issuer) Sync(ctx context.Context,
+	k8sClient client.Client) (client.Object, error) {
+	getObj := &certmanagerv1.Issuer{}
+	namespacedName := types.NamespacedName{Name: obj.loadedObj.Name, Namespace: obj.loadedObj.Namespace}
+	err := k8sClient.Get(ctx, namespacedName, getObj)
+	if err != nil {
+		return nil, err //nolint:wrapcheck
+	}
+	obj.syncOwners(&getObj.ObjectMeta)
+	getObj.Spec = obj.loadedObj.Spec
+	return getObj, nil
+}
+
+// Certificate
+type Certificate struct {
+	*DefaultControlledObject
+	loadedObj *certmanagerv1.Certificate
+}
+
+func NewCertificate(defaultObj *DefaultControlledObject,
+	runtimeObj runtime.Object, targetNamespace string) (ControlledObject, error) {
+	if obj, ok := runtimeObj.(*certmanagerv1.Certificate); ok {
+		obj.Namespace = defaultObj.Namespace
+		defaultObj.Object = obj
+		return &Certificate{
+			DefaultControlledObject: defaultObj,
+			loadedObj:               obj,
+		}, nil
+	}
+	return nil, spyreerr.ErrParseFile
+}
+
+func (obj *Certificate) Fetch(ctx context.Context,
+	k8sClient client.Client) (client.Object, error) {
+	fetchObj := &certmanagerv1.Certificate{}
+	namespacedName := types.NamespacedName{Name: obj.loadedObj.Name, Namespace: obj.loadedObj.Namespace}
+	err := k8sClient.Get(ctx, namespacedName, fetchObj)
+	return fetchObj, err //nolint:wrapcheck
+}
+
+func (obj *Certificate) Sync(ctx context.Context,
+	k8sClient client.Client) (client.Object, error) {
+	getObj := &certmanagerv1.Certificate{}
 	namespacedName := types.NamespacedName{Name: obj.loadedObj.Name, Namespace: obj.loadedObj.Namespace}
 	err := k8sClient.Get(ctx, namespacedName, getObj)
 	if err != nil {

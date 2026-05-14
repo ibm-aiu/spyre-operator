@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	spyrev1alpha1 "github.com/ibm-aiu/spyre-operator/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -80,6 +81,8 @@ var _ = BeforeSuite(func() {
 	err = appsv1.AddToScheme(testScheme)
 	Expect(err).NotTo(HaveOccurred())
 	err = nfdv1alpha1.AddToScheme(testScheme)
+	Expect(err).To(BeNil())
+	err = certmanagerv1.AddToScheme(testScheme)
 	Expect(err).To(BeNil())
 	K8sClient, err = client.New(Cfg, client.Options{Scheme: testScheme})
 	Expect(err).NotTo(HaveOccurred())

@@ -1,0 +1,27 @@
+# +-------------------------------------------------------------------+
+# | Copyright IBM Corp. 2025 All Rights Reserved                      |
+# | PID 5698-SPR                                                      |
+# +-------------------------------------------------------------------+
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: spyre-device-plugin-cert
+  namespace: "FILLED BY THE OPERATOR"
+spec:
+  secretName: spyre-device-plugin-cert
+  duration: 8760h
+  renewBefore: 720h
+  commonName: spyre-device-plugin
+  isCA: false
+  privateKey:
+    algorithm: RSA
+    encoding: PKCS1
+    size: 2048
+  usages:
+  - digital signature
+  - key encipherment
+  - client auth
+  - server auth
+  issuerRef:
+    name: spyre-device-plugin-issuer
+    kind: Issuer

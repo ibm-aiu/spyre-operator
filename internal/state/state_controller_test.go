@@ -153,6 +153,8 @@ func newStateController(ctx context.Context) *StateController {
 	spyrev1alpha1.AddToScheme(controllerScheme)
 	nfdv1alpha1.AddToScheme(controllerScheme)
 	secv1.AddToScheme(controllerScheme)
+	err := InitializeScheme(controllerScheme)
+	Expect(err).To(BeNil())
 	stateController, err := NewStateController(ctx, Cfg, controllerScheme)
 	Expect(err).To(BeNil())
 	return stateController
