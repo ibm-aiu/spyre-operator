@@ -428,13 +428,16 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 				expectedTopologyFile = false
 			}
 			resourceName := resourceNameFunc()
-			var expectedPaths []string
 			commonPaths := []string{
 				"/etc/aiu/senlib_config.json",
 				"/etc/aiu/resource_pool",
 			}
+			var expectedPaths []string
 			if expectedTopologyFile {
-				expectedPaths = []string{"/etc/aiu/topo.json"}
+				expectedPaths = make([]string, 0, len(commonPaths)+1)
+				expectedPaths = append(expectedPaths, "/etc/aiu/topo.json")
+			} else {
+				expectedPaths = make([]string, 0, len(commonPaths))
 			}
 			expectedPaths = append(expectedPaths, commonPaths...)
 

@@ -11,6 +11,9 @@ on:
 
 permissions: read-all
 
+env:
+  GOTOOLCHAIN: auto
+
 jobs:
   pre-commit:
     uses: ibm-aiu/spyre-operator-actions/.github/workflows/pre-commit.yaml@main
@@ -40,6 +43,8 @@ jobs:
 
     - name: Generate API docs
       if: steps.check-api.outputs.api_changed == 'true'
+      env:
+        GOTOOLCHAIN: auto
       run: make api-docs
 
     - name: Check for uncommitted changes

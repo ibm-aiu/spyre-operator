@@ -59,7 +59,7 @@ func UninstallOperator(ctx context.Context, k8sClientset *kubernetes.Clientset, 
 	By("deleting cluster policy")
 	err := spyreV2Client.Delete(ctx, clusterPolicy, &client.DeleteOptions{})
 	target := &apiutil.ErrResourceDiscoveryFailed{}
-	if !(apiErrors.IsNotFound(err) || errors.As(err, &target) || meta.IsNoMatchError(err)) {
+	if !apiErrors.IsNotFound(err) && !errors.As(err, &target) && !meta.IsNoMatchError(err) {
 		result = multierror.Append(result, err)
 	}
 	err = spyreV2Client.Get(ctx, types.NamespacedName{Name: ClusterPolicyName, Namespace: OperatorNamespace}, clusterPolicy)
@@ -118,7 +118,7 @@ func UninstallOperator(ctx context.Context, k8sClientset *kubernetes.Clientset, 
 	By("deleting Spyre operator CRDs")
 	for _, spyreCrd := range spyreCrds {
 		if err := DeleteResource(ctx, dynClient, metav1.NamespaceAll, spyreCrd, customresourcedefinitionResource); err != nil &&
-			!(apiErrors.IsNotFound(err) || meta.IsNoMatchError(err)) {
+			(!apiErrors.IsNotFound(err) && !meta.IsNoMatchError(err)) {
 			result = multierror.Append(result, err)
 		}
 	}

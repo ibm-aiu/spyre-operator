@@ -126,7 +126,7 @@ func (s *SpyreNodeStateState) createSpyreNodeState(ctx context.Context,
 			return fmt.Errorf("failed to create SpyreNodeState: %w", err)
 		}
 		nodeStateMap[node.Name] = *nodeState
-	} else if len(nodeState.ObjectMeta.OwnerReferences) == 0 {
+	} else if len(nodeState.OwnerReferences) == 0 {
 		if err := controllerutil.SetControllerReference(clusterPolicy, &nodeState, s.scheme); err != nil {
 			return fmt.Errorf("failed to set controller reference for SpyreNodeState: %w", err)
 		}

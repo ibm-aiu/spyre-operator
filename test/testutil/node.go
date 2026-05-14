@@ -64,18 +64,18 @@ func CleanUpNode(ctx context.Context, k8sClientset *kubernetes.Clientset, nodeNa
 			newLabel[key] = value
 		}
 	}
-	node.ObjectMeta.Labels = newLabel
+	node.Labels = newLabel
 	_, err = k8sClientset.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{})
 	Expect(err).To(BeNil())
 }
 
 func GetSpyreWorkerNodeNames(ctx context.Context, k8sClientset *kubernetes.Clientset) []string {
-	nodeNames := make([]string, 0)
 	labelSelector := fmt.Sprintf("%s,%s", spyreWorkerNodeLabel, workerNodeLabel)
 	nodeList, err := k8sClientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
 	Expect(err).To(BeNil())
 	Expect(nodeList).ToNot(BeNil())
 	Expect(nodeList.Items).ToNot(BeEmpty())
+	nodeNames := make([]string, 0, len(nodeList.Items))
 	for _, node := range nodeList.Items {
 		nodeNames = append(nodeNames, node.Name)
 	}

@@ -83,7 +83,7 @@ func (r *SpyreClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	// Fetch the SpyreClusterPolicyinstance
 	instance := &spyrev1alpha1.SpyreClusterPolicy{}
-	err := r.Client.Get(ctx, req.NamespacedName, instance)
+	err := r.Get(ctx, req.NamespacedName, instance)
 	if apierrors.IsNotFound(err) {
 		// Request object not found, could have been deleted after reconcile request.
 		// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
@@ -111,7 +111,7 @@ func (r *SpyreClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.R
 	if isDeleted {
 		if controllerutil.ContainsFinalizer(instance, SpyreClusterPolicyFinalizer) {
 			controllerutil.RemoveFinalizer(instance, SpyreClusterPolicyFinalizer)
-			err := r.Client.Update(ctx, instance)
+			err := r.Update(ctx, instance)
 			if err != nil {
 				return ctrl.Result{Requeue: true}, fmt.Errorf("failed to update cluster policy finalizers: %w", err)
 			}
@@ -165,7 +165,7 @@ func (r *SpyreClusterPolicyReconciler) addWatchNewSpyreNode(ctx context.Context,
 
 		for _, cp := range list.Items {
 			cpToRec = append(cpToRec, reconcile.Request{NamespacedName: types.NamespacedName{
-				Name:      cp.ObjectMeta.GetName(),
+				Name:      cp.GetName(),
 				Namespace: metav1.NamespaceAll,
 			}})
 		}
@@ -267,13 +267,13 @@ func (r *SpyreClusterPolicyReconciler) SetupWithManager(ctx context.Context, cfg
 func (r *SpyreClusterPolicyReconciler) updateCRState(ctx context.Context, namespacedName types.NamespacedName, state spyrev1alpha1.State, message string) error {
 	// Fetch latest instance and update state to avoid version mismatch
 	instance := &spyrev1alpha1.SpyreClusterPolicy{}
-	err := r.Client.Get(ctx, namespacedName, instance)
+	err := r.Get(ctx, namespacedName, instance)
 	if err != nil {
 		return fmt.Errorf("failed to get cluster policy: %w", err)
 	}
 
 	// Update the CR state
-	instance.SetStatus(state, r.stateController.ClusterState.OperatorNamespace, message)
+	instance.SetStatus(state, r.stateController.OperatorNamespace, message)
 	err = r.Client.Status().Update(ctx, instance)
 	if err != nil {
 		return fmt.Errorf("failed to update spyre cluster policy status: %w", err)
@@ -305,7 +305,7 @@ func processOverallStatus(ctx context.Context,
 
 func (r *SpyreClusterPolicyReconciler) GetLogLevel() zapcore.Level {
 	if r.stateController != nil {
-		return r.stateController.ClusterState.GetLogLevel()
+		return r.stateController.GetLogLevel()
 	}
 	return zapcore.InfoLevel
 }

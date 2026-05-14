@@ -17,7 +17,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -25,7 +24,7 @@ import (
 // control-plane nodes.
 // note: This function may leave puller Pods, and therefore caller must use CleanupForcePullPods() in DeferCleanup().
 func ForcePullLatestSchedulerImage(ctx context.Context, k8sClientset *kubernetes.Clientset, schedImage string) {
-	nodes, err := k8sClientset.CoreV1().Nodes().List(ctx, v1.ListOptions{
+	nodes, err := k8sClientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{
 		LabelSelector: "node-role.kubernetes.io/worker",
 	})
 	Expect(err).To(BeNil())
@@ -37,7 +36,7 @@ func ForcePullLatestSchedulerImage(ctx context.Context, k8sClientset *kubernetes
 			continue
 		}
 		pod := &corev1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "force-sched-image-puller-",
 				Namespace:    "default",
 				Labels: map[string]string{
@@ -59,13 +58,13 @@ func ForcePullLatestSchedulerImage(ctx context.Context, k8sClientset *kubernetes
 				RestartPolicy: corev1.RestartPolicyNever,
 			},
 		}
-		_, err := k8sClientset.CoreV1().Pods("default").Create(ctx, pod, v1.CreateOptions{})
+		_, err := k8sClientset.CoreV1().Pods("default").Create(ctx, pod, metav1.CreateOptions{})
 		Expect(err).To(BeNil())
 	}
 	DeferCleanup(CleanupForcePullPods, ctx, k8sClientset)
 
 	Eventually(func(g Gomega) {
-		pods, err := k8sClientset.CoreV1().Pods("default").List(ctx, v1.ListOptions{
+		pods, err := k8sClientset.CoreV1().Pods("default").List(ctx, metav1.ListOptions{
 			LabelSelector: "app=" + schedForcePullPodLabel,
 		})
 
@@ -83,7 +82,7 @@ func ForcePullLatestSchedulerImage(ctx context.Context, k8sClientset *kubernetes
 func CleanupForcePullPods(ctx context.Context, k8sClientset *kubernetes.Clientset) {
 	By("Cleaning up image-puller pods")
 	Eventually(func(g Gomega) {
-		pods, err := k8sClientset.CoreV1().Pods("default").List(ctx, v1.ListOptions{
+		pods, err := k8sClientset.CoreV1().Pods("default").List(ctx, metav1.ListOptions{
 			LabelSelector: "app=" + schedForcePullPodLabel,
 		})
 		g.Expect(err).To(BeNil())
@@ -92,7 +91,7 @@ func CleanupForcePullPods(ctx context.Context, k8sClientset *kubernetes.Clientse
 			err = k8sClientset.CoreV1().Pods("default").Delete(ctx, pod.Name, metav1.DeleteOptions{})
 			g.Expect(err).To(BeNil())
 		}
-		pods, err = k8sClientset.CoreV1().Pods("default").List(ctx, v1.ListOptions{
+		pods, err = k8sClientset.CoreV1().Pods("default").List(ctx, metav1.ListOptions{
 			LabelSelector: "app=" + schedForcePullPodLabel,
 		})
 		g.Expect(err).To(BeNil())
