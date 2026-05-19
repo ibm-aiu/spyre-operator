@@ -25,7 +25,7 @@ COPY pkg/ pkg/
 COPY internal/ internal/
 ARG BUILD_FLAGS=""
 
-ENV GOTOOLCHAIN="1.25.10"
+ENV GOTOOLCHAIN="auto"
 
 RUN echo "TARGETARCH = '${TARGETARCH}' TARGETOS='${TARGETOS}'" && \
     echo "GO ENV DUMP: " && go env GOVERSION && go env GOTOOLDIR && \
