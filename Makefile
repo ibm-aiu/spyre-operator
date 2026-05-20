@@ -422,7 +422,7 @@ build: generate vendor ## Build local binary
 
 .PHONY: lint
 lint: golangci-lint vendor ## Run golangci-lint against code.
-	$(GOLANGCI_LINT) run --sort-results --config $(REPO_ROOT)/.golangci.yaml --go $(GOLANG_VERSION)
+	$(GOLANGCI_LINT) run --config $(REPO_ROOT)/.golangci.yaml
 
 .PHONY: lint-fix
 lint-fix: golangci-lint vendor ## Run golangci-lint against code.

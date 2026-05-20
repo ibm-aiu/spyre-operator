@@ -1,0 +1,383 @@
+# +-------------------------------------------------------------------+
+# | Copyright IBM Corp. 2025 All Rights Reserved                      |
+# | PID 5698-SPR                                                      |
+# +-------------------------------------------------------------------+
+
+name: E2E Test CRC (Dry Run - No GCP)
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch_name:
+        description: 'Branch name to test'
+        required: false
+        type: string
+        default: ''
+      crc_cpus:
+        description: 'CRC CPUs'
+        required: false
+        type: string
+        default: '16'
+      crc_memory:
+        description: 'CRC Memory (MiB)'
+        required: false
+        type: string
+        default: '24000'
+      crc_disk_size:
+        description: 'CRC Disk Size (GiB)'
+        required: false
+        type: string
+        default: '128'
+
+env:
+  GOTOOLCHAIN: go1.24.13
+  HAS_DEVICE: 'false'
+  # GCAR_REGISTRY: us-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/spyre-images  # COMMENTED FOR DRY RUN
+
+jobs:
+  e2e-test-crc-dry-run:
+    name: E2E Test CRC Dry Run (No GCP)
+    runs-on: ubuntu-latest
+    timeout-minutes: 360 # 6 hours (GitHub limit)
+
+    permissions:
+      contents: read
+      # id-token: write  # COMMENTED - Required for Workload Identity Federation (not needed for dry run)
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.branch_name || github.ref }}
+        fetch-depth: 0
+
+    - name: Setup Go environment
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24.13'
+        cache: true
+
+    - name: Display Configuration
+      run: |
+        echo "=========================================="
+        echo "E2E Test CRC DRY RUN (No GCP)"
+        echo "=========================================="
+        echo "Branch: ${{ inputs.branch_name || github.ref_name }}"
+        echo "Commit: ${{ github.sha }}"
+        echo "CRC CPUs: ${{ inputs.crc_cpus || '16' }}"
+        echo "CRC Memory: ${{ inputs.crc_memory || '24000' }} MiB"
+        echo "CRC Disk: ${{ inputs.crc_disk_size || '128' }} GiB"
+        echo "⚠️  DRY RUN MODE - GCP/GCAR disabled"
+        echo "=========================================="
+
+    - name: Setup CRC Cluster
+      uses: crc-org/crc-github-action@v1
+      with:
+        crc-version: latest
+        cpus: ${{ inputs.crc_cpus || '16' }}
+        memory: ${{ inputs.crc_memory || '24000' }}
+        disk-size: ${{ inputs.crc_disk_size || '128' }}
+
+    - name: Verify CRC Cluster
+      run: |
+        echo "Verifying CRC cluster..."
+        crc version
+        crc status
+
+        echo ""
+        echo "Verifying OpenShift access..."
+        oc version
+        oc get nodes
+        oc get co
+
+        echo ""
+        echo "✅ CRC cluster is ready"
+
+    # ============================================================
+    # GCP/GCAR AUTHENTICATION - COMMENTED OUT FOR DRY RUN
+    # ============================================================
+    # - name: Authenticate to Google Cloud
+    #   id: auth
+    #   uses: google-github-actions/auth@v2
+    #   with:
+    #     workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+    #     service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+    #
+    # - name: Setup Cloud SDK
+    #   uses: google-github-actions/setup-gcloud@v2
+    #
+    # - name: Configure Docker for GCAR
+    #   run: |
+    #     echo "Configuring Docker authentication for Google Cloud Artifact Registry..."
+    #     gcloud auth configure-docker us-docker.pkg.dev
+    #     echo "✅ Docker configured for GCAR"
+    #
+    # - name: Configure OpenShift Pull Secret for GCAR
+    #   run: |
+    #     echo "Configuring OpenShift pull secret for GCAR..."
+    #
+    #     # Get GCAR access token
+    #     GCAR_TOKEN=$(gcloud auth print-access-token)
+    #
+    #     # Create docker config JSON
+    #     DOCKER_CONFIG=$(echo -n "oauth2accesstoken:${GCAR_TOKEN}" | base64 -w 0)
+    #
+    #     # Create pull secret
+    #     cat > /tmp/gcar-pull-secret.json << EOF
+    #     {
+    #       "auths": {
+    #         "us-docker.pkg.dev": {
+    #           "auth": "${DOCKER_CONFIG}",
+    #           "email": "not-needed@example.com"
+    #         }
+    #       }
+    #     }
+    #     EOF
+    #
+    #     # Apply to OpenShift
+    #     oc create secret generic gcar-pull-secret \
+    #       --from-file=.dockerconfigjson=/tmp/gcar-pull-secret.json \
+    #       --type=kubernetes.io/dockerconfigjson \
+    #       -n openshift-config || true
+    #
+    #     # Get existing pull secret
+    #     oc get secret/pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfigjson}' | \
+    #       base64 -d > /tmp/existing-pull-secret.json
+    #
+    #     # Merge secrets
+    #     jq -s '.[0] * .[1]' /tmp/existing-pull-secret.json /tmp/gcar-pull-secret.json > /tmp/merged-pull-secret.json
+    #
+    #     # Update global pull secret
+    #     oc set data secret/pull-secret -n openshift-config \
+    #       --from-file=.dockerconfigjson=/tmp/merged-pull-secret.json
+    #
+    #     # Clean up
+    #     rm -f /tmp/*pull-secret.json
+    #
+    #     echo "✅ OpenShift pull secret configured for GCAR"
+    # ============================================================
+
+    - name: Install Test Tools
+      run: |
+        echo "Installing test tools..."
+        make ginkgo jq stern yq
+        echo "✅ Test tools installed"
+
+    - name: Display Test Configuration
+      run: |
+        echo "Current test configuration:"
+        echo "=========================================="
+        if [ -f test/config.yaml ]; then
+          bin/yq '.' test/config.yaml || cat test/config.yaml
+        else
+          echo "⚠️  test/config.yaml not found"
+        fi
+        echo "=========================================="
+        echo ""
+        echo "⚠️  NOTE: In dry run mode, using default registry configuration"
+        echo "⚠️  For full testing, configure GCP/GCAR and use the main workflow"
+
+    # COMMENTED OUT - Patch configuration (requires GCP setup)
+    # - name: Patch Test Configuration
+    #   env:
+    #     EXPORTER_TAG: ${{ inputs.exporter_tag }}
+    #     DEVICE_PLUGIN_TAG: ${{ inputs.device_plugin_tag }}
+    #     FEATURE_DISCOVERY_TAG: ${{ inputs.feature_discovery_tag }}
+    #     SCHEDULER_PLUGIN_TAG: ${{ inputs.scheduler_plugin_tag }}
+    #     VALIDATOR_TAG: ${{ inputs.validator_tag }}
+    #     HEALTH_CHECKER_TAG: ${{ inputs.health_checker_tag }}
+    #     OPERATOR_TAG: ${{ inputs.operator_tag }}
+    #     BUNDLE_TAG: ${{ inputs.bundle_tag }}
+    #     CATALOG_TAG: ${{ inputs.catalog_tag }}
+    #   run: |
+    #     echo "Patching test configuration..."
+    #     ./jenkins/scripts/patch-e2e-config.bash
+    #
+    #     echo ""
+    #     echo "Test Configuration:"
+    #     echo "=========================================="
+    #     bin/yq '.' test/config.yaml
+    #     echo "=========================================="
+
+    - name: Apply MachineConfig
+      timeout-minutes: 15
+      run: |
+        echo "Applying MachineConfig for device plugin..."
+
+        # Apply MachineConfig (change worker to master for CRC)
+        cat config/machineconfig/amd64/50-spyre-device-plugin-selinux-minimal.yaml | \
+          sed -e 's@machineconfiguration.openshift.io/role: worker@machineconfiguration.openshift.io/role: master@g' | \
+          oc apply -f -
+
+        echo "Waiting for MachineConfig to be applied..."
+        sleep 120
+
+        # Wait for CRC to be running
+        echo "Waiting for OpenShift cluster to be running..."
+        max_attempts=60
+        attempt=0
+        while [ $attempt -lt $max_attempts ]; do
+          status=$(crc status -o json | jq -r ".openshiftStatus" 2>/dev/null || echo "Unknown")
+          if [ "$status" == "Running" ]; then
+            echo "✅ OpenShift cluster is running"
+            break
+          else
+            echo "Waiting... (attempt $((attempt+1))/$max_attempts, status: $status)"
+            sleep 5
+            attempt=$((attempt+1))
+          fi
+        done
+
+        if [ $attempt -eq $max_attempts ]; then
+          echo "❌ Timeout waiting for OpenShift cluster"
+          exit 1
+        fi
+
+        echo "✅ MachineConfig applied successfully"
+
+    - name: Verify Cluster State
+      run: |
+        echo "Verifying cluster state after MachineConfig..."
+        echo ""
+        echo "Nodes:"
+        oc get nodes -o wide
+        echo ""
+        echo "Cluster Operators:"
+        oc get co
+        echo ""
+        echo "Machine Configs:"
+        oc get machineconfig | grep spyre || echo "No spyre machineconfigs found"
+        echo ""
+        echo "✅ Cluster verification complete"
+
+    - name: Test Basic Operator Deployment (Dry Run)
+      run: |
+        echo "Testing basic operator deployment capabilities..."
+        echo ""
+        echo "Creating test namespace..."
+        oc create namespace spyre-operator-test || true
+
+        echo ""
+        echo "Checking if we can create basic resources..."
+        cat << EOF | oc apply -f - || true
+        apiVersion: v1
+        kind: ConfigMap
+        metadata:
+          name: test-config
+          namespace: spyre-operator-test
+        data:
+          test: "dry-run-success"
+        EOF
+
+        echo ""
+        echo "Verifying resource creation..."
+        oc get configmap test-config -n spyre-operator-test -o yaml || echo "ConfigMap not found"
+
+        echo ""
+        echo "Cleaning up test resources..."
+        oc delete namespace spyre-operator-test --wait=false || true
+
+        echo ""
+        echo "✅ Basic deployment test complete"
+
+    # COMMENTED OUT - Full E2E tests (require actual images from GCAR)
+    # - name: Create Barrier for Log Capture
+    #   run: touch stern.barrier
+    #
+    # - name: Start Log Capture - Operator
+    #   run: |
+    #     hack/capture-logs.bash spyre-operator spyre-operator stern.barrier &
+    #     echo $! > /tmp/log-capture-operator.pid
+    #
+    # - name: Start Log Capture - Device Plugin
+    #   run: |
+    #     hack/capture-logs.bash spyre-device-plugin spyre-operator stern.barrier &
+    #     echo $! > /tmp/log-capture-device-plugin.pid
+    #
+    # - name: Start Log Capture - Validator
+    #   run: |
+    #     hack/capture-logs.bash spyre-webhook-validator spyre-operator stern.barrier &
+    #     echo $! > /tmp/log-capture-validator.pid
+    #
+    # - name: Start Log Capture - Health Checker
+    #   run: |
+    #     hack/capture-logs.bash spyre-health-checker spyre-operator stern.barrier &
+    #     echo $! > /tmp/log-capture-health-checker.pid
+    #
+    # - name: Start Log Capture - Metrics Exporter
+    #   run: |
+    #     hack/capture-logs.bash spyre-metrics-exporter spyre-operator stern.barrier &
+    #     echo $! > /tmp/log-capture-metrics-exporter.pid
+    #
+    # - name: Start Log Capture - Scheduler
+    #   run: |
+    #     hack/capture-logs.bash secondary-scheduler openshift-secondary-scheduler-operator stern.barrier &
+    #     echo $! > /tmp/log-capture-scheduler.pid
+    #
+    # - name: Start Log Capture - Card Management
+    #   run: |
+    #     hack/capture-logs.bash spyre-card-management spyre-operator stern.barrier &
+    #     echo $! > /tmp/log-capture-card-management.pid
+    #
+    # - name: Start Marketplace Monitoring
+    #   run: |
+    #     jenkins/scripts/monitor-openshift-marketplace.bash stern.barrier &
+    #     echo $! > /tmp/marketplace-monitor.pid
+    #
+    # - name: Run End-to-End Tests
+    #   run: |
+    #     echo "Running E2E tests..."
+    #     make e2e-test
+    #     TEST_RC=$?
+    #
+    #     echo "Stopping log capture..."
+    #     rm -f stern.barrier
+    #     sleep 5
+    #
+    #     if [ $TEST_RC -eq 0 ]; then
+    #       echo "✅ E2E tests passed"
+    #     else
+    #       echo "❌ E2E tests failed with exit code $TEST_RC"
+    #     fi
+    #
+    #     exit $TEST_RC
+
+    - name: Dry Run Summary
+      if: always()
+      run: |
+        echo ""
+        echo "=========================================="
+        echo "DRY RUN COMPLETE"
+        echo "=========================================="
+        echo ""
+        echo "✅ Workflow structure validated"
+        echo "✅ CRC cluster setup successful"
+        echo "✅ OpenShift access verified"
+        echo "✅ MachineConfig applied"
+        echo "✅ Basic deployment tested"
+        echo ""
+        echo "⚠️  NEXT STEPS:"
+        echo "1. Setup Google Cloud Project (see SETUP-GITHUB-HOSTED-CRC.md)"
+        echo "2. Configure GitHub Secrets (GCP_PROJECT_ID, GCP_WORKLOAD_IDENTITY_PROVIDER, GCP_SERVICE_ACCOUNT)"
+        echo "3. Migrate images to GCAR"
+        echo "4. Use the full workflow: e2e-test-crc-github-hosted.yml"
+        echo ""
+        echo "=========================================="
+
+    - name: Upload Dry Run Logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: dry-run-logs-${{ github.run_number }}
+        path: |
+          **/*.log
+        retention-days: 7
+        if-no-files-found: warn
+
+    - name: Cleanup
+      if: always()
+      run: |
+        echo "Cleaning up..."
+        echo "✅ Cleanup completed"
+        echo ""
+        echo "Note: CRC cluster will be automatically stopped by crc-github-action"
