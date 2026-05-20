@@ -30,7 +30,7 @@ on:
         default: '128'
 
 env:
-  GOTOOLCHAIN: go1.24.13
+  GOTOOLCHAIN: go1.23
   HAS_DEVICE: 'false'
   # GCAR_REGISTRY: us-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/spyre-images  # COMMENTED FOR DRY RUN
 
@@ -54,7 +54,7 @@ jobs:
       - name: Setup Go environment
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24.13'
+          go-version: '1.23'
           cache: true
 
       - name: Display Configuration
