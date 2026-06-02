@@ -6,6 +6,15 @@
 name: E2E Test CRC (Dry Run - No GCP)
 
 on:
+  # Run on all pushes to any branch
+  push:
+    branches:
+      - '**'
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+      - 'LICENSE'
+      - '.gitignore'
   workflow_dispatch:
     inputs:
       branch_name:
