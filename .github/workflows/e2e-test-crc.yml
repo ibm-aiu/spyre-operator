@@ -87,7 +87,7 @@ on:
         description: 'CRC Memory (MiB)'
         required: false
         type: string
-        default: '16000'
+        default: '15000'
       crc_disk_size:
         description: 'CRC Disk Size (GiB)'
         required: false
@@ -134,7 +134,7 @@ jobs:
           echo "Branch: ${{ inputs.branch_name || github.ref_name }}"
           echo "Commit: ${{ github.sha }}"
           echo "CRC CPUs: ${{ inputs.crc_cpus || '16' }}"
-          echo "CRC Memory: ${{ inputs.crc_memory || '16000' }} MiB"
+          echo "CRC Memory: ${{ inputs.crc_memory || '15000' }} MiB"
           echo "CRC Disk: ${{ inputs.crc_disk_size || '128' }} GiB"
           echo "Registry: ${{ env.GHCR_REGISTRY }}"
           echo "=========================================="
@@ -144,7 +144,7 @@ jobs:
         with:
           crc-version: latest
           cpus: ${{ inputs.crc_cpus || '16' }}
-          memory: ${{ inputs.crc_memory || '16000' }}
+          memory: ${{ inputs.crc_memory || '15000' }}
           disk-size: ${{ inputs.crc_disk_size || '128' }}
 
       - name: Verify CRC Cluster
