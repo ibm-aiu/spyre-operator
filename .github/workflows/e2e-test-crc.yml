@@ -431,7 +431,15 @@ jobs:
       - name: Install Test Tools
         run: |
           echo "Installing test tools..."
-          make ginkgo jq stern yq
+          make ginkgo jq yq
+          
+          # Install stern manually (no Makefile target exists)
+          echo "Installing stern..."
+          STERN_VERSION="1.30.0"
+          curl -sL "https://github.com/stern/stern/releases/download/v${STERN_VERSION}/stern_${STERN_VERSION}_linux_amd64.tar.gz" | \
+            tar xz -C bin/ stern
+          chmod +x bin/stern
+          
           echo "✅ Test tools installed"
 
       - name: Patch Test Configuration
