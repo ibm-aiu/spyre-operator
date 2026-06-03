@@ -302,10 +302,25 @@ jobs:
           echo "Verifying CRC Cluster"
           echo "=========================================="
           
-          # Setup oc environment
+          # Setup oc environment and export to PATH
           eval $(crc oc-env)
+          export PATH="$PATH:$HOME/.crc/bin/oc"
+          
+          # Copy oc to a location in PATH for persistence
+          OC_PATH=$(sg libvirt -c "crc oc-env" | grep "export PATH" | sed 's/.*PATH="\([^"]*\)".*/\1/' | cut -d: -f1)
+          if [ -n "$OC_PATH" ] && [ -f "$OC_PATH/oc" ]; then
+            sudo cp "$OC_PATH/oc" /usr/local/bin/
+            echo "✅ oc command copied to /usr/local/bin/"
+          fi
+          
+          # Verify oc is available
+          echo ""
+          echo "Checking oc command:"
+          which oc || echo "⚠️  oc not found in PATH"
+          oc version --client || echo "⚠️  oc version failed"
           
           # Display CRC version
+          echo ""
           crc version
           
           # Get cluster credentials (this works even if status check fails)
@@ -332,10 +347,14 @@ jobs:
           if [ $attempt -eq $max_attempts ]; then
             echo "❌ Timeout waiting for OpenShift API"
             echo ""
-            echo "Attempting to get CRC status for debugging:"
+            echo "Debugging information:"
+            echo "PATH: $PATH"
+            echo "oc location: $(which oc || echo 'not found')"
+            echo ""
+            echo "Attempting to get CRC status:"
             sg libvirt -c "crc status" || true
             echo ""
-            echo "Attempting oc commands for debugging:"
+            echo "Attempting oc commands:"
             oc version || true
             oc get nodes || true
             exit 1
