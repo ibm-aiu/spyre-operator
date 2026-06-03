@@ -151,6 +151,32 @@ jobs:
         run: |
           echo "Verifying CRC cluster..."
           crc version
+          
+          # Wait for CRC to be fully ready
+          echo "Waiting for CRC cluster to be ready..."
+          max_attempts=30
+          attempt=0
+          while [ $attempt -lt $max_attempts ]; do
+            if crc status 2>&1 | grep -q "Running"; then
+              echo "✅ CRC cluster is running"
+              break
+            else
+              echo "Waiting for CRC... (attempt $((attempt+1))/$max_attempts)"
+              sleep 10
+              attempt=$((attempt+1))
+            fi
+          done
+          
+          if [ $attempt -eq $max_attempts ]; then
+            echo "❌ Timeout waiting for CRC cluster"
+            echo "CRC status output:"
+            crc status || true
+            exit 1
+          fi
+          
+          # Display CRC status
+          echo ""
+          echo "CRC Status:"
           crc status
           
           echo ""
