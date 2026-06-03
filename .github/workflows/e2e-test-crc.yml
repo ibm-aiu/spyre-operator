@@ -175,15 +175,32 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq \
             qemu-kvm \
+            qemu-utils \
             libvirt-daemon-system \
             libvirt-clients \
+            libvirt-daemon-driver-qemu \
             bridge-utils \
-            cpu-checker
+            cpu-checker \
+            virtiofsd
           
           # Check virtualization capability
           echo ""
           echo "Virtualization Check:"
           kvm-ok || true
+          
+          # Verify virtiofsd is installed
+          echo ""
+          echo "Checking virtiofsd:"
+          which virtiofsd || echo "⚠️  virtiofsd not found in PATH"
+          if [ -f /usr/lib/qemu/virtiofsd ]; then
+            echo "✅ virtiofsd found at /usr/lib/qemu/virtiofsd"
+            ls -la /usr/lib/qemu/virtiofsd
+          elif [ -f /usr/libexec/virtiofsd ]; then
+            echo "✅ virtiofsd found at /usr/libexec/virtiofsd"
+            ls -la /usr/libexec/virtiofsd
+          else
+            echo "⚠️  virtiofsd not found in standard locations"
+          fi
           
           # Configure libvirt
           echo ""
