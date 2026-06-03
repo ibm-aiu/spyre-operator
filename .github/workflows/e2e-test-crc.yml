@@ -3,7 +3,7 @@
 # | PID 5698-SPR                                                      |
 # +-------------------------------------------------------------------+
 
-name: E2E Test CRC (GitHub-Hosted)
+name: E2E Test CRC
 
 on:
   # Run on all pushes to any branch
@@ -25,6 +25,7 @@ on:
     - '**.md'
     - 'LICENSE'
     - '.gitignore'
+
   workflow_dispatch:
     inputs:
       branch_name:
@@ -92,18 +93,6 @@ on:
         required: false
         type: string
         default: '128'
-  pull_request:
-    branches:
-      - main
-    paths-ignore:
-      - 'docs/**'
-      - '**.md'
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - 'docs/**'
-      - '**.md'
 
 permissions:
   contents: read
