@@ -1,0 +1,376 @@
+# +-------------------------------------------------------------------+
+# | Copyright IBM Corp. 2025 All Rights Reserved                      |
+# | PID 5698-SPR                                                      |
+# +-------------------------------------------------------------------+
+
+name: End-to-End Test CRC
+
+on:
+  # Run on all pushes to any branch
+  push:
+    branches:
+    - '**'
+    paths-ignore:
+    - 'docs/**'
+    - '**.md'
+    - 'LICENSE'
+    - '.gitignore'
+
+  # Run on all pull requests
+  pull_request:
+    branches:
+    - '**'
+    paths-ignore:
+    - 'docs/**'
+    - '**.md'
+    - 'LICENSE'
+    - '.gitignore'
+  workflow_dispatch:
+    inputs:
+      branch_name:
+        description: 'Branch name to execute the end-to-end test from'
+        required: true
+        type: string
+        default: 'main'
+      device_plugin_tag:
+        description: 'Device Plugin Image Tag to run in test'
+        required: false
+        type: string
+        default: ''
+      exporter_tag:
+        description: 'Metrics Exporter Image tag to run in test'
+        required: false
+        type: string
+        default: ''
+      feature_discovery_tag:
+        description: 'Feature discovery Image tag to run in test'
+        required: false
+        type: string
+        default: ''
+      scheduler_plugin_tag:
+        description: 'Spyre scheduler plugin tag to run in test'
+        required: false
+        type: string
+        default: ''
+      validator_tag:
+        description: 'Spyre pod validator tag to run in test'
+        required: false
+        type: string
+        default: ''
+      health_checker_tag:
+        description: 'Spyre health checker tag to run in test'
+        required: false
+        type: string
+        default: ''
+      operator_tag:
+        description: 'Spyre pod operator tag to run in test'
+        required: false
+        type: string
+        default: ''
+      bundle_tag:
+        description: 'Spyre pod operator-bundle tag to run in test'
+        required: false
+        type: string
+        default: ''
+      catalog_tag:
+        description: 'Spyre pod operator-catalog tag to run in test'
+        required: false
+        type: string
+        default: ''
+      crc_cpus:
+        description: 'The CRC instance number of virtual CPUs'
+        required: true
+        type: string
+        default: '16'
+      crc_memory:
+        description: 'The CRC instance memory in MiB'
+        required: true
+        type: string
+        default: '24000'
+      crc_disk_size:
+        description: 'The CRC instance disk size in GiB'
+        required: true
+        type: string
+        default: '128'
+
+permissions:
+  contents: read
+  packages: write # Crucial for pushing to ghcr.io
+
+env:
+  GOTOOLCHAIN: go1.24.13
+  ICR_REGISTRY: icr.io/ibmaiu_internal
+  HAS_DEVICE: 'false'
+
+jobs:
+  e2e-test-crc:
+    name: End-to-End Test with CRC
+    runs-on: [self-hosted, linux, x64, crc-fyre]
+    timeout-minutes: 1500 # 25 hours
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.branch_name }}
+        fetch-depth: 0
+
+    - name: Setup Go environment
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24.13'
+        cache: true
+
+    - name: Echo Parameters and Environment
+      run: |
+        echo "BRANCH_NAME:              ${{ inputs.branch_name }}"
+        echo "DEVICE_PLUGIN_TAG:        ${{ inputs.device_plugin_tag }}"
+        echo "EXPORTER_TAG:             ${{ inputs.exporter_tag }}"
+        echo "FEATURE_DISCOVERY_TAG:    ${{ inputs.feature_discovery_tag }}"
+        echo "SCHEDULER_PLUGIN_TAG:     ${{ inputs.scheduler_plugin_tag }}"
+        echo "VALIDATOR_TAG:            ${{ inputs.validator_tag }}"
+        echo "HEALTH_CHECKER_TAG:       ${{ inputs.health_checker_tag }}"
+        echo "OPERATOR_TAG:             ${{ inputs.operator_tag }}"
+        echo "BUNDLE_TAG:               ${{ inputs.bundle_tag }}"
+        echo "CATALOG_TAG:              ${{ inputs.catalog_tag }}"
+        echo "CRC CPUs:                 ${{ inputs.crc_cpus }}"
+        echo "CRC memory:               ${{ inputs.crc_memory }}"
+        echo "CRC disk-size:            ${{ inputs.crc_disk_size }}"
+        echo "Go version:"
+        go version
+
+    - name: Configure and Start CRC
+      env:
+        OC_CREDENTIALS_PSW: ${{ secrets.CRC_KUBEADMIN_PASSWORD }}
+      run: |
+        set -e
+
+        echo "Configuring CRC..."
+        crc config set kubeadmin-password "${OC_CREDENTIALS_PSW}"
+        crc config set cpus ${{ inputs.crc_cpus }}
+        crc config set memory ${{ inputs.crc_memory }}
+        crc config set disk-size ${{ inputs.crc_disk_size }}
+
+        echo "Deleting existing CRC instance if any..."
+        crc delete -f || true
+
+        echo "Starting CRC..."
+        crc start
+
+        echo "CRC Status:"
+        crc status || true
+
+    - name: End-to-End Test Preparation
+      env:
+        EXPORTER_TAG: ${{ inputs.exporter_tag }}
+        DEVICE_PLUGIN_TAG: ${{ inputs.device_plugin_tag }}
+        FEATURE_DISCOVERY_TAG: ${{ inputs.feature_discovery_tag }}
+        SCHEDULER_PLUGIN_TAG: ${{ inputs.scheduler_plugin_tag }}
+        VALIDATOR_TAG: ${{ inputs.validator_tag }}
+        HEALTH_CHECKER_TAG: ${{ inputs.health_checker_tag }}
+        OPERATOR_TAG: ${{ inputs.operator_tag }}
+        BUNDLE_TAG: ${{ inputs.bundle_tag }}
+        CATALOG_TAG: ${{ inputs.catalog_tag }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        OC_CREDENTIALS_USR: ${{ secrets.CRC_KUBEADMIN_USERNAME }}
+        OC_CREDENTIALS_PSW: ${{ secrets.CRC_KUBEADMIN_PASSWORD }}
+      run: |
+        set -e
+
+        # Create barrier file for log capture coordination
+        touch stern.barrier
+
+        # Configure Git
+        git config --global --unset "url.https://taas-github-ibm-cache.swg-devops.com/.insteadof" || true
+        git branch --show-current
+        git rev-parse --abbrev-ref HEAD
+
+        # Install required tools
+        make ginkgo jq stern yq
+
+        # Patch E2E configuration
+        ./jenkins/scripts/patch-e2e-config.bash
+
+        echo "End-to-End Config:"
+        echo "-------------------------------------------------------------------------------------------"
+        bin/yq '.' test/config.yaml
+        echo "-------------------------------------------------------------------------------------------"
+
+        # Login to OpenShift
+        oc login --username="${OC_CREDENTIALS_USR}" --password="${OC_CREDENTIALS_PSW}" \
+          -s=api.crc.testing:6443 --insecure-skip-tls-verify=true
+
+    - name: Apply MachineConfig and Configure Pull Secret
+      timeout-minutes: 15
+      env:
+        OC_CREDENTIALS_USR: ${{ secrets.CRC_KUBEADMIN_USERNAME }}
+        OC_CREDENTIALS_PSW: ${{ secrets.CRC_KUBEADMIN_PASSWORD }}
+        ICR_REGISTRY_USERNAME: ${{ secrets.ICR_REGISTRY_USERNAME }}
+        ICR_REGISTRY_TOKEN: ${{ secrets.ICR_REGISTRY_TOKEN }}
+      run: |
+        set -e
+
+        echo "Applying MachineConfig..."
+        cat config/machineconfig/amd64/50-spyre-device-plugin-selinux-minimal.yaml | \
+          sed -e 's@machineconfiguration.openshift.io/role: worker@machineconfiguration.openshift.io/role: master@g' | \
+          oc apply -f -
+
+        # Wait for 120 seconds before checking status
+        echo "Waiting 120 seconds for MachineConfig to be applied..."
+        sleep 120
+
+        # Wait for OpenShift cluster to be running
+        echo "Waiting for OpenShift cluster to be running..."
+        while : ; do
+          status=$(crc status -o json | jq -r ".openshiftStatus")
+          if [ "$status" == "Running" ]; then
+            echo "OpenShift cluster is running."
+            break
+          else
+            echo "OpenShift cluster is not running (status: $status). Retrying..."
+            sleep 5
+          fi
+        done
+
+        # Re-login to OpenShift
+        echo "Re-logging into OpenShift..."
+        while : ; do
+          if oc login --username="${OC_CREDENTIALS_USR}" --password="${OC_CREDENTIALS_PSW}" \
+            -s=api.crc.testing:6443 --insecure-skip-tls-verify=true ; then
+            echo "Successful re-login into OpenShift"
+            break
+          else
+            echo "Retrying login..."
+            sleep 5
+          fi
+        done
+
+        # Configure global pull secret
+        echo "Configuring global pull secret..."
+        REGISTRY_USERNAME="${ICR_REGISTRY_USERNAME}" \
+        REGISTRY_TOKEN="${ICR_REGISTRY_TOKEN}" \
+        make configure-global-pull-secret
+
+    - name: Start Log Capture - Operator
+      run: |
+        hack/capture-logs.bash spyre-operator spyre-operator stern.barrier &
+        echo $! > /tmp/log-capture-operator.pid
+
+    - name: Start Log Capture - Device Plugin
+      run: |
+        hack/capture-logs.bash spyre-device-plugin spyre-operator stern.barrier &
+        echo $! > /tmp/log-capture-device-plugin.pid
+
+    - name: Start Log Capture - Validator
+      run: |
+        hack/capture-logs.bash spyre-webhook-validator spyre-operator stern.barrier &
+        echo $! > /tmp/log-capture-validator.pid
+
+    - name: Start Log Capture - Health Checker
+      run: |
+        hack/capture-logs.bash spyre-health-checker spyre-operator stern.barrier &
+        echo $! > /tmp/log-capture-health-checker.pid
+
+    - name: Start Log Capture - Metrics Exporter
+      run: |
+        hack/capture-logs.bash spyre-metrics-exporter spyre-operator stern.barrier &
+        echo $! > /tmp/log-capture-metrics-exporter.pid
+
+    - name: Start Log Capture - Scheduler
+      run: |
+        hack/capture-logs.bash secondary-scheduler openshift-secondary-scheduler-operator stern.barrier &
+        echo $! > /tmp/log-capture-scheduler.pid
+
+    - name: Start Log Capture - Card Management
+      run: |
+        hack/capture-logs.bash spyre-card-management spyre-operator stern.barrier &
+        echo $! > /tmp/log-capture-card-management.pid
+
+    - name: Start Marketplace Monitoring
+      run: |
+        jenkins/scripts/monitor-openshift-marketplace.bash stern.barrier &
+        echo $! > /tmp/marketplace-monitor.pid
+
+    - name: Run End-to-End Tests
+      run: |
+        set -e
+
+        # Verify Git configuration
+        git config --global --unset "url.https://taas-github-ibm-cache.swg-devops.com/.insteadof" || true
+        git branch --show-current
+        git rev-parse --abbrev-ref HEAD
+
+        # Run E2E tests
+        make e2e-test
+        TEST_RC=$?
+
+        # Remove barrier to stop log capture
+        rm -rfv stern.barrier
+
+        # Wait for log capture processes to finish
+        sleep 5
+
+        exit ${TEST_RC}
+
+    - name: Upload Test Results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: e2e-test-results-crc-${{ github.run_number }}
+        path: |
+          test/results/
+          logs/
+          *.log
+        retention-days: 30
+        if-no-files-found: warn
+
+    - name: Upload Test Logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: e2e-test-logs-crc-${{ github.run_number }}
+        path: |
+          **/*.log
+          **/stern.*.log
+        retention-days: 30
+        if-no-files-found: warn
+
+    - name: Send Slack Notification
+      if: always()
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        JOB_STATUS: ${{ job.status }}
+        JOB_NAME: ${{ github.workflow }}
+        BUILD_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{
+          github.run_id }}
+      run: |
+        python3 -m ensurepip --upgrade --user
+        python3 -m pip install --user --upgrade pip
+        python3 -m pip install --user requests
+        python3 hack/slack-notifier.py \
+          --job_status "${JOB_STATUS}" \
+          --job_name "${JOB_NAME}" \
+          --build_url "${BUILD_URL}"
+
+    - name: Stop CRC
+      if: always()
+      run: |
+        echo "Stopping CRC..."
+        crc stop -f || true
+
+    - name: Cleanup Workspace
+      if: always()
+      run: |
+        # Kill any remaining background processes
+        for pid_file in /tmp/log-capture-*.pid /tmp/marketplace-monitor.pid; do
+          if [ -f "$pid_file" ]; then
+            pid=$(cat "$pid_file")
+            kill $pid 2>/dev/null || true
+            rm -f "$pid_file"
+          fi
+        done
+
+        # Clean up temporary files
+        rm -f stern.barrier
+
+        echo "Cleanup completed"
