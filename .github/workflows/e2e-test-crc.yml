@@ -455,7 +455,7 @@ jobs:
           CATALOG_TAG: ${{ inputs.catalog_tag }}
         run: |
           echo "Patching test configuration..."
-          ./jenkins/scripts/patch-e2e-config.bash
+          ./test/script/patch-e2e-config.bash
           
           echo ""
           echo "Test Configuration:"
@@ -539,7 +539,7 @@ jobs:
 
       - name: Start Marketplace Monitoring
         run: |
-          jenkins/scripts/monitor-openshift-marketplace.bash stern.barrier &
+          test/script/monitor-openshift-marketplace.bash stern.barrier &
           echo $! > /tmp/marketplace-monitor.pid
 
       - name: Run End-to-End Tests
