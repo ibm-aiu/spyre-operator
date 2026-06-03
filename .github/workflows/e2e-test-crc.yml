@@ -298,15 +298,23 @@ jobs:
 
       - name: Verify CRC Cluster
         run: |
-          echo "Verifying CRC cluster..."
+          echo "=========================================="
+          echo "Verifying CRC Cluster"
+          echo "=========================================="
+          
+          # Setup oc environment
+          eval $(crc oc-env)
+          
+          # Display CRC version
           crc version
           
-          # Wait for CRC to be fully ready
+          # Wait for CRC to be fully ready (check with sg context)
+          echo ""
           echo "Waiting for CRC cluster to be ready..."
           max_attempts=30
           attempt=0
           while [ $attempt -lt $max_attempts ]; do
-            if crc status 2>&1 | grep -q "Running"; then
+            if sg libvirt -c "crc status" 2>&1 | grep -q "Running"; then
               echo "✅ CRC cluster is running"
               break
             else
@@ -319,15 +327,21 @@ jobs:
           if [ $attempt -eq $max_attempts ]; then
             echo "❌ Timeout waiting for CRC cluster"
             echo "CRC status output:"
-            crc status || true
+            sg libvirt -c "crc status" || true
             exit 1
           fi
           
-          # Display CRC status
+          # Display CRC status (with proper group context)
           echo ""
           echo "CRC Status:"
-          crc status
+          sg libvirt -c "crc status"
           
+          # Get cluster credentials
+          echo ""
+          echo "Cluster Credentials:"
+          sg libvirt -c "crc console --credentials"
+          
+          # Verify OpenShift access
           echo ""
           echo "Verifying OpenShift access..."
           oc version
@@ -335,7 +349,8 @@ jobs:
           oc get co
           
           echo ""
-          echo "✅ CRC cluster is ready"
+          echo "✅ CRC cluster is ready and verified"
+          echo "=========================================="
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
