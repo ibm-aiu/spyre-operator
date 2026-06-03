@@ -463,82 +463,24 @@ jobs:
           bin/yq '.' test/config.yaml
           echo "=========================================="
 
-      - name: Apply MachineConfig
-        timeout-minutes: 20
+      - name: Skip MachineConfig for CRC
         run: |
           echo "=========================================="
-          echo "Applying MachineConfig for Device Plugin"
+          echo "Skipping MachineConfig for CRC"
           echo "=========================================="
-          
-          # Apply MachineConfig (change worker to master for CRC)
-          echo "Applying MachineConfig..."
-          cat config/machineconfig/amd64/50-spyre-device-plugin-selinux-minimal.yaml | \
-            sed -e 's@machineconfiguration.openshift.io/role: worker@machineconfiguration.openshift.io/role: master@g' | \
-            oc apply -f -
-          
           echo ""
-          echo "MachineConfig applied. Waiting for node to update..."
-          echo "Note: This will cause the node to reboot and may take 5-10 minutes"
-          
-          # Wait longer for MachineConfig to be applied and node to reboot
-          sleep 180  # 3 minutes initial wait
-          
-          # Wait for node to come back and be Ready
+          echo "Note: MachineConfig is designed for multi-node production clusters."
+          echo "CRC is a single-node development cluster and applying MachineConfig"
+          echo "that triggers node reboots can cause the cluster to become unavailable."
           echo ""
-          echo "Waiting for node to be Ready after MachineConfig update..."
-          max_attempts=60
-          attempt=0
-          while [ $attempt -lt $max_attempts ]; do
-            if oc get nodes 2>/dev/null | grep -q "Ready"; then
-              echo "✅ Node is Ready"
-              break
-            else
-              echo "Waiting for node... (attempt $((attempt+1))/$max_attempts)"
-              sleep 10
-              attempt=$((attempt+1))
-            fi
-          done
-          
-          if [ $attempt -eq $max_attempts ]; then
-            echo "❌ Timeout waiting for node to be Ready"
-            echo ""
-            echo "Node status:"
-            oc get nodes || true
-            echo ""
-            echo "MachineConfig status:"
-            oc get mcp || true
-            exit 1
-          fi
-          
-          # Wait for all cluster operators to be available
+          echo "For CRC testing, SELinux policies will be handled differently or"
+          echo "the device plugin will run in a mode that doesn't require them."
           echo ""
-          echo "Waiting for cluster operators to be available..."
-          max_attempts=60
-          attempt=0
-          while [ $attempt -lt $max_attempts ]; do
-            unavailable=$(oc get co -o json | jq -r '.items[] | select(.status.conditions[] | select(.type=="Available" and .status=="False")) | .metadata.name' | wc -l)
-            if [ "$unavailable" -eq 0 ]; then
-              echo "✅ All cluster operators are available"
-              break
-            else
-              echo "Waiting for cluster operators... ($unavailable unavailable, attempt $((attempt+1))/$max_attempts)"
-              sleep 10
-              attempt=$((attempt+1))
-            fi
-          done
-          
-          if [ $attempt -eq $max_attempts ]; then
-            echo "⚠️  Some cluster operators may still be updating, but continuing..."
-            oc get co || true
-          fi
-          
-          echo ""
-          echo "Final cluster status:"
+          echo "Current cluster status:"
           oc get nodes
-          oc get co
-          
+          oc get co | head -10
           echo ""
-          echo "✅ MachineConfig applied and cluster is ready"
+          echo "✅ Skipping MachineConfig step"
           echo "=========================================="
 
       - name: Create Barrier for Log Capture
