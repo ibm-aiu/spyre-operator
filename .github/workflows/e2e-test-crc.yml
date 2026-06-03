@@ -308,45 +308,60 @@ jobs:
           # Display CRC version
           crc version
           
-          # Wait for CRC to be fully ready (check with sg context)
+          # Get cluster credentials (this works even if status check fails)
           echo ""
-          echo "Waiting for CRC cluster to be ready..."
-          max_attempts=30
+          echo "Cluster Credentials:"
+          sg libvirt -c "crc console --credentials" || true
+          
+          # Wait for OpenShift API to be ready (more reliable than crc status)
+          echo ""
+          echo "Waiting for OpenShift API to be ready..."
+          max_attempts=60
           attempt=0
           while [ $attempt -lt $max_attempts ]; do
-            if sg libvirt -c "crc status" 2>&1 | grep -q "Running"; then
-              echo "✅ CRC cluster is running"
+            if oc get nodes &>/dev/null; then
+              echo "✅ OpenShift API is responding"
               break
             else
-              echo "Waiting for CRC... (attempt $((attempt+1))/$max_attempts)"
+              echo "Waiting for OpenShift API... (attempt $((attempt+1))/$max_attempts)"
               sleep 10
               attempt=$((attempt+1))
             fi
           done
           
           if [ $attempt -eq $max_attempts ]; then
-            echo "❌ Timeout waiting for CRC cluster"
-            echo "CRC status output:"
+            echo "❌ Timeout waiting for OpenShift API"
+            echo ""
+            echo "Attempting to get CRC status for debugging:"
             sg libvirt -c "crc status" || true
+            echo ""
+            echo "Attempting oc commands for debugging:"
+            oc version || true
+            oc get nodes || true
             exit 1
           fi
           
-          # Display CRC status (with proper group context)
+          # Verify OpenShift cluster is functional
           echo ""
-          echo "CRC Status:"
-          sg libvirt -c "crc status"
-          
-          # Get cluster credentials
-          echo ""
-          echo "Cluster Credentials:"
-          sg libvirt -c "crc console --credentials"
-          
-          # Verify OpenShift access
-          echo ""
-          echo "Verifying OpenShift access..."
+          echo "Verifying OpenShift cluster..."
           oc version
+          
+          echo ""
+          echo "Cluster Nodes:"
           oc get nodes
+          
+          echo ""
+          echo "Cluster Operators:"
           oc get co
+          
+          echo ""
+          echo "All Pods:"
+          oc get pods --all-namespaces | head -20
+          
+          # Try to get CRC status (may show warning but cluster is working)
+          echo ""
+          echo "CRC Status (informational, may show libvirt warning):"
+          sg libvirt -c "crc status" || echo "Note: CRC status check shows warning but cluster is operational"
           
           echo ""
           echo "✅ CRC cluster is ready and verified"
