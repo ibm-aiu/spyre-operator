@@ -106,7 +106,7 @@ env:
 jobs:
   e2e-test-crc-github-hosted:
     name: E2E Test with CRC (GitHub-Hosted Runner)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-8-cores  # Use larger runner with better virtualization support
     timeout-minutes: 360  # 6 hours (GitHub limit)
     
     permissions:
@@ -141,51 +141,123 @@ jobs:
 
       - name: Enable KVM Support
         run: |
-          echo "Checking KVM support..."
-          # Check if KVM is available
+          echo "=========================================="
+          echo "Checking KVM and Virtualization Support"
+          echo "=========================================="
+          
+          # Check CPU virtualization support
+          echo "CPU Info:"
+          if grep -E 'vmx|svm' /proc/cpuinfo > /dev/null; then
+            echo "✅ CPU supports virtualization ($(grep -E 'vmx|svm' /proc/cpuinfo | wc -l) cores)"
+          else
+            echo "❌ CPU does not support virtualization"
+            echo "This runner may not support nested virtualization required for CRC"
+          fi
+          
+          # Check if KVM module is loaded
+          echo ""
+          echo "KVM Modules:"
+          lsmod | grep kvm || echo "⚠️  KVM modules not loaded"
+          
+          # Check /dev/kvm
+          echo ""
+          echo "KVM Device:"
           if [ -e /dev/kvm ]; then
             echo "✅ /dev/kvm exists"
             ls -la /dev/kvm
           else
-            echo "⚠️  /dev/kvm does not exist"
+            echo "❌ /dev/kvm does not exist"
           fi
           
-          # Check CPU virtualization support
-          if grep -E 'vmx|svm' /proc/cpuinfo > /dev/null; then
-            echo "✅ CPU supports virtualization"
-          else
-            echo "⚠️  CPU does not support virtualization"
-          fi
+          # Install required packages
+          echo ""
+          echo "Installing virtualization packages..."
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            qemu-kvm \
+            libvirt-daemon-system \
+            libvirt-clients \
+            bridge-utils \
+            cpu-checker
           
-          # Install and configure libvirt if needed
-          sudo apt-get update
-          sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils
+          # Check virtualization capability
+          echo ""
+          echo "Virtualization Check:"
+          kvm-ok || true
           
-          # Add user to libvirt group
-          sudo usermod -aG libvirt $USER
-          sudo usermod -aG kvm $USER
-          
-          # Start libvirt service
+          # Configure libvirt
+          echo ""
+          echo "Configuring libvirt..."
           sudo systemctl start libvirtd
           sudo systemctl enable libvirtd
-          sudo systemctl status libvirtd
+          
+          # Add user to groups
+          sudo usermod -aG libvirt $USER
+          sudo usermod -aG kvm $USER
           
           # Set permissions on /dev/kvm
           if [ -e /dev/kvm ]; then
             sudo chmod 666 /dev/kvm
+            echo "✅ /dev/kvm permissions set to 666"
             ls -la /dev/kvm
           fi
           
-          echo "✅ KVM support configured"
+          # Verify libvirt is running
+          echo ""
+          echo "Libvirt Status:"
+          sudo systemctl status libvirtd --no-pager || true
+          
+          # Check groups
+          echo ""
+          echo "User Groups:"
+          groups
+          id
+          
+          echo ""
+          echo "✅ KVM support configuration completed"
+          echo "=========================================="
 
       - name: Setup CRC Cluster
-        uses: crc-org/crc-github-action@v1
-        with:
-          crc-version: latest
-          cpus: ${{ inputs.crc_cpus || '16' }}
-          memory: ${{ inputs.crc_memory || '15000' }}
-          disk-size: ${{ inputs.crc_disk_size || '128' }}
-          preset: openshift
+        run: |
+          echo "=========================================="
+          echo "Setting up CRC Cluster"
+          echo "=========================================="
+          
+          # Download and install CRC
+          echo "Downloading CRC..."
+          CRC_VERSION="latest"
+          wget -q https://developers.redhat.com/content-gateway/rest/mirror/pub/openshift-v4/clients/crc/latest/crc-linux-amd64.tar.xz
+          tar -xf crc-linux-amd64.tar.xz
+          sudo mv crc-linux-*-amd64/crc /usr/local/bin/
+          rm -rf crc-linux-*
+          
+          # Verify CRC installation
+          crc version
+          
+          # Setup CRC with proper group context
+          echo ""
+          echo "Setting up CRC (this may take several minutes)..."
+          
+          # Run setup with sg to use libvirt group
+          sg libvirt -c "crc setup"
+          
+          # Configure CRC
+          crc config set cpus ${{ inputs.crc_cpus || '16' }}
+          crc config set memory ${{ inputs.crc_memory || '15000' }}
+          crc config set disk-size ${{ inputs.crc_disk_size || '128' }}
+          crc config set preset openshift
+          
+          # Start CRC with proper group context
+          echo ""
+          echo "Starting CRC cluster (this will take 10-15 minutes)..."
+          sg libvirt -c "crc start --log-level debug"
+          
+          # Setup oc command
+          eval $(crc oc-env)
+          
+          echo ""
+          echo "✅ CRC cluster setup completed"
+          echo "=========================================="
 
       - name: Verify CRC Cluster
         run: |
