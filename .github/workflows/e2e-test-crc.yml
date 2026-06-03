@@ -218,10 +218,24 @@ jobs:
           echo "=========================================="
 
       - name: Setup CRC Cluster
+        env:
+          CRC_PULL_SECRET: ${{ secrets.CRC_PULL_SECRET }}
         run: |
           echo "=========================================="
           echo "Setting up CRC Cluster"
           echo "=========================================="
+          
+          # Check if pull secret is available
+          if [ -z "$CRC_PULL_SECRET" ]; then
+            echo "❌ ERROR: CRC_PULL_SECRET is not set"
+            echo ""
+            echo "To fix this:"
+            echo "1. Get your pull secret from: https://console.redhat.com/openshift/create/local"
+            echo "2. Add it as a repository secret named 'CRC_PULL_SECRET'"
+            echo "3. Go to: Settings > Secrets and variables > Actions > New repository secret"
+            echo ""
+            exit 1
+          fi
           
           # Download and install CRC
           echo "Downloading CRC..."
@@ -247,10 +261,16 @@ jobs:
           crc config set disk-size ${{ inputs.crc_disk_size || '128' }}
           crc config set preset openshift
           
-          # Start CRC with proper group context
+          # Save pull secret to file
+          echo "$CRC_PULL_SECRET" > /tmp/pull-secret.txt
+          
+          # Start CRC with proper group context and pull secret
           echo ""
           echo "Starting CRC cluster (this will take 10-15 minutes)..."
-          sg libvirt -c "crc start --log-level debug"
+          sg libvirt -c "crc start --pull-secret-file /tmp/pull-secret.txt --log-level debug"
+          
+          # Clean up pull secret
+          rm -f /tmp/pull-secret.txt
           
           # Setup oc command
           eval $(crc oc-env)
