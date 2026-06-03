@@ -139,6 +139,45 @@ jobs:
           echo "Registry: ${{ env.GHCR_REGISTRY }}"
           echo "=========================================="
 
+      - name: Enable KVM Support
+        run: |
+          echo "Checking KVM support..."
+          # Check if KVM is available
+          if [ -e /dev/kvm ]; then
+            echo "✅ /dev/kvm exists"
+            ls -la /dev/kvm
+          else
+            echo "⚠️  /dev/kvm does not exist"
+          fi
+          
+          # Check CPU virtualization support
+          if grep -E 'vmx|svm' /proc/cpuinfo > /dev/null; then
+            echo "✅ CPU supports virtualization"
+          else
+            echo "⚠️  CPU does not support virtualization"
+          fi
+          
+          # Install and configure libvirt if needed
+          sudo apt-get update
+          sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils
+          
+          # Add user to libvirt group
+          sudo usermod -aG libvirt $USER
+          sudo usermod -aG kvm $USER
+          
+          # Start libvirt service
+          sudo systemctl start libvirtd
+          sudo systemctl enable libvirtd
+          sudo systemctl status libvirtd
+          
+          # Set permissions on /dev/kvm
+          if [ -e /dev/kvm ]; then
+            sudo chmod 666 /dev/kvm
+            ls -la /dev/kvm
+          fi
+          
+          echo "✅ KVM support configured"
+
       - name: Setup CRC Cluster
         uses: crc-org/crc-github-action@v1
         with:
@@ -146,6 +185,7 @@ jobs:
           cpus: ${{ inputs.crc_cpus || '16' }}
           memory: ${{ inputs.crc_memory || '15000' }}
           disk-size: ${{ inputs.crc_disk_size || '128' }}
+          preset: openshift
 
       - name: Verify CRC Cluster
         run: |
