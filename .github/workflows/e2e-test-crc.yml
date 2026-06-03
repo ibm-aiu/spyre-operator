@@ -106,7 +106,7 @@ env:
 jobs:
   e2e-test-crc-github-hosted:
     name: E2E Test with CRC (GitHub-Hosted Runner)
-    runs-on: ubuntu-24.04-8-cores  # Use larger runner with better virtualization support
+    runs-on: ubuntu-latest  # Standard GitHub-hosted runner
     timeout-minutes: 360  # 6 hours (GitHub limit)
     
     permissions:
