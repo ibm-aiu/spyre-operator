@@ -537,6 +537,7 @@ jobs:
 
       - name: Patch Test Configuration
         env:
+          REGISTRY: ${{ env.GHCR_REGISTRY }}
           EXPORTER_TAG: ${{ inputs.exporter_tag }}
           DEVICE_PLUGIN_TAG: ${{ inputs.device_plugin_tag }}
           FEATURE_DISCOVERY_TAG: ${{ inputs.feature_discovery_tag }}
@@ -548,6 +549,12 @@ jobs:
           CATALOG_TAG: ${{ inputs.catalog_tag }}
         run: |
           echo "Patching test configuration..."
+          
+          # Update repository to use GHCR (CRITICAL FIX)
+          echo "Updating repository to: $REGISTRY"
+          bin/yq eval -i ".repository = \"$REGISTRY\"" test/config.yaml
+          
+          # Run the standard patch script for versions
           ./test/script/patch-e2e-config.bash
           
           echo ""
