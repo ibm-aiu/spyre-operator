@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-    - main
+    - feat-dra-driver-image-build
 
 permissions:
   contents: read
@@ -25,6 +25,7 @@ jobs:
     with:
       image_name: spyre-operator
       pre_build_command: make vendor
+      image_suffix: -sunya-ch-dev
 
   build-bundle-catalog:
     runs-on: ubuntu-latest
@@ -36,7 +37,7 @@ jobs:
       uses: actions/checkout@v6
     - uses: actions/setup-go@v6
       with:
-        go-version: 1.24.13
+        go-version: 1.25.9
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
     - name: Log in to container registry
@@ -99,7 +100,7 @@ jobs:
         chmod +x operator-sdk_${{ env.OS }}_${{ env.ARCH }} && sudo mv operator-sdk_${{ env.OS }}_${{ env.ARCH }} /usr/local/bin/operator-sdk
     - name: Make and build bundle catalog
       env:
-        VERSION: ${{ steps.get_version.outputs.version }}-dev
+        VERSION: ${{ steps.get_version.outputs.version }}-sunya-ch-dev
       # TODO: add bundle-validate after multi-arch build enablement
       run: |
         make bundle bundle-build bundle-push fbc-bundle-add fbc-build fbc-push
