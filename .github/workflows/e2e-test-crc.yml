@@ -418,11 +418,11 @@ jobs:
           make bundle-push BUNDLE_IMG=$REGISTRY/spyre-operator-bundle:$VERSION
           echo "✅ Bundle image pushed"
           
-          # Build catalog image
+          # Build catalog image (File Based Catalog)
           echo ""
           echo "Building catalog image..."
-          make catalog-build CATALOG_IMG=$REGISTRY/spyre-operator-catalog:$VERSION
-          make catalog-push CATALOG_IMG=$REGISTRY/spyre-operator-catalog:$VERSION
+          make fbc-build CATALOG_IMG=$REGISTRY/spyre-operator-catalog:$VERSION BUNDLE_IMG=$REGISTRY/spyre-operator-bundle:$VERSION
+          make fbc-push CATALOG_IMG=$REGISTRY/spyre-operator-catalog:$VERSION
           echo "✅ Catalog image pushed"
           
           echo ""
