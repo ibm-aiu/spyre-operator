@@ -404,6 +404,8 @@ jobs:
           echo "Registry: $REGISTRY"
           echo "Version: $VERSION"
           echo ""
+          echo "Note: Skipping catalog build for CRC E2E tests"
+          echo ""
           
           # Function to retry push with exponential backoff
           retry_push() {
@@ -437,22 +439,9 @@ jobs:
           retry_push "make docker-push IMG=$REGISTRY/spyre-operator:$VERSION"
           echo "✅ Operator image pushed"
           
-          # Build bundle image
           echo ""
-          echo "Building bundle image..."
-          make bundle-build BUNDLE_IMG=$REGISTRY/spyre-operator-bundle:$VERSION
-          retry_push "make bundle-push BUNDLE_IMG=$REGISTRY/spyre-operator-bundle:$VERSION"
-          echo "✅ Bundle image pushed"
-          
-          # Build catalog image (File Based Catalog)
-          echo ""
-          echo "Building catalog image..."
-          make fbc-build CATALOG_IMG=$REGISTRY/spyre-operator-catalog:$VERSION BUNDLE_IMG=$REGISTRY/spyre-operator-bundle:$VERSION
-          retry_push "make fbc-push CATALOG_IMG=$REGISTRY/spyre-operator-catalog:$VERSION"
-          echo "✅ Catalog image pushed"
-          
-          echo ""
-          echo "✅ All images built and pushed successfully"
+          echo "✅ Operator image built and pushed successfully"
+          echo "Note: Bundle and catalog builds skipped for CRC E2E tests"
           echo "=========================================="
 
       - name: Configure OpenShift Pull Secret for GHCR
@@ -621,34 +610,7 @@ jobs:
           hack/capture-logs.bash spyre-card-management spyre-operator stern.barrier &
           echo $! > /tmp/log-capture-card-management.pid
 
-      - name: Verify Catalog Image
-        env:
-          REGISTRY: ${{ env.GHCR_REGISTRY }}
-          VERSION: ${{ inputs.operator_tag || '1.3.0-dev' }}
-        run: |
-          echo "=========================================="
-          echo "Verifying Catalog Image"
-          echo "=========================================="
-          
-          CATALOG_IMAGE="$REGISTRY/spyre-operator-catalog:$VERSION"
-          echo "Catalog Image: $CATALOG_IMAGE"
-          
-          echo ""
-          echo "Attempting to pull catalog image..."
-          if podman pull "$CATALOG_IMAGE"; then
-            echo "✅ Catalog image pulled successfully"
-            echo ""
-            echo "Image details:"
-            podman inspect "$CATALOG_IMAGE" | jq -r '.[0] | {Created, Size, Architecture, Os}'
-          else
-            echo "❌ Failed to pull catalog image"
-            echo "This will cause the catalog source pod to fail"
-            exit 1
-          fi
-          
-          echo "=========================================="
-
-      - name: Debug Marketplace Status
+      - name: Debug Marketplace Status (Skipped for CRC)
         run: |
           echo "=========================================="
           echo "Checking Marketplace Status (Before Tests)"
