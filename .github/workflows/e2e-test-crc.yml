@@ -552,6 +552,37 @@ jobs:
           hack/capture-logs.bash spyre-card-management spyre-operator stern.barrier &
           echo $! > /tmp/log-capture-card-management.pid
 
+      - name: Debug Marketplace Status
+        run: |
+          echo "=========================================="
+          echo "Checking Marketplace Status"
+          echo "=========================================="
+          
+          echo "Catalog Sources:"
+          oc get catalogsources -n openshift-marketplace
+          
+          echo ""
+          echo "Marketplace Pods:"
+          oc get pods -n openshift-marketplace
+          
+          echo ""
+          echo "Marketplace Pod Details:"
+          oc describe pods -n openshift-marketplace -l olm.catalogSource=ibm-spyre-operators || echo "No catalog pods found yet"
+          
+          echo ""
+          echo "Marketplace Events:"
+          oc get events -n openshift-marketplace --sort-by='.lastTimestamp' | tail -20
+          
+          echo ""
+          echo "Pull Secrets in Marketplace:"
+          oc get secrets -n openshift-marketplace | grep pull
+          
+          echo ""
+          echo "Service Account Secrets:"
+          oc get sa default -n openshift-marketplace -o yaml | grep -A 5 imagePullSecrets || echo "No imagePullSecrets configured"
+          
+          echo "=========================================="
+
       - name: Start Marketplace Monitoring
         run: |
           test/script/monitor-openshift-marketplace.bash stern.barrier &
