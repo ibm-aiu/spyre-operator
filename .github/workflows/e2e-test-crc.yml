@@ -405,24 +405,50 @@ jobs:
           echo "Version: $VERSION"
           echo ""
           
+          # Function to retry push with exponential backoff
+          retry_push() {
+            local cmd="$1"
+            local max_attempts=5
+            local attempt=1
+            local delay=5
+            
+            while [ $attempt -le $max_attempts ]; do
+              echo "Push attempt $attempt/$max_attempts..."
+              if eval "$cmd"; then
+                echo "✅ Push successful"
+                return 0
+              else
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "⚠️  Push failed, retrying in ${delay}s..."
+                  sleep $delay
+                  delay=$((delay * 2))
+                  attempt=$((attempt + 1))
+                else
+                  echo "❌ Push failed after $max_attempts attempts"
+                  return 1
+                fi
+              fi
+            done
+          }
+          
           # Build operator image
           echo "Building operator image..."
           make docker-build IMG=$REGISTRY/spyre-operator:$VERSION
-          make docker-push IMG=$REGISTRY/spyre-operator:$VERSION
+          retry_push "make docker-push IMG=$REGISTRY/spyre-operator:$VERSION"
           echo "✅ Operator image pushed"
           
           # Build bundle image
           echo ""
           echo "Building bundle image..."
           make bundle-build BUNDLE_IMG=$REGISTRY/spyre-operator-bundle:$VERSION
-          make bundle-push BUNDLE_IMG=$REGISTRY/spyre-operator-bundle:$VERSION
+          retry_push "make bundle-push BUNDLE_IMG=$REGISTRY/spyre-operator-bundle:$VERSION"
           echo "✅ Bundle image pushed"
           
           # Build catalog image (File Based Catalog)
           echo ""
           echo "Building catalog image..."
           make fbc-build CATALOG_IMG=$REGISTRY/spyre-operator-catalog:$VERSION BUNDLE_IMG=$REGISTRY/spyre-operator-bundle:$VERSION
-          make fbc-push CATALOG_IMG=$REGISTRY/spyre-operator-catalog:$VERSION
+          retry_push "make fbc-push CATALOG_IMG=$REGISTRY/spyre-operator-catalog:$VERSION"
           echo "✅ Catalog image pushed"
           
           echo ""
