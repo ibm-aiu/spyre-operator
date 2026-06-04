@@ -1938,6 +1938,7 @@ spec:
                   - scheduler
                   - podValidator
                   - healthChecker
+                  - draDriver
                   type: string
                 type: array
             required:

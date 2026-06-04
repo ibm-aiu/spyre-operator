@@ -17,7 +17,7 @@ import (
 
 // Component describes a operator-controlled component name
 // +enum
-// +kubebuilder:validation:Enum=commonInit;devicePlugin;cardManagement;metricsExporter;scheduler;podValidator;healthChecker
+// +kubebuilder:validation:Enum=commonInit;devicePlugin;cardManagement;metricsExporter;scheduler;podValidator;healthChecker;draDriver
 type Component string
 
 const (

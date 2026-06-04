@@ -1,0 +1,32 @@
+spec:
+  devicePlugin:
+    draDriver: true
+    configName: senlib_config.json
+    configPath: /etc/aiu
+    image: dra-driver-spyre
+    initContainer:
+      executePolicy: IfNotPresent
+      image: spyre-device-plugin-init
+      repository: icr.io/ibmaiu_internal
+      version: 1.3.0-dev
+    repository: ghcr.io/ibm-aiu
+    version: 1.3.0-dev
+  healthChecker:
+    enabled: false
+    image: spyre-health-checker
+    repository: ghcr.io/ibm-aiu
+    version: 1.3.0-dev
+  metricsExporter:
+    enabled: false
+    image: spyre-exporter
+    repository: icr.io/ibmaiu_internal
+    version: 1.3.0-dev
+  podValidator:
+    enabled: true
+    image: spyre-webhook-validator
+    repository: ghcr.io/ibm-aiu
+    version: 1.3.0-dev
+  scheduler:
+    image: spyre-scheduler
+    repository: ghcr.io/ibm-aiu
+    version: 1.3.0-dev
