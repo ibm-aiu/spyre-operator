@@ -487,7 +487,11 @@ clean-resource: ## Delete spyre-related resources on a cluster
 
 .PHONY: install-operator
 install-operator: yq ## Install operator via olm and deploy SpyreClusterPolicy
-	@$(REPO_ROOT)/hack/install-operator.bash install $(OPERATOR_NAMESPACE) $(CATALOG_IMG) $(CHANNELS) ARCH=${ARCH}
+	@$(REPO_ROOT)/hack/install-operator.bash install $(OPERATOR_NAMESPACE) $(CATALOG_IMG) $(CHANNELS)
+
+.PHONY: uninstall-operator
+uninstall-operator: ## Uninstall operator via olm and delete SpyreClusterPolicy
+	@$(REPO_ROOT)/hack/install-operator.bash uninstall $(OPERATOR_NAMESPACE)
 
 ##@ Release targets
 .PHONY: detect-secrets-install
