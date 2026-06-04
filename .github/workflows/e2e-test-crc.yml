@@ -588,10 +588,37 @@ jobs:
           hack/capture-logs.bash spyre-card-management spyre-operator stern.barrier &
           echo $! > /tmp/log-capture-card-management.pid
 
+      - name: Verify Catalog Image
+        env:
+          REGISTRY: ${{ env.GHCR_REGISTRY }}
+          VERSION: ${{ inputs.operator_tag || '1.3.0-dev' }}
+        run: |
+          echo "=========================================="
+          echo "Verifying Catalog Image"
+          echo "=========================================="
+          
+          CATALOG_IMAGE="$REGISTRY/spyre-operator-catalog:$VERSION"
+          echo "Catalog Image: $CATALOG_IMAGE"
+          
+          echo ""
+          echo "Attempting to pull catalog image..."
+          if podman pull "$CATALOG_IMAGE"; then
+            echo "✅ Catalog image pulled successfully"
+            echo ""
+            echo "Image details:"
+            podman inspect "$CATALOG_IMAGE" | jq -r '.[0] | {Created, Size, Architecture, Os}'
+          else
+            echo "❌ Failed to pull catalog image"
+            echo "This will cause the catalog source pod to fail"
+            exit 1
+          fi
+          
+          echo "=========================================="
+
       - name: Debug Marketplace Status
         run: |
           echo "=========================================="
-          echo "Checking Marketplace Status"
+          echo "Checking Marketplace Status (Before Tests)"
           echo "=========================================="
           
           echo "Catalog Sources:"
@@ -602,14 +629,6 @@ jobs:
           oc get pods -n openshift-marketplace
           
           echo ""
-          echo "Marketplace Pod Details:"
-          oc describe pods -n openshift-marketplace -l olm.catalogSource=ibm-spyre-operators || echo "No catalog pods found yet"
-          
-          echo ""
-          echo "Marketplace Events:"
-          oc get events -n openshift-marketplace --sort-by='.lastTimestamp' | tail -20
-          
-          echo ""
           echo "Pull Secrets in Marketplace:"
           oc get secrets -n openshift-marketplace | grep pull
           
@@ -617,6 +636,8 @@ jobs:
           echo "Service Account Secrets:"
           oc get sa default -n openshift-marketplace -o yaml | grep -A 5 imagePullSecrets || echo "No imagePullSecrets configured"
           
+          echo ""
+          echo "Note: The ibm-spyre-operators catalog source will be created by the E2E test"
           echo "=========================================="
 
       - name: Start Marketplace Monitoring
