@@ -395,12 +395,14 @@ jobs:
 
       - name: Configure OpenShift Pull Secret for GHCR
         run: |
-          echo "Configuring OpenShift pull secret for GitHub Container Registry..."
+          echo "=========================================="
+          echo "Configuring Pull Secrets for GHCR"
+          echo "=========================================="
           
           # Create docker config JSON with GitHub token
           DOCKER_CONFIG=$(echo -n "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" | base64 -w 0)
           
-          # Create pull secret
+          # Create pull secret JSON
           cat > /tmp/ghcr-pull-secret.json << EOF
           {
             "auths": {
@@ -412,21 +414,50 @@ jobs:
           }
           EOF
           
-          # Get existing pull secret
+          # Update global pull secret
+          echo "Updating global pull secret..."
           oc get secret/pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfigjson}' | \
             base64 -d > /tmp/existing-pull-secret.json
           
-          # Merge secrets
           jq -s '.[0] * .[1]' /tmp/existing-pull-secret.json /tmp/ghcr-pull-secret.json > /tmp/merged-pull-secret.json
           
-          # Update global pull secret
           oc set data secret/pull-secret -n openshift-config \
             --from-file=.dockerconfigjson=/tmp/merged-pull-secret.json
+          
+          echo "✅ Global pull secret updated"
+          
+          # Create pull secret in openshift-marketplace namespace for catalog source
+          echo ""
+          echo "Creating pull secret in openshift-marketplace namespace..."
+          oc create secret docker-registry ghcr-pull-secret \
+            --docker-server=ghcr.io \
+            --docker-username="${{ github.actor }}" \
+            --docker-password="${{ secrets.GITHUB_TOKEN }}" \
+            --docker-email="${{ github.actor }}@users.noreply.github.com" \
+            -n openshift-marketplace \
+            --dry-run=client -o yaml | oc apply -f -
+          
+          echo "✅ Marketplace pull secret created"
+          
+          # Link the secret to the default service account in marketplace
+          echo ""
+          echo "Linking pull secret to service accounts..."
+          oc secrets link default ghcr-pull-secret --for=pull -n openshift-marketplace || true
+          oc secrets link builder ghcr-pull-secret --for=pull -n openshift-marketplace || true
+          
+          echo "✅ Pull secrets linked"
+          
+          # Wait for nodes to pick up the new global pull secret
+          echo ""
+          echo "Waiting for nodes to sync pull secret (30 seconds)..."
+          sleep 30
           
           # Clean up
           rm -f /tmp/*pull-secret.json
           
-          echo "✅ OpenShift pull secret configured for GHCR"
+          echo ""
+          echo "✅ All pull secrets configured for GHCR"
+          echo "=========================================="
 
       - name: Install Test Tools
         run: |
