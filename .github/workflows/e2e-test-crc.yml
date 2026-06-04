@@ -393,6 +393,42 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Build and Push Images
+        env:
+          REGISTRY: ${{ env.GHCR_REGISTRY }}
+          VERSION: ${{ inputs.operator_tag || '1.3.0-dev' }}
+        run: |
+          echo "=========================================="
+          echo "Building and Pushing Images to GHCR"
+          echo "=========================================="
+          echo "Registry: $REGISTRY"
+          echo "Version: $VERSION"
+          echo ""
+          
+          # Build operator image
+          echo "Building operator image..."
+          make docker-build IMG=$REGISTRY/spyre-operator:$VERSION
+          make docker-push IMG=$REGISTRY/spyre-operator:$VERSION
+          echo "✅ Operator image pushed"
+          
+          # Build bundle image
+          echo ""
+          echo "Building bundle image..."
+          make bundle-build BUNDLE_IMG=$REGISTRY/spyre-operator-bundle:$VERSION
+          make bundle-push BUNDLE_IMG=$REGISTRY/spyre-operator-bundle:$VERSION
+          echo "✅ Bundle image pushed"
+          
+          # Build catalog image
+          echo ""
+          echo "Building catalog image..."
+          make catalog-build CATALOG_IMG=$REGISTRY/spyre-operator-catalog:$VERSION
+          make catalog-push CATALOG_IMG=$REGISTRY/spyre-operator-catalog:$VERSION
+          echo "✅ Catalog image pushed"
+          
+          echo ""
+          echo "✅ All images built and pushed successfully"
+          echo "=========================================="
+
       - name: Configure OpenShift Pull Secret for GHCR
         run: |
           echo "=========================================="
