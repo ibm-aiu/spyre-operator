@@ -28,12 +28,8 @@ spec:
       - name: init-data
         image: "FILLED BY THE OPERATOR"
         securityContext:
-          runAsUser: 1001
-          runAsGroup: 0
-          runAsNonRoot: true
-          privileged: false
-          seLinuxOptions:
-            type: spc_t
+          # need to keep this privileged until /usr/local/etc/dra-driver-spyre added to machineconfig
+          privileged: true
         env:
         - name: VERIFY_P2P
           value: "0"
@@ -60,12 +56,8 @@ spec:
       containers:
       - name: plugin
         securityContext:
-          runAsUser: 1001
-          runAsGroup: 0
-          runAsNonRoot: true
-          privileged: false
-          seLinuxOptions:
-            type: spc_t
+          # need to keep this privileged until permission on /var/lib/kubelet/plugins_registry and /var/lib/kubelet/plugins are resolved
+          privileged: true
         image: "FILLED BY THE OPERATOR" # NOSONAR - Placeholder replaced by the operator
         imagePullPolicy: Always
         command: ["spyre-dra-plugin"]
