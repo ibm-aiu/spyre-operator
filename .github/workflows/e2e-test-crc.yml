@@ -672,6 +672,7 @@ jobs:
           echo $! > /tmp/marketplace-monitor.pid
 
       - name: Run End-to-End Tests
+        id: e2e_tests
         run: |
           echo "Running E2E tests..."
           make e2e-test
@@ -688,6 +689,43 @@ jobs:
           fi
           
           exit $TEST_RC
+
+      - name: Debug Test Failure
+        if: failure() && steps.e2e_tests.outcome == 'failure'
+        run: |
+          echo "=========================================="
+          echo "Debugging E2E Test Failure"
+          echo "=========================================="
+          
+          echo "Catalog Sources (after test):"
+          oc get catalogsources -n openshift-marketplace -o yaml
+          
+          echo ""
+          echo "=========================================="
+          echo "Marketplace Pods (after test):"
+          oc get pods -n openshift-marketplace -o wide
+          
+          echo ""
+          echo "=========================================="
+          echo "IBM Spyre Catalog Pod Details:"
+          oc describe pods -n openshift-marketplace -l olm.catalogSource=ibm-spyre-operators || echo "No IBM Spyre catalog pods found"
+          
+          echo ""
+          echo "=========================================="
+          echo "Recent Marketplace Events:"
+          oc get events -n openshift-marketplace --sort-by='.lastTimestamp' | tail -30
+          
+          echo ""
+          echo "=========================================="
+          echo "OLM Operator Logs:"
+          oc logs -n openshift-operator-lifecycle-manager deployment/olm-operator --tail=50 || true
+          
+          echo ""
+          echo "=========================================="
+          echo "Catalog Operator Logs:"
+          oc logs -n openshift-operator-lifecycle-manager deployment/catalog-operator --tail=50 || true
+          
+          echo "=========================================="
 
       - name: Upload Test Results
         if: always()
