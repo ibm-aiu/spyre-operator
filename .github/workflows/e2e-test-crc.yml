@@ -499,9 +499,50 @@ jobs:
           echo "✅ Pull secrets linked"
           
           # Wait for nodes to pick up the new global pull secret
+          # Note: Updating global pull secret can cause node restarts in OpenShift
           echo ""
-          echo "Waiting for nodes to sync pull secret (30 seconds)..."
-          sleep 30
+          echo "Waiting for cluster to stabilize after pull secret update..."
+          echo "This may take a few minutes as the node picks up the new configuration..."
+          sleep 60
+          
+          # Wait for cluster to be accessible again
+          echo ""
+          echo "Checking cluster accessibility..."
+          MAX_RETRIES=30
+          RETRY_COUNT=0
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            if oc get nodes &>/dev/null; then
+              echo "✅ Cluster is accessible"
+              break
+            fi
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            echo "Attempt $RETRY_COUNT/$MAX_RETRIES: Cluster not ready yet, waiting 10 seconds..."
+            sleep 10
+          done
+          
+          if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+            echo "❌ Cluster did not become accessible after pull secret update"
+            echo "Attempting to restart CRC..."
+            sg libvirt -c "crc stop" || true
+            sleep 10
+            sg libvirt -c "crc start --log-level debug"
+            
+            # Wait for cluster to be ready
+            echo "Waiting for cluster to be ready after restart..."
+            sleep 60
+            
+            # Verify cluster is accessible
+            if ! oc get nodes; then
+              echo "❌ Cluster still not accessible after restart"
+              exit 1
+            fi
+          fi
+          
+          # Verify cluster health
+          echo ""
+          echo "Verifying cluster health..."
+          oc get nodes
+          oc get co | head -10
           
           # Clean up
           rm -f /tmp/*pull-secret.json
