@@ -396,15 +396,19 @@ jobs:
       - name: Build and Push Images with E2E Tag
         env:
           REGISTRY: ${{ env.GHCR_REGISTRY }}
-          E2E_TAG: e2e
+          BASE_VERSION: ${{ inputs.operator_tag || '1.3.0' }}
         run: |
           echo "=========================================="
           echo "Building and Pushing Images with E2E Tag"
           echo "=========================================="
           echo "Registry: $REGISTRY"
-          echo "E2E Tag: $E2E_TAG"
+          echo "Base Version: $BASE_VERSION"
+          
+          # Create E2E version by appending -e2e
+          VERSION="${BASE_VERSION}-e2e"
+          echo "E2E Version: $VERSION"
           echo ""
-          echo "Note: Using 'e2e' tag to avoid polluting version tags"
+          echo "Note: Using version-e2e tag format (e.g., 1.3.0-e2e)"
           echo "Note: Skipping catalog build for CRC E2E tests"
           echo ""
           
@@ -434,15 +438,15 @@ jobs:
             done
           }
           
-          # Build operator image with e2e tag
+          # Build operator image with version-e2e tag
           echo "Building operator image..."
-          make docker-build IMG=$REGISTRY/spyre-operator:$E2E_TAG
-          retry_push "make docker-push IMG=$REGISTRY/spyre-operator:$E2E_TAG"
+          make docker-build IMG=$REGISTRY/spyre-operator:$VERSION
+          retry_push "make docker-push IMG=$REGISTRY/spyre-operator:$VERSION"
           echo "✅ Operator image pushed with e2e tag"
           
           echo ""
           echo "✅ Operator image built and pushed successfully"
-          echo "Image: $REGISTRY/spyre-operator:$E2E_TAG"
+          echo "Image: $REGISTRY/spyre-operator:$VERSION"
           echo "Note: Bundle and catalog builds skipped for CRC E2E tests"
           echo "=========================================="
 
@@ -570,7 +574,7 @@ jobs:
       - name: Patch Test Configuration
         env:
           REGISTRY: ${{ env.GHCR_REGISTRY }}
-          E2E_TAG: e2e
+          BASE_VERSION: ${{ inputs.operator_tag || '1.3.0' }}
           EXPORTER_TAG: ${{ inputs.exporter_tag }}
           DEVICE_PLUGIN_TAG: ${{ inputs.device_plugin_tag }}
           FEATURE_DISCOVERY_TAG: ${{ inputs.feature_discovery_tag }}
@@ -583,13 +587,17 @@ jobs:
         run: |
           echo "Patching test configuration for E2E testing..."
           
+          # Create E2E version by appending -e2e
+          VERSION="${BASE_VERSION}-e2e"
+          echo "E2E Version: $VERSION"
+          
           # Update repository to use GHCR
           echo "Updating repository to: $REGISTRY"
           bin/yq eval -i ".repository = \"$REGISTRY\"" test/config.yaml
           
-          # Update operator version to use e2e tag
-          echo "Updating operator version to: $E2E_TAG"
-          bin/yq eval -i ".operator.version = \"$E2E_TAG\"" test/config.yaml
+          # Update operator version to use version-e2e tag
+          echo "Updating operator version to: $VERSION"
+          bin/yq eval -i ".operator.version = \"$VERSION\"" test/config.yaml
           
           # Set image pull policy to Always to ensure fresh pull
           echo "Setting imagePullPolicy to Always"
