@@ -642,19 +642,18 @@ jobs:
 
       - name: Run End-to-End Tests
         id: e2e_tests
-        env:
-          E2E_TEST_LABEL: "e2e && !prop-deps && !catalog"
         run: |
           echo "=========================================="
           echo "Running E2E Tests (Operator-focused)"
           echo "=========================================="
-          echo "Test Label Filter: $E2E_TEST_LABEL"
+          echo "Test Label Filter: e2e && !prop-deps"
           echo ""
           echo "Note: Running only operator-related tests"
-          echo "Skipping: catalog, metrics exporter, and property-dependent tests"
+          echo "Skipping: metrics exporter and property-dependent tests"
           echo ""
           
-          make e2e-test
+          # Use the default E2E_TEST_LABEL which already excludes prop-deps
+          make e2e-test E2E_TEST_LABEL="e2e && !prop-deps"
           TEST_RC=$?
           
           echo ""
