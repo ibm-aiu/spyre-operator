@@ -698,8 +698,17 @@ jobs:
           echo "E2E_KUBECONFIG set to: $E2E_KUBECONFIG"
           
           # Set TEST_CONFIG environment variable to point to the test configuration file
-          export TEST_CONFIG="test/config.yaml"
+          # Use absolute path since ginkgo changes to the test directory
+          export TEST_CONFIG="$(pwd)/test/config.yaml"
           echo "TEST_CONFIG set to: $TEST_CONFIG"
+          
+          # Verify the config file exists
+          if [ ! -f "$TEST_CONFIG" ]; then
+            echo "❌ Error: Test config file not found at $TEST_CONFIG"
+            ls -la test/
+            exit 1
+          fi
+          echo "✅ Test config file found"
           
           # Run ginkgo directly without ensure-deps to avoid NFD/cert-manager installation issues
           # These dependencies are not needed for basic operator tests
