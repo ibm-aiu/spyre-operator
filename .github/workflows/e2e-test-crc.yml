@@ -652,6 +652,10 @@ jobs:
           echo "Skipping: metrics exporter, property-dependent tests, and external dependencies"
           echo ""
           
+          # Set E2E_KUBECONFIG environment variable required by test suite
+          export E2E_KUBECONFIG="$HOME/.kube/config"
+          echo "E2E_KUBECONFIG set to: $E2E_KUBECONFIG"
+          
           # Run ginkgo directly without ensure-deps to avoid NFD/cert-manager installation issues
           # These dependencies are not needed for basic operator tests
           bin/ginkgo run --timeout=2h --label-filter="e2e && !prop-deps" --cover --coverprofile=coverage-report.out -v ./test/e2e/...
