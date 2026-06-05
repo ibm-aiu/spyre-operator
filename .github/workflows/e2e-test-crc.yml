@@ -697,6 +697,10 @@ jobs:
           export E2E_KUBECONFIG="$HOME/.kube/config"
           echo "E2E_KUBECONFIG set to: $E2E_KUBECONFIG"
           
+          # Set TEST_CONFIG environment variable to point to the test configuration file
+          export TEST_CONFIG="test/config.yaml"
+          echo "TEST_CONFIG set to: $TEST_CONFIG"
+          
           # Run ginkgo directly without ensure-deps to avoid NFD/cert-manager installation issues
           # These dependencies are not needed for basic operator tests
           bin/ginkgo run --timeout=2h --label-filter="e2e && !prop-deps" --cover --coverprofile=coverage-report.out -v ./test/e2e/...
