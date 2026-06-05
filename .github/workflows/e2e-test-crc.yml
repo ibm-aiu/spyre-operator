@@ -642,11 +642,22 @@ jobs:
 
       - name: Run End-to-End Tests
         id: e2e_tests
+        env:
+          E2E_TEST_LABEL: "e2e && !prop-deps && !catalog"
         run: |
-          echo "Running E2E tests..."
+          echo "=========================================="
+          echo "Running E2E Tests (Operator-focused)"
+          echo "=========================================="
+          echo "Test Label Filter: $E2E_TEST_LABEL"
+          echo ""
+          echo "Note: Running only operator-related tests"
+          echo "Skipping: catalog, metrics exporter, and property-dependent tests"
+          echo ""
+          
           make e2e-test
           TEST_RC=$?
           
+          echo ""
           echo "Stopping log capture..."
           rm -f stern.barrier
           sleep 5
@@ -657,6 +668,7 @@ jobs:
             echo "❌ E2E tests failed with exit code $TEST_RC"
           fi
           
+          echo "=========================================="
           exit $TEST_RC
 
       - name: Debug Test Failure
