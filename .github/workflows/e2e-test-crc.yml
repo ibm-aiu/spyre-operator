@@ -99,7 +99,7 @@ permissions:
   packages: write # Crucial for pushing to ghcr.io
 
 env:
-  GOTOOLCHAIN: go1.24.13
+  GOTOOLCHAIN: go1.25.10
   HAS_DEVICE: 'false'
   GHCR_REGISTRY: ghcr.io/${{ github.repository_owner }}
 
