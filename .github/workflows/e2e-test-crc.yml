@@ -393,22 +393,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and Push Images with E2E Tag
+      - name: Build and Push Images
         env:
           REGISTRY: ${{ env.GHCR_REGISTRY }}
-          BASE_VERSION: ${{ inputs.operator_tag || '1.3.0' }}
+          VERSION: ${{ inputs.operator_tag || '1.3.0' }}
         run: |
           echo "=========================================="
-          echo "Building and Pushing Images with E2E Tag"
+          echo "Building and Pushing Images"
           echo "=========================================="
           echo "Registry: $REGISTRY"
-          echo "Base Version: $BASE_VERSION"
-          
-          # Create E2E version by appending -e2e
-          VERSION="${BASE_VERSION}-e2e"
-          echo "E2E Version: $VERSION"
-          echo ""
-          echo "Note: Using version-e2e tag format (e.g., 1.3.0-e2e)"
+          echo "Version: $VERSION"
           echo ""
           
           # Function to retry push with exponential backoff
@@ -443,16 +437,24 @@ jobs:
           retry_push "make docker-push IMG=$REGISTRY/spyre-operator:$VERSION"
           echo "✅ Operator image pushed"
           
+          # Build and push bundle image (required for catalog)
+          echo ""
+          echo "Building bundle image..."
+          make bundle-build BUNDLE_IMG=$REGISTRY/spyre-operator-bundle:$VERSION
+          retry_push "make bundle-push BUNDLE_IMG=$REGISTRY/spyre-operator-bundle:$VERSION"
+          echo "✅ Bundle image pushed"
+          
           # Build and push catalog image (required for E2E tests)
           echo ""
           echo "Building catalog image..."
-          make fbc-build CATALOG_IMG=$REGISTRY/spyre-operator-catalog:$VERSION
+          make fbc-build CATALOG_IMG=$REGISTRY/spyre-operator-catalog:$VERSION BUNDLE_IMG=$REGISTRY/spyre-operator-bundle:$VERSION
           retry_push "make fbc-push CATALOG_IMG=$REGISTRY/spyre-operator-catalog:$VERSION"
           echo "✅ Catalog image pushed"
           
           echo ""
           echo "✅ All images built and pushed successfully"
           echo "Operator: $REGISTRY/spyre-operator:$VERSION"
+          echo "Bundle: $REGISTRY/spyre-operator-bundle:$VERSION"
           echo "Catalog: $REGISTRY/spyre-operator-catalog:$VERSION"
           echo "=========================================="
 
@@ -580,7 +582,6 @@ jobs:
       - name: Patch Test Configuration
         env:
           REGISTRY: ${{ env.GHCR_REGISTRY }}
-          BASE_VERSION: ${{ inputs.operator_tag || '1.3.0' }}
           EXPORTER_TAG: ${{ inputs.exporter_tag }}
           DEVICE_PLUGIN_TAG: ${{ inputs.device_plugin_tag }}
           FEATURE_DISCOVERY_TAG: ${{ inputs.feature_discovery_tag }}
@@ -591,30 +592,13 @@ jobs:
           BUNDLE_TAG: ${{ inputs.bundle_tag }}
           CATALOG_TAG: ${{ inputs.catalog_tag }}
         run: |
-          echo "Patching test configuration for E2E testing..."
-          
-          # Create E2E version by appending -e2e
-          VERSION="${BASE_VERSION}-e2e"
-          echo "E2E Version: $VERSION"
+          echo "Patching test configuration..."
           
           # Update repository to use GHCR
           echo "Updating repository to: $REGISTRY"
           bin/yq eval -i ".repository = \"$REGISTRY\"" test/config.yaml
           
-          # Update operator version to use version-e2e tag
-          echo "Updating operator version to: $VERSION"
-          bin/yq eval -i ".operator.version = \"$VERSION\"" test/config.yaml
-          
-          # Update catalog version to use version-e2e tag
-          echo "Updating catalog version to: $VERSION"
-          bin/yq eval -i ".catalog.version = \"$VERSION\"" test/config.yaml
-          
-          # Set image pull policy to Always to ensure fresh pull
-          echo "Setting imagePullPolicy to Always"
-          bin/yq eval -i ".operator.imagePullPolicy = \"Always\"" test/config.yaml
-          bin/yq eval -i ".catalog.imagePullPolicy = \"Always\"" test/config.yaml
-          
-          # Run the standard patch script for other component versions
+          # Run the standard patch script for versions
           ./test/script/patch-e2e-config.bash
           
           echo ""
