@@ -409,7 +409,6 @@ jobs:
           echo "E2E Version: $VERSION"
           echo ""
           echo "Note: Using version-e2e tag format (e.g., 1.3.0-e2e)"
-          echo "Note: Skipping catalog build for CRC E2E tests"
           echo ""
           
           # Function to retry push with exponential backoff
@@ -438,16 +437,23 @@ jobs:
             done
           }
           
-          # Build operator image with version-e2e tag
+          # Build operator image
           echo "Building operator image..."
           make docker-build IMG=$REGISTRY/spyre-operator:$VERSION
           retry_push "make docker-push IMG=$REGISTRY/spyre-operator:$VERSION"
-          echo "✅ Operator image pushed with e2e tag"
+          echo "✅ Operator image pushed"
+          
+          # Build and push catalog image (required for E2E tests)
+          echo ""
+          echo "Building catalog image..."
+          make fbc-build CATALOG_IMG=$REGISTRY/spyre-operator-catalog:$VERSION
+          retry_push "make fbc-push CATALOG_IMG=$REGISTRY/spyre-operator-catalog:$VERSION"
+          echo "✅ Catalog image pushed"
           
           echo ""
-          echo "✅ Operator image built and pushed successfully"
-          echo "Image: $REGISTRY/spyre-operator:$VERSION"
-          echo "Note: Bundle and catalog builds skipped for CRC E2E tests"
+          echo "✅ All images built and pushed successfully"
+          echo "Operator: $REGISTRY/spyre-operator:$VERSION"
+          echo "Catalog: $REGISTRY/spyre-operator-catalog:$VERSION"
           echo "=========================================="
 
       - name: Configure OpenShift Pull Secret for GHCR
@@ -599,9 +605,14 @@ jobs:
           echo "Updating operator version to: $VERSION"
           bin/yq eval -i ".operator.version = \"$VERSION\"" test/config.yaml
           
+          # Update catalog version to use version-e2e tag
+          echo "Updating catalog version to: $VERSION"
+          bin/yq eval -i ".catalog.version = \"$VERSION\"" test/config.yaml
+          
           # Set image pull policy to Always to ensure fresh pull
           echo "Setting imagePullPolicy to Always"
           bin/yq eval -i ".operator.imagePullPolicy = \"Always\"" test/config.yaml
+          bin/yq eval -i ".catalog.imagePullPolicy = \"Always\"" test/config.yaml
           
           # Run the standard patch script for other component versions
           ./test/script/patch-e2e-config.bash
