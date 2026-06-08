@@ -323,12 +323,12 @@ jobs:
           echo ""
           crc version
           
-          # Get cluster credentials (this works even if status check fails)
+          # Get cluster credentials
           echo ""
           echo "Cluster Credentials:"
           sg libvirt -c "crc console --credentials" || true
           
-          # Wait for OpenShift API to be ready (more reliable than crc status)
+          # Wait for OpenShift API to be ready
           echo ""
           echo "Waiting for OpenShift API to be ready..."
           max_attempts=60
@@ -437,14 +437,14 @@ jobs:
           retry_push "make docker-push IMG=$REGISTRY/spyre-operator:$VERSION"
           echo "✅ Operator image pushed"
           
-          # Build and push bundle image (required for catalog)
+          # Build and push bundle image
           echo ""
           echo "Building bundle image..."
           make bundle-build BUNDLE_IMG=$REGISTRY/spyre-operator-bundle:$VERSION
           retry_push "make bundle-push BUNDLE_IMG=$REGISTRY/spyre-operator-bundle:$VERSION"
           echo "✅ Bundle image pushed"
           
-          # Build and push catalog image (required for E2E tests)
+          # Build and push catalog image
           echo ""
           echo "Building catalog image..."
           make fbc-build CATALOG_IMG=$REGISTRY/spyre-operator-catalog:$VERSION BUNDLE_IMG=$REGISTRY/spyre-operator-bundle:$VERSION
@@ -570,7 +570,7 @@ jobs:
           echo "Installing test tools..."
           make ginkgo jq yq
           
-          # Install stern manually (no Makefile target exists)
+          # Install stern manually
           echo "Installing stern..."
           STERN_VERSION="1.30.0"
           curl -sL "https://github.com/stern/stern/releases/download/v${STERN_VERSION}/stern_${STERN_VERSION}_linux_amd64.tar.gz" | \
@@ -612,13 +612,6 @@ jobs:
           echo "=========================================="
           echo "Skipping MachineConfig for CRC"
           echo "=========================================="
-          echo ""
-          echo "Note: MachineConfig is designed for multi-node production clusters."
-          echo "CRC is a single-node development cluster and applying MachineConfig"
-          echo "that triggers node reboots can cause the cluster to become unavailable."
-          echo ""
-          echo "For CRC testing, SELinux policies will be handled differently or"
-          echo "the device plugin will run in a mode that doesn't require them."
           echo ""
           echo "Current cluster status:"
           oc get nodes
@@ -665,7 +658,7 @@ jobs:
           hack/capture-logs.bash spyre-card-management spyre-operator stern.barrier &
           echo $! > /tmp/log-capture-card-management.pid
 
-      - name: Debug Marketplace Status (Skipped for CRC)
+      - name: Debug Marketplace Status
         run: |
           echo "=========================================="
           echo "Checking Marketplace Status (Before Tests)"
@@ -687,7 +680,6 @@ jobs:
           oc get sa default -n openshift-marketplace -o yaml | grep -A 5 imagePullSecrets || echo "No imagePullSecrets configured"
           
           echo ""
-          echo "Note: The ibm-spyre-operators catalog source will be created by the E2E test"
           echo "=========================================="
 
       - name: Start Marketplace Monitoring
@@ -699,12 +691,9 @@ jobs:
         id: e2e_tests
         run: |
           echo "=========================================="
-          echo "Running E2E Tests (Operator-focused, No Dependencies)"
+          echo "Running E2E Tests"
           echo "=========================================="
           echo "Test Label Filter: e2e && !prop-deps"
-          echo ""
-          echo "Note: Running only operator-related tests"
-          echo "Skipping: metrics exporter, property-dependent tests, and external dependencies"
           echo ""
           
           # Set E2E_KUBECONFIG environment variable required by test suite
