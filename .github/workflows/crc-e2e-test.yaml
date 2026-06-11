@@ -263,7 +263,6 @@ jobs:
     # Updates the global pull secret to enable pulling images from the specified registry
     # This action is maintained in ibm-aiu/spyre-operator-actions repository
     - name: Update global pull secret for ghcr.io
-    ibm-aiu/spyre-operator-actions/.github/workflows/create-release.yaml@main
       uses: karthikeyan-balakrishnan1/spyre-operator-actions/.github/workflows/crc-login-and-registry.yaml@main
       with:
         crc-password-path: ~/.crc/machines/crc/kubeadmin-password
