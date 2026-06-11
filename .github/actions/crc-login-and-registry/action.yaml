@@ -1,0 +1,60 @@
+# +-------------------------------------------------------------------+
+# | Copyright IBM Corp. 2025,2026                                     |
+# | SPDX-License-Identifier: Apache-2.0                               |
+# +-------------------------------------------------------------------+
+
+name: 'CRC Login and Registry Setup'
+description: 'Login to CRC cluster and configure registry access'
+
+inputs:
+  crc-password-path:
+    description: 'Path to CRC kubeadmin password file'
+    required: false
+    default: '~/.crc/machines/crc/kubeadmin-password'
+  registry:
+    description: 'Container registry to configure (e.g., ghcr.io)'
+    required: true
+  registry-username:
+    description: 'Registry username'
+    required: true
+  registry-token:
+    description: 'Registry authentication token'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Login to CRC and update global pull secret
+      shell: bash
+      env:
+        REGISTRY: ${{ inputs.registry }}
+        GHCR_TOKEN: ${{ inputs.registry-token }}
+        GHCR_USERNAME: ${{ inputs.registry-username }}
+      run: |
+        # Create temporary files
+        GPS_FILE=$(mktemp)
+        REG_AUTH_FILE=$(mktemp -u)
+        NEW_GPS_FILE=$(mktemp)
+        AUTH_VALUE_FILE=$(mktemp)
+
+        oc login -u kubeadmin -p $(cat ${{ inputs.crc-password-path }}) https://api.crc.testing:6443 --insecure-skip-tls-verify=true
+
+        # Get current global pull secret
+        oc get secret/pull-secret -n openshift-config --template='{{index .data ".dockerconfigjson" | base64decode}}' > ${GPS_FILE}
+
+        # Create registry auth
+        oc registry login --registry="${REGISTRY}" --auth-basic="${GHCR_USERNAME}:${GHCR_TOKEN}" --to=${REG_AUTH_FILE}
+
+        # Extract auth value
+        cat ${REG_AUTH_FILE} | jq -r ".auths[\"${REGISTRY}\"].auth" > ${AUTH_VALUE_FILE}
+
+        # Merge auth into global pull secret
+        jq ".auths |= .+ {\"${REGISTRY}\":{\"auth\": \"$(cat ${AUTH_VALUE_FILE})\"}}" < ${GPS_FILE} > ${NEW_GPS_FILE}
+
+        # Update global pull secret
+        oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=${NEW_GPS_FILE}
+        
+        # Clean up temporary files
+        rm -f ${GPS_FILE} ${REG_AUTH_FILE} ${NEW_GPS_FILE} ${AUTH_VALUE_FILE}
+
+        echo "Global pull secret updated successfully"

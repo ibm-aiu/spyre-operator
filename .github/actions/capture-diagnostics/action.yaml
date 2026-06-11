@@ -1,0 +1,65 @@
+# +-------------------------------------------------------------------+
+# | Copyright IBM Corp. 2025,2026                                     |
+# | SPDX-License-Identifier: Apache-2.0                               |
+# +-------------------------------------------------------------------+
+
+name: 'Capture Spyre Diagnostics'
+description: 'Capture diagnostic information for Spyre components'
+
+inputs:
+  log-directory:
+    description: 'Directory to store diagnostic files'
+    required: false
+    default: 'logs'
+  namespace:
+    description: 'Namespace where Spyre components are deployed'
+    required: false
+    default: 'spyre-operator'
+  component:
+    description: 'Component name to capture diagnostics for'
+    required: false
+    default: 'spyre-device-plugin'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Capture component diagnostics
+      shell: bash
+      run: |
+        #!/bin/bash -e
+
+        oc get po -n ${{ inputs.namespace }}
+
+        mkdir -p ${{ inputs.log-directory }}
+
+        echo "=== Capturing ${{ inputs.component }} pod describe output ===" | tee ${{ inputs.log-directory }}/${{ inputs.component }}-describe.log
+
+        # Get all component pods in namespace
+        PODS=$(oc get pods -n ${{ inputs.namespace }} -l app=${{ inputs.component }} -o name 2>/dev/null || echo "")
+
+        if [ -z "$PODS" ]; then
+          echo "No ${{ inputs.component }} pods found in ${{ inputs.namespace }} namespace" | tee -a ${{ inputs.log-directory }}/${{ inputs.component }}-describe.log
+        else
+          for POD in $PODS; do
+            echo "" | tee -a ${{ inputs.log-directory }}/${{ inputs.component }}-describe.log
+            echo "=== Describe output for $POD ===" | tee -a ${{ inputs.log-directory }}/${{ inputs.component }}-describe.log
+            oc describe $POD -n ${{ inputs.namespace }} >> ${{ inputs.log-directory }}/${{ inputs.component }}-describe.log 2>&1 || echo "Failed to describe $POD" | tee -a ${{ inputs.log-directory }}/${{ inputs.component }}-describe.log
+            echo "" | tee -a ${{ inputs.log-directory }}/${{ inputs.component }}-describe.log
+          done
+        fi
+
+        # Also capture daemonset information
+        echo "=== ${{ inputs.component }} DaemonSet describe ===" | tee -a ${{ inputs.log-directory }}/${{ inputs.component }}-describe.log
+        oc describe daemonset -n ${{ inputs.namespace }} -l app=${{ inputs.component }} >> ${{ inputs.log-directory }}/${{ inputs.component }}-describe.log 2>&1 || echo "No ${{ inputs.component }} daemonset found" | tee -a ${{ inputs.log-directory }}/${{ inputs.component }}-describe.log
+
+        # Capture pod status
+        echo "" | tee -a ${{ inputs.log-directory }}/${{ inputs.component }}-describe.log
+        echo "=== ${{ inputs.component }} pod status ===" | tee -a ${{ inputs.log-directory }}/${{ inputs.component }}-describe.log
+        oc get pods -n ${{ inputs.namespace }} -l app=${{ inputs.component }} -o wide >> ${{ inputs.log-directory }}/${{ inputs.component }}-describe.log 2>&1 || echo "Failed to get pod status" | tee -a ${{ inputs.log-directory }}/${{ inputs.component }}-describe.log
+
+        # Capture events related to component
+        echo "" | tee -a ${{ inputs.log-directory }}/${{ inputs.component }}-describe.log
+        echo "=== Recent events in ${{ inputs.namespace }} namespace ===" | tee -a ${{ inputs.log-directory }}/${{ inputs.component }}-describe.log
+        oc get events -n ${{ inputs.namespace }} --sort-by='.lastTimestamp' | grep -i "${{ inputs.component }}" >> ${{ inputs.log-directory }}/${{ inputs.component }}-describe.log 2>&1 || echo "No events found for ${{ inputs.component }}" | tee -a ${{ inputs.log-directory }}/${{ inputs.component }}-describe.log
+
+# Made with Bob

@@ -58,24 +58,12 @@ jobs:
         echo "branch-name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
         echo "Using branch: ${BRANCH_NAME}"
 
-    - name: install operator-sdk
-      run: |
-        if ! command -v operator-sdk &> /dev/null; then
-          #!/bin/bash -e
-          export ARCH=$(case $(uname -m) in x86_64) echo -n amd64 ;; aarch64) echo -n arm64 ;; *) echo -n $(uname -m) ;; esac)
-          export OS=$(uname | awk '{print tolower($0)}')
-          export OPERATOR_SDK_DL_URL=https://github.com/operator-framework/operator-sdk/releases/download/v1.38.0
-          curl --retry 30 -sLO ${OPERATOR_SDK_DL_URL}/operator-sdk_${OS}_${ARCH}
-          gpg --keyserver keyserver.ubuntu.com --recv-keys 052996E2A20B5C7E
-          curl --retry 30 -sLO ${OPERATOR_SDK_DL_URL}/checksums.txt
-          curl --retry 30 -sLO ${OPERATOR_SDK_DL_URL}/checksums.txt.asc
-          gpg -u "Operator SDK (release) <cncf-operator-sdk@cncf.io>" --verify checksums.txt.asc
-          grep operator-sdk_${OS}_${ARCH} checksums.txt | sha256sum -c -
-          chmod +x operator-sdk_${OS}_${ARCH} && sudo mv operator-sdk_${OS}_${ARCH} /usr/local/bin/operator-sdk
-        else
-          echo "Operator SDK already installed"
-        fi
-        operator-sdk version
+    # Reusable action: Install Operator SDK CLI tool with GPG verification
+    # This action is maintained in ibm-aiu/spyre-operator-actions repository
+    - name: Install operator-sdk
+      uses: ibm-aiu/spyre-operator-actions/install-operator-sdk@main
+      with:
+        version: v1.38.0
 
     - name: Checkout spyre-operator repository
       uses: actions/checkout@v6
@@ -172,24 +160,12 @@ jobs:
         curl -sSL -o patch-e2e-config.bash https://raw.githubusercontent.com/ibm-aiu/spyre-operator-actions/image-build/scripts/patch-e2e-config.bash
         chmod +x patch-e2e-config.bash
 
+    # Reusable action: Install Stern CLI for Kubernetes log tailing
+    # This action is maintained in ibm-aiu/spyre-operator-actions repository
     - name: Install Stern
-      run: |
-        #!/bin/bash -eu
-
-        # Install stern for log capture
-        if ! command -v stern &> /dev/null; then
-          STERN_VERSION="1.30.0"
-          curl -L "https://github.com/stern/stern/releases/download/v${STERN_VERSION}/stern_${STERN_VERSION}_linux_amd64.tar.gz" -o stern.tar.gz
-          tar -xzf stern.tar.gz
-          sudo mv stern /usr/local/bin/
-          sudo chmod +x /usr/local/bin/stern
-          rm stern.tar.gz
-        else
-          echo "stern already installed"
-        fi
-
-        # Verify installation
-        stern --version
+      uses: ibm-aiu/spyre-operator-actions/install-stern@main
+      with:
+        version: '1.30.0'
 
     - name: Push test component image to CRC
       if: ${{ inputs.pr-url != '' }}
@@ -283,37 +259,16 @@ jobs:
         cpus: 16
         disk: 128
 
+    # Reusable action: Login to CRC cluster and configure registry access
+    # Updates the global pull secret to enable pulling images from the specified registry
+    # This action is maintained in ibm-aiu/spyre-operator-actions repository
     - name: Update global pull secret for ghcr.io
-      env:
-        GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        GHCR_USERNAME: ${{ github.actor }}
-      run: |
-        # Create temporary files
-        GPS_FILE=$(mktemp)
-        REG_AUTH_FILE=$(mktemp -u)
-        NEW_GPS_FILE=$(mktemp)
-        AUTH_VALUE_FILE=$(mktemp)
-
-        oc login -u kubeadmin -p $(cat ~/.crc/machines/crc/kubeadmin-password) https://api.crc.testing:6443 --insecure-skip-tls-verify=true
-
-        # Get current global pull secret
-        oc get secret/pull-secret -n openshift-config --template='{{index .data ".dockerconfigjson" | base64decode}}' > ${GPS_FILE}
-
-        # Create registry auth
-        oc registry login --registry="${REGISTRY}" --auth-basic="${GHCR_USERNAME}:${GHCR_TOKEN}" --to=${REG_AUTH_FILE}
-
-        # Extract auth value
-        cat ${REG_AUTH_FILE} | jq -r ".auths[\"${REGISTRY}\"].auth" > ${AUTH_VALUE_FILE}
-
-        # Merge auth into global pull secret
-        jq ".auths |= .+ {\"${REGISTRY}\":{\"auth\": \"$(cat ${AUTH_VALUE_FILE})\"}}" < ${GPS_FILE} > ${NEW_GPS_FILE}
-
-        # Update global pull secret
-        oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=${NEW_GPS_FILE}
-        # Clean up temporary files
-        rm -f ${GPS_FILE} ${REG_AUTH_FILE} ${NEW_GPS_FILE} ${AUTH_VALUE_FILE}
-
-        echo "Global pull secret updated successfully"
+      uses: ibm-aiu/spyre-operator-actions/crc-login-and-registry@main
+      with:
+        crc-password-path: ~/.crc/machines/crc/kubeadmin-password
+        registry: ${{ env.REGISTRY }}
+        registry-username: ${{ github.actor }}
+        registry-token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Apply MachineConfig
       timeout-minutes: 30
@@ -345,20 +300,21 @@ jobs:
         oc get po -n openshift-marketplace
         oc get mcp
 
-    - name: Run E2E tests with log capture
+    # Reusable action: Start background log capture for Spyre components
+    # Captures logs from: spyre-operator, spyre-device-plugin, spyre-webhook-validator,
+    # spyre-health-checker, and secondary-scheduler
+    # This action is maintained in ibm-aiu/spyre-operator-actions repository
+    - name: Start log capture
+      uses: ibm-aiu/spyre-operator-actions/capture-component-logs@main
+      with:
+        log-directory: spyre-operator/logs
+        since: 1h
+
+    - name: Run E2E tests
       timeout-minutes: 70
       working-directory: spyre-operator
       run: |
         #!/bin/bash -e
-
-        mkdir -p logs
-
-        # Start log capture in background, each component to a separate file
-        stern spyre-operator -n spyre-operator --since=1h > logs/spyre-operator.log 2>&1 &
-        stern spyre-device-plugin -n spyre-operator --since=1h > logs/spyre-device-plugin.log 2>&1 &
-        stern spyre-webhook-validator -n spyre-operator --since=1h > logs/spyre-webhook-validator.log 2>&1 &
-        stern spyre-health-checker -n spyre-operator --since=1h > logs/spyre-health-checker.log 2>&1 &
-        stern secondary-scheduler -n openshift-secondary-scheduler-operator --since=1h > logs/secondary-scheduler.log 2>&1 &
 
         # Run the actual tests
         make e2e-test 2>&1 | tee e2e-test-output.log
@@ -369,45 +325,16 @@ jobs:
 
         exit ${E2E_EXIT}
 
+    # Reusable action: Capture diagnostic information for troubleshooting
+    # Collects pod descriptions, daemonset info, pod status, and events
+    # This action is maintained in ibm-aiu/spyre-operator-actions repository
     - name: Capture spyre-device-plugin diagnostics
       if: always()
-      working-directory: spyre-operator
-      run: |
-        #!/bin/bash -e
-
-        oc get po -n spyre-operator
-
-        mkdir -p logs
-
-        echo "=== Capturing spyre-device-plugin pod describe output ===" | tee logs/spyre-device-plugin-describe.log
-
-        # Get all spyre-device-plugin pods in spyre-operator namespace
-        PODS=$(oc get pods -n spyre-operator -l app=spyre-device-plugin -o name 2>/dev/null || echo "")
-
-        if [ -z "$PODS" ]; then
-          echo "No spyre-device-plugin pods found in spyre-operator namespace" | tee -a logs/spyre-device-plugin-describe.log
-        else
-          for POD in $PODS; do
-            echo "" | tee -a logs/spyre-device-plugin-describe.log
-            echo "=== Describe output for $POD ===" | tee -a logs/spyre-device-plugin-describe.log
-            oc describe $POD -n spyre-operator >> logs/spyre-device-plugin-describe.log 2>&1 || echo "Failed to describe $POD" | tee -a logs/spyre-device-plugin-describe.log
-            echo "" | tee -a logs/spyre-device-plugin-describe.log
-          done
-        fi
-
-        # Also capture daemonset information
-        echo "=== Spyre-device-plugin DaemonSet describe ===" | tee -a logs/spyre-device-plugin-describe.log
-        oc describe daemonset -n spyre-operator -l app=spyre-device-plugin >> logs/spyre-device-plugin-describe.log 2>&1 || echo "No spyre-device-plugin daemonset found" | tee -a logs/spyre-device-plugin-describe.log
-
-        # Capture pod status
-        echo "" | tee -a logs/spyre-device-plugin-describe.log
-        echo "=== Spyre-device-plugin pod status ===" | tee -a logs/spyre-device-plugin-describe.log
-        oc get pods -n spyre-operator -l app=spyre-device-plugin -o wide >> logs/spyre-device-plugin-describe.log 2>&1 || echo "Failed to get pod status" | tee -a logs/spyre-device-plugin-describe.log
-
-        # Capture events related to spyre-device-plugin
-        echo "" | tee -a logs/spyre-device-plugin-describe.log
-        echo "=== Recent events in spyre-operator namespace ===" | tee -a logs/spyre-device-plugin-describe.log
-        oc get events -n spyre-operator --sort-by='.lastTimestamp' | grep -i "spyre-device-plugin" >> logs/spyre-device-plugin-describe.log 2>&1 || echo "No events found for spyre-device-plugin" | tee -a logs/spyre-device-plugin-describe.log
+      uses: ibm-aiu/spyre-operator-actions/capture-diagnostics@main
+      with:
+        log-directory: spyre-operator/logs
+        namespace: spyre-operator
+        component: spyre-device-plugin
 
     - name: Upload component logs
       if: always()
