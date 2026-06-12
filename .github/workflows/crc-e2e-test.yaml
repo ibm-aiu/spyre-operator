@@ -69,7 +69,7 @@ jobs:
     # Reusable action: Install Operator SDK CLI tool with GPG verification
     # This action is maintained locally in .github/actions/install-operator-sdk
     - name: Install operator-sdk
-      uses: karthikeyan-balakrishnan1/spyre-operator-actions/.github/actions/install-operator-sdk
+      uses: karthikeyan-balakrishnan1/spyre-operator-actions/.github/actions/install-operator-sdk@main
       with:
         version: v1.38.0
 
@@ -171,7 +171,7 @@ jobs:
     # Reusable action: Install Stern CLI for Kubernetes log tailing
     # This action is maintained locally in .github/actions/install-stern
     - name: Install Stern
-      uses: karthikeyan-balakrishnan1/spyre-operator-actions/.github/actions/install-stern
+      uses: karthikeyan-balakrishnan1/spyre-operator-actions/.github/actions/install-stern@main
       with:
         version: '1.30.0'
 
