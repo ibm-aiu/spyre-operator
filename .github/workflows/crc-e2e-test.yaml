@@ -7,10 +7,6 @@ name: CRC End to End Test on amd64
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-    -'**'
-
     inputs:
       branch-name:
         description: "Branch name to checkout from spyre-operator repo"
@@ -35,6 +31,9 @@ on:
         description: "Operator channel"
         required: false
         type: string
+  push:
+    branches:
+    - '**'
 
 permissions:
   contents: read
