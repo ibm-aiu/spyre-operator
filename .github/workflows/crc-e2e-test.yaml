@@ -271,7 +271,7 @@ jobs:
     # Updates the global pull secret to enable pulling images from the specified registry
     # This action is maintained locally in .github/actions/crc-login-and-registry
     - name: Update global pull secret for ghcr.io
-      uses: karthikeyan-balakrishnan1/spyre-operator-actions/.github/actions/crc-login-and-registry
+      uses: karthikeyan-balakrishnan1/spyre-operator-actions/.github/actions/crc-login-and-registry@main
       with:
         crc-password-path: ~/.crc/machines/crc/kubeadmin-password
         registry: ${{ env.REGISTRY }}
@@ -313,7 +313,7 @@ jobs:
     # spyre-health-checker, and secondary-scheduler
     # This action is maintained locally in .github/actions/capture-component-logs
     - name: Start log capture
-      uses: karthikeyan-balakrishnan1/spyre-operator-actions/.github/actions/capture-component-logs
+      uses: karthikeyan-balakrishnan1/spyre-operator-actions/.github/actions/capture-component-logs@main
       with:
         log-directory: spyre-operator/logs
         since: 1h
@@ -338,7 +338,7 @@ jobs:
     # This action is maintained locally in .github/actions/capture-diagnostics
     - name: Capture spyre-device-plugin diagnostics
       if: always()
-      uses: karthikeyan-balakrishnan1/spyre-operator-actions/.github/actions/capture-diagnostics
+      uses: karthikeyan-balakrishnan1/spyre-operator-actions/.github/actions/capture-diagnostics@main
       with:
         log-directory: spyre-operator/logs
         namespace: spyre-operator
