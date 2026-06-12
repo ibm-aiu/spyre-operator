@@ -5,12 +5,12 @@
 
 name: CRC End to End Test on amd64
 
+# Trigger conditions for this workflow
 on:
-  workflow_dispatch:
-  push:
+  push:  # Run on every push to the repository
     branches:
-    -'**'
-
+      - '**'  # Trigger on all branches
+  workflow_dispatch:  # Allow manual triggering with custom parameters
     inputs:
       branch-name:
         description: "Branch name to checkout from spyre-operator repo"
