@@ -63,10 +63,10 @@ jobs:
         echo "branch-name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
         echo "Using branch: ${BRANCH_NAME}"
 
-    # Reusable action:Install Operator SDK CLI tool with GPG verification
-    # This action is maintained in ibm-aiu/spyre-operator-actions repository
+    # Reusable action: Install Operator SDK CLI tool with GPG verification
+    # This action is maintained locally in .github/actions/install-operator-sdk
     - name: Install operator-sdk
-      uses: karthikeyan-balakrishnan1/spyre-operator-actions/.github/workflows/install-operator-sdk.yaml@main
+      uses: ./.github/actions/install-operator-sdk
       with:
         version: v1.38.0
 
@@ -166,9 +166,9 @@ jobs:
         chmod +x patch-e2e-config.bash
 
     # Reusable action: Install Stern CLI for Kubernetes log tailing
-    # This action is maintained in karthikeyan-balakrishnan1/spyre-operator-actions repository
+    # This action is maintained locally in .github/actions/install-stern
     - name: Install Stern
-      uses: karthikeyan-balakrishnan1/spyre-operator-actions/.github/workflows/install-stern.yaml@main
+      uses: ./.github/actions/install-stern
       with:
         version: '1.30.0'
 
@@ -266,9 +266,9 @@ jobs:
 
     # Reusable action: Login to CRC cluster and configure registry access
     # Updates the global pull secret to enable pulling images from the specified registry
-    # This action is maintained in karthikeyan-balakrishnan1/spyre-operator-actions repository
+    # This action is maintained locally in .github/actions/crc-login-and-registry
     - name: Update global pull secret for ghcr.io
-      uses: karthikeyan-balakrishnan1/spyre-operator-actions/.github/workflows/crc-login-and-registry.yaml@main
+      uses: ./.github/actions/crc-login-and-registry
       with:
         crc-password-path: ~/.crc/machines/crc/kubeadmin-password
         registry: ${{ env.REGISTRY }}
@@ -308,9 +308,9 @@ jobs:
     # Reusable action: Start background log capture for Spyre components
     # Captures logs from: spyre-operator, spyre-device-plugin, spyre-webhook-validator,
     # spyre-health-checker, and secondary-scheduler
-    # This action is maintained in karthikeyan-balakrishnan1/spyre-operator-actions repository
+    # This action is maintained locally in .github/actions/capture-component-logs
     - name: Start log capture
-      uses: karthikeyan-balakrishnan1/spyre-operator-actions/.github/workflows/capture-component-logs.yaml@main
+      uses: ./.github/actions/capture-component-logs
       with:
         log-directory: spyre-operator/logs
         since: 1h
@@ -332,10 +332,10 @@ jobs:
 
     # Reusable action: Capture diagnostic information for troubleshooting
     # Collects pod descriptions, daemonset info, pod status, and events
-    # This action is maintained in karthikeyan-balakrishnan1/spyre-operator-actions repository
+    # This action is maintained locally in .github/actions/capture-diagnostics
     - name: Capture spyre-device-plugin diagnostics
       if: always()
-      uses: karthikeyan-balakrishnan1/spyre-operator-actions/.github/workflows/capture-diagnostics.yaml@main
+      uses: ./.github/actions/capture-diagnostics
       with:
         log-directory: spyre-operator/logs
         namespace: spyre-operator
