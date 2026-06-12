@@ -37,7 +37,7 @@ on:
         required: false
         type: string
 
-# Restrict workflow permissions to read-only for security
+# Restrict workflow permissions for security
 permissions:
   contents: read
   packages: write
@@ -47,23 +47,9 @@ env:
   CRC_REGISTRY: default-route-openshift-image-registry.apps-crc.testing
 
 jobs:
-  # Job 1: Install operator-sdk using reusable workflow
-  install-operator-sdk:
-    uses: karthikeyan-balakrishnan1/spyre-operator-actions/.github/workflows/install-operator-sdk.yaml@main
-    with:
-      version: v1.38.0
-
-  # Job 2: Install stern using reusable workflow
-  install-stern:
-    uses: karthikeyan-balakrishnan1/spyre-operator-actions/.github/workflows/install-stern.yaml@main
-    with:
-      version: '1.30.0'
-
-  # Job 3: Main CRC E2E test job
+  # Main CRC E2E test job - runs all test steps sequentially
   crc-test:
     runs-on: ubuntu-latest
-    # Wait for tool installation jobs to complete
-    needs: [install-operator-sdk, install-stern]
     env:
       # Use input registry if provided, otherwise default to ghcr.io/ibm-aiu
       REGISTRY: ${{ inputs.registry || 'ghcr.io/ibm-aiu' }}
