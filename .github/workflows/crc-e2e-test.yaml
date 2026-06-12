@@ -48,6 +48,10 @@ jobs:
     env:
       REGISTRY: ${{ inputs.registry || 'ghcr.io/ibm-aiu' }}
     steps:
+    # Checkout the current repository first to access local actions
+    - name: Checkout current repository for actions
+      uses: actions/checkout@v6
+
     - name: Set branch name
       id: set-branch
       run: |
