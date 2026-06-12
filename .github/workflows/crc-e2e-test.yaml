@@ -69,7 +69,7 @@ jobs:
     # Reusable action: Install Operator SDK CLI tool with GPG verification
     # This action is maintained locally in .github/actions/install-operator-sdk
     - name: Install operator-sdk
-      uses: ./.github/actions/install-operator-sdk
+      uses: karthikeyan-balakrishnan1/spyre-operator-actions/.github/actions/install-operator-sdk
       with:
         version: v1.38.0
 
@@ -171,7 +171,7 @@ jobs:
     # Reusable action: Install Stern CLI for Kubernetes log tailing
     # This action is maintained locally in .github/actions/install-stern
     - name: Install Stern
-      uses: ./.github/actions/install-stern
+      uses: karthikeyan-balakrishnan1/spyre-operator-actions/.github/actions/install-stern
       with:
         version: '1.30.0'
 
@@ -271,7 +271,7 @@ jobs:
     # Updates the global pull secret to enable pulling images from the specified registry
     # This action is maintained locally in .github/actions/crc-login-and-registry
     - name: Update global pull secret for ghcr.io
-      uses: ./.github/actions/crc-login-and-registry
+      uses: karthikeyan-balakrishnan1/spyre-operator-actions/.github/actions/crc-login-and-registry
       with:
         crc-password-path: ~/.crc/machines/crc/kubeadmin-password
         registry: ${{ env.REGISTRY }}
@@ -313,7 +313,7 @@ jobs:
     # spyre-health-checker, and secondary-scheduler
     # This action is maintained locally in .github/actions/capture-component-logs
     - name: Start log capture
-      uses: ./.github/actions/capture-component-logs
+      uses: karthikeyan-balakrishnan1/spyre-operator-actions/.github/actions/capture-component-logs
       with:
         log-directory: spyre-operator/logs
         since: 1h
@@ -338,7 +338,7 @@ jobs:
     # This action is maintained locally in .github/actions/capture-diagnostics
     - name: Capture spyre-device-plugin diagnostics
       if: always()
-      uses: ./.github/actions/capture-diagnostics
+      uses: karthikeyan-balakrishnan1/spyre-operator-actions/.github/actions/capture-diagnostics
       with:
         log-directory: spyre-operator/logs
         namespace: spyre-operator
