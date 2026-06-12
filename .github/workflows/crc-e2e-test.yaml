@@ -58,8 +58,8 @@ jobs:
         echo "branch-name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
         echo "Using branch: ${BRANCH_NAME}"
 
-    # Reusable action: Install Operator SDK CLI tool with GPG verification
-    # This action is maintained in karthikeyan-balakrishnan1/spyre-operator-actions repository
+    # Reusable action:Install Operator SDK CLI tool with GPG verification
+    # This action is maintained in ibm-aiu/spyre-operator-actions repository
     - name: Install operator-sdk
       uses: karthikeyan-balakrishnan1/spyre-operator-actions/.github/workflows/install-operator-sdk.yaml@main
       with:
