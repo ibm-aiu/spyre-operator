@@ -6,8 +6,11 @@
 name: CRC End to End Test on amd64
 
 on:
-  push:
   workflow_dispatch:
+  push:
+    branches:
+    -'**'
+
     inputs:
       branch-name:
         description: "Branch name to checkout from spyre-operator repo"
@@ -33,7 +36,9 @@ on:
         required: false
         type: string
 
-permissions: read-all
+permissions:
+  contents: read
+  packages: write
 
 env:
   CRC_REGISTRY: default-route-openshift-image-registry.apps-crc.testing
