@@ -22,33 +22,33 @@ metadata:
                 "executePolicy": "IfNotPresent",
                 "image": "spyre-device-plugin-init",
                 "repository": "docker.io/spyre-operator",
-                "version": "1.3.0-dev"
+                "version": "1.4.0-dev"
               },
               "repository": "docker.io/spyre-operator",
-              "version": "1.3.0-dev"
+              "version": "1.4.0-dev"
             },
             "healthChecker": {
               "enabled": false,
               "image": "spyre-health-checker",
               "repository": "docker.io/spyre-operator",
-              "version": "1.3.0-dev"
+              "version": "1.4.0-dev"
             },
             "metricsExporter": {
               "enabled": false,
               "image": "spyre-exporter",
               "repository": "docker.io/spyre-operator",
-              "version": "1.3.0-dev"
+              "version": "1.4.0-dev"
             },
             "podValidator": {
               "enabled": true,
               "image": "spyre-webhook-validator",
               "repository": "docker.io/spyre-operator",
-              "version": "1.3.0-dev"
+              "version": "1.4.0-dev"
             },
             "scheduler": {
               "image": "spyre-scheduler",
               "repository": "docker.io/spyre-operator",
-              "version": "1.3.0-dev"
+              "version": "1.4.0-dev"
             }
           }
         },
@@ -68,8 +68,8 @@ metadata:
       ]
     capabilities: Basic Install
     categories: AI/Machine Learning
-    containerImage: docker.io/spyre-operator/spyre-operator:1.3.0
-    createdAt: "2026-06-19T00:20:59Z"
+    containerImage: docker.io/spyre-operator/spyre-operator:1.4.0
+    createdAt: "2026-06-23T02:19:41Z"
     description: Operator for IBM Spyre devices
     features.operators.openshift.io/disconnected: "false"
     features.operators.openshift.io/fips-compliant: "false"
@@ -89,7 +89,7 @@ metadata:
     operatorframework.io/arch.ppc64le: supported
     operatorframework.io/arch.s390x: supported
     operatorframework.io/os.linux: supported
-  name: spyre-operator.v1.3.0
+  name: spyre-operator.v1.4.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -566,14 +566,14 @@ spec:
       deployments:
       - label:
           control-plane: spyre-operator
-          operator-version: 1.3.0-dev
+          operator-version: 1.4.0-dev
         name: spyre-operator
         spec:
           replicas: 1
           selector:
             matchLabels:
               control-plane: spyre-operator
-              operator-version: 1.3.0-dev
+              operator-version: 1.4.0-dev
           strategy: {}
           template:
             metadata:
@@ -581,7 +581,7 @@ spec:
                 kubectl.kubernetes.io/default-container: manager
               labels:
                 control-plane: spyre-operator
-                operator-version: 1.3.0-dev
+                operator-version: 1.4.0-dev
             spec:
               affinity:
                 nodeAffinity:
@@ -611,8 +611,8 @@ spec:
                     fieldRef:
                       fieldPath: metadata.namespace
                 - name: RELATED_IMAGE_SPYRE_OPERATOR
-                  value: docker.io/spyre-operator/spyre-operator:1.3.0
-                image: docker.io/spyre-operator/spyre-operator:1.3.0
+                  value: docker.io/spyre-operator/spyre-operator:1.4.0
+                image: docker.io/spyre-operator/spyre-operator:1.4.0
                 imagePullPolicy: Always
                 livenessProbe:
                   httpGet:
@@ -700,6 +700,6 @@ spec:
   provider:
     name: IBM
   relatedImages:
-  - image: docker.io/spyre-operator/spyre-operator:1.3.0
+  - image: docker.io/spyre-operator/spyre-operator:1.4.0
     name: spyre-operator
-  version: 1.3.0
+  version: 1.4.0

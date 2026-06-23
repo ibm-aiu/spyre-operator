@@ -60,6 +60,7 @@ spec:
                       config (spyrecardmgmg.ini).
                     properties:
                       pfRunnerImage:
+                        default: docker.io/spyre-operator/spyredriver-image:latest
                         description: PfRunnerImage specifies pfimage_URL
                         type: string
                       spyreFilter:
@@ -67,6 +68,7 @@ spec:
                         description: SpyreFilter specifies spyrefilter value
                         type: string
                       vfRunnerImage:
+                        default: docker.io/spyre-operator/spyredriver-image:latest
                         description: VfRunnerImage specifies vfimage_URL
                         type: string
                     type: object

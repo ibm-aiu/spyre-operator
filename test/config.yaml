@@ -8,33 +8,33 @@ nodeName: "" # Provide actual hostname with Spyre cards or integration test will
 defaultChannel: "fast-v1.3"
 catalog:
   image: spyre-operator-catalog
-  version: 1.3.0-dev
+  version: 1.4.0-dev
   imagePullPolicy: Always
 bundle:
   image: spyre-operator-bundle
-  version: 1.3.0-dev
+  version: 1.4.0-dev
   imagePullPolicy: Always
 operator:
   image: spyre-operator
-  version: 1.3.0-dev
+  version: 1.4.0-dev
   imagePullPolicy: Always
 devicePlugin:
   image: spyre-device-plugin
-  version: 1.3.0-dev
+  version: 1.4.0-dev
   imagePullPolicy: Always
 scheduler:
   image: spyre-scheduler
-  version: 1.3.0-dev
+  version: 1.4.0-dev
   imagePullPolicy: Always
 podValidator:
   enabled: false
   image: spyre-webhook-validator
-  version: 1.3.0-dev
+  version: 1.4.0-dev
   imagePullPolicy: Always
 healthChecker:
   enabled: false
   image: spyre-health-checker
-  version: 1.3.0-dev
+  version: 1.4.0-dev
   imagePullPolicy: Always
 draDriver:
   image: dra-driver-spyre
@@ -43,18 +43,18 @@ draDriver:
 exporter:
   enabled: false
   image: spyre-exporter
-  version: 1.2.1
+  version: 1.4.0-dev
   imagePullPolicy: Always
   repository: quay.io/ibm-aiu
 mockUser:
   image: spyre-mock-user
-  version: 1.2.1
+  version: 1.4.0-dev
   imagePullPolicy: Always
   repository: quay.io/ibm-aiu
 devicePluginInit:
   enabled: true
   image: spyre-device-plugin-init
-  version: 1.2.1
+  version: 1.4.0-dev
   imagePullPolicy: Always
   executePolicy: IfNotPresent
   repository: quay.io/ibm-aiu
