@@ -75,6 +75,7 @@ function propagate_version() {
 	${YQ} eval -i ".scheduler.version=\"$(image_tag scheduler)\"" ${REPO_ROOT}/test/config.yaml
 	${YQ} eval -i ".podValidator.version=\"$(image_tag podValidator)\"" ${REPO_ROOT}/test/config.yaml
 	${YQ} eval -i ".healthChecker.version=\"$(image_tag healthChecker)\"" ${REPO_ROOT}/test/config.yaml
+	${YQ} eval -i ".draDriver.version=\"$(image_tag draDriver)\"" ${REPO_ROOT}/test/config.yaml
 	${YQ} eval -i ".defaultChannel=\"${DEFAULT_CHANNEL}\"" ${REPO_ROOT}/test/config.yaml
 
 	# patch bundle annotation
