@@ -43,18 +43,18 @@ draDriver:
 exporter:
   enabled: false
   image: spyre-exporter
-  version: 1.4.0-dev
+  version: 1.3.0
   imagePullPolicy: Always
   repository: quay.io/ibm-aiu
 mockUser:
   image: spyre-mock-user
-  version: 1.4.0-dev
+  version: 1.3.0
   imagePullPolicy: Always
   repository: quay.io/ibm-aiu
 devicePluginInit:
   enabled: true
   image: spyre-device-plugin-init
-  version: 1.4.0-dev
+  version: 1.3.0
   imagePullPolicy: Always
   executePolicy: IfNotPresent
   repository: quay.io/ibm-aiu
