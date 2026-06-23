@@ -16,7 +16,7 @@ spec:
   devicePlugin:
     repository: "docker.io/spyre-operator"
     image: "spyre-device-plugin"
-    version: 1.3.0-dev
+    version: 1.4.0-dev
   skipUpdateComponents:
   - commonInit
   - devicePlugin
