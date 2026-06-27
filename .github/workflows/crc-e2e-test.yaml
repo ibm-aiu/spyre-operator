@@ -39,9 +39,6 @@ permissions:
   contents: read
   packages: write
 
-env:
-  CRC_REGISTRY: default-route-openshift-image-registry.apps-crc.testing
-
 jobs:
   crc-test:
     uses: karthikeyan-balakrishnan1/spyre-operator-actions/.github/workflows/crc-e2e-test.yaml@main
