@@ -3,7 +3,7 @@
 # | SPDX-License-Identifier: Apache-2.0                               |
 # +-------------------------------------------------------------------+
 
-name: CRC End to End Test
+name: CRC Spyre Operator End to End Test
 
 on:
   workflow_dispatch:
