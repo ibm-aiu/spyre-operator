@@ -44,7 +44,7 @@ env:
 
 jobs:
   crc-test:
-    uses: karthikeyan-balakrishnan1/spyre-operator-actions/.github/workflows/build-image.yaml@main
+    uses: karthikeyan-balakrishnan1/spyre-operator-actions/.github/workflows/crc-e2e-test.yaml@main
     with:
       runner: ubuntu-latest
       repository: ibm-aiu/spyre-operator
