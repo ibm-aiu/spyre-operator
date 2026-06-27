@@ -44,6 +44,11 @@ env:
 
 jobs:
   crc-test:
+    uses: karthikeyan-balakrishnan1/spyre-operator-actions/.github/workflows/build-image.yaml@main
+    with:
+      runner: ubuntu-latest
+      repository: ibm-aiu/spyre-operator
+      path: spyre-operator
     runs-on: ubuntu-latest
     env:
       REGISTRY: ${{ inputs.registry || 'ghcr.io/ibm-aiu' }}
@@ -64,7 +69,7 @@ jobs:
 
     # Reusable action: Install Operator SDK CLI tool with GPG verification
     - name: Install operator-sdk
-      uses: ibm-aiu/spyre-operator-actions/.github/actions/install-operator-sdk@main
+      uses: karthikeyan-balakrishnan1/spyre-operator-actions/.github/actions/install-operator-sdk@main
       with:
         version: v1.38.0
 
@@ -164,7 +169,7 @@ jobs:
 
     # Reusable action: Install Stern CLI for Kubernetes log tailing
     - name: Install Stern
-      uses: ibm-aiu/spyre-operator-actions/.github/actions/install-stern@main
+      uses: karthikeyan-balakrishnan1/spyre-operator-actions/.github/actions/install-stern@main
       with:
         version: '1.30.0'
 
@@ -263,7 +268,7 @@ jobs:
     # Reusable action: Login to CRC cluster and configure registry access
     # Updates the global pull secret to enable pulling images from the specified registry
     - name: Update global pull secret for ghcr.io
-      uses: ibm-aiu/spyre-operator-actions/.github/actions/crc-login-and-registry@main
+      uses: karthikeyan-balakrishnan1/spyre-operator-actions/.github/actions/crc-login-and-registry@main
       with:
         crc-password-path: ~/.crc/machines/crc/kubeadmin-password
         registry: ${{ env.REGISTRY }}
@@ -304,7 +309,7 @@ jobs:
     # Captures logs from: spyre-operator, spyre-device-plugin, spyre-webhook-validator,
     # spyre-health-checker, and secondary-scheduler
     - name: Start log capture
-      uses: ibm-aiu/spyre-operator-actions/.github/actions/capture-component-logs@main
+      uses: karthikeyan-balakrishnan1/spyre-operator-actions/.github/actions/capture-component-logs@main
       with:
         log-directory: spyre-operator/logs
         since: 1h
@@ -328,7 +333,7 @@ jobs:
     # Collects pod descriptions, daemonset info, pod status, and events
     - name: Capture spyre-device-plugin diagnostics
       if: always()
-      uses: ibm-aiu/spyre-operator-actions/.github/actions/capture-diagnostics@main
+      uses: karthikeyan-balakrishnan1/spyre-operator-actions/.github/actions/capture-diagnostics@main
       with:
         log-directory: spyre-operator/logs
         namespace: spyre-operator
