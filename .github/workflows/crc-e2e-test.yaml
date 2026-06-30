@@ -1,0 +1,53 @@
+# +-------------------------------------------------------------------+
+# | Copyright IBM Corp. 2026                                          |
+# | SPDX-License-Identifier: Apache-2.0                               |
+# +-------------------------------------------------------------------+
+
+name: CRC Spyre Operator End to End Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch-name:
+        description: "Branch name to checkout from spyre-operator repo"
+        required: false
+        type: string
+        default: "main"
+      registry:
+        description: 'Container registry to push to (e.g., ghcr.io, docker.io)'
+        required: false
+        type: string
+        default: 'ghcr.io/ibm-aiu'
+      pr-url:
+        description: 'GitHub Pull Request URL to test. If provided, will fetch and
+          test the PR branch.'
+        required: false
+        type: string
+      operator-version:
+        description: "Spyre operator tag to run in test"
+        required: false
+        type: string
+      operator-channel:
+        description: "Operator channel"
+        required: false
+        type: string
+  push:
+    branches:
+    - '**'
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  CRC_REGISTRY: default-route-openshift-image-registry.apps-crc.testing
+
+jobs:
+  crc-test:
+    uses: ibm-aiu/spyre-operator-actions/.github/workflows/crc-e2e-test.yaml@main
+    secrets:
+      CRC_PULL_SECRET_SUNYACH: ${{ secrets.CRC_PULL_SECRET_SUNYACH }}
+    with:
+      runner: ubuntu-latest
+      repository: ibm-aiu/spyre-operator
+      path: spyre-operator
