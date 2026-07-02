@@ -28,11 +28,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type entry struct {
-	ScriptName string
-	Doom       bool
-}
-
 var discoClient *discovery.DiscoveryClient
 var amd64arch bool
 var ppc64le bool
@@ -160,45 +155,13 @@ var _ = Describe("integration test", Label("integration", "cardmgmt"), Ordered, 
 			})
 		})
 
-		// Skip small toy test. Original image is obsolete.
-		PIt("run small-toy.py on spyre VF", func() {
-
-			By("create small toy config map")
-			smallToyCM := entry{
-				ScriptName: "small-toy.py",
-				Doom:       true,
-			}
-			smallToyCmYaml := testutils.YamlFromTemplate(testutils.WorkloadConfigMapTemplate, smallToyCM)
-			_, err := testutils.CreateResourceFromYaml(ctx, dynClient, discoClient, "spyre-apps", smallToyCmYaml)
-			Expect(err).To(BeNil())
-			defer os.Remove(smallToyCmYaml)
-
-			By("create small toy pod")
-			smallToyPodData := testutils.PodTemplateData{
-				Name:             "small-toy",
-				Image:            itConfig.WorkloadImage,
+		It("can deploy a Spyre VF pod", func() {
+			vfPodData := testutils.PodTemplateData{
+				Name:             "vf-pod-deploy",
 				ResourceName:     "ibm.com/spyre_vf",
 				ResourceQuantity: "1",
-				FlexDevice:       "VF",
 			}
-			if len(nodeFilter) > 0 {
-				smallToyPodData.NodeSelectorNode = nodeFilter[0]
-			}
-			smallToyYaml := testutils.YamlFromTemplate(testutils.WorkloadPodTemplate, smallToyPodData)
-			defer os.Remove(smallToyYaml)
-			_, err = testutils.CreateResourceFromYaml(ctx, dynClient, discoClient, "spyre-apps", smallToyYaml)
-			Expect(err).To(BeNil())
-			By("wait small toy to run successfully")
-			Eventually(func(g Gomega) {
-				pod, err := k8sClientset.CoreV1().Pods("spyre-apps").Get(ctx, smallToyPodData.Name, metav1.GetOptions{})
-				g.Expect(err).To(BeNil())
-				log, err := testutils.GetPodLog(ctx, k8sClientset, "app", *pod)
-				g.Expect(err).To(BeNil())
-				if strings.Contains(log, "FAILED") {
-					Fail(fmt.Sprintf("%s workload log: %s", smallToyPodData.Name, log))
-				}
-				g.Expect(pod.Status.Phase).To(BeEquivalentTo("Succeeded"))
-			}).WithTimeout(180 * time.Second).WithPolling(5 * time.Second).Should(Succeed())
+			createPodFromTemplateAndWait(ctx, vfPodData, nodeFilter, testutils.PodTemplate, "Running")
 		})
 
 	})
@@ -211,8 +174,8 @@ var _ = Describe("integration test", Label("integration", "cardmgmt"), Ordered, 
 			}
 
 			// Need three worker nodes to run this test.
+			requireMultiNode(3)
 			workers = testutils.GetWorkerNodeNames(ctx, k8sClientset)
-			Expect(len(workers)).To(BeNumerically(">=", 3))
 
 			// Two of the workers need to have Spyre devices.
 			spyreWorkers = testutils.GetSpyreWorkerNodeNames(ctx, k8sClientset)
@@ -275,8 +238,9 @@ var _ = Describe("integration test", Label("integration", "cardmgmt"), Ordered, 
 			Expect(err).To(BeNil())
 			testutils.EnableInitContainer(clusterPolicy, itConfig, spyrev1alpha1.ExecuteAlways)
 		})
-		// Following test temporarily skipped since it requires 2 nodes. Current test environment only has 1 node.
-		PIt("verify Pod deployment running when spyreFilter: worker-1", func() {
+		// Requires >= 2 worker nodes; skipped at runtime on smaller clusters.
+		It("verify Pod deployment running when spyreFilter: worker-1", func() {
+			requireMultiNode(2)
 			testutils.EnabledCardmgmtForWorkers(ctx, clusterPolicy, spyreV2Client, k8sClientset, spyreWorker1)
 			createPodsFromTemplateListAndDelete(ctx, append(testutils.CardmgmtEnableWorker1TestRunning, vfPerDevWorker1, pf1Worker3, vf1Worker3), []string{}, testutils.CardmgmtTestPodTemplate, "Running")
 		})
@@ -509,43 +473,13 @@ var _ = Describe("integration test", Label("integration"), Ordered, ContinueOnFa
 			testutils.DeletePod(ctx, k8sClientset, pod2)
 		})
 
-		// Skip small toy test. Original image is obsolete.
-		PIt("run small-toy.py with 2 spyre PFs", Label("extended"), func() {
-			By("create small toy config map")
-			smallToyCM := entry{
-				ScriptName: "small-toy.py",
-				Doom:       false,
-			}
-			smallToyCmYaml := testutils.YamlFromTemplate(testutils.WorkloadConfigMapTemplate, smallToyCM)
-			_, err := testutils.CreateResourceFromYaml(ctx, dynClient, discoClient, "spyre-apps", smallToyCmYaml)
-			Expect(err).To(BeNil())
-			defer os.Remove(smallToyCmYaml)
-
-			By("create small toy pod")
-			smallToyPodData := testutils.PodTemplateData{
-				Name:             "small-toy",
-				Image:            itConfig.WorkloadImage,
+		It("can deploy 2 Spyre PF pods", func() {
+			pfPodData := testutils.PodTemplateData{
+				Name:             "pf-pod-deploy",
 				ResourceName:     "ibm.com/spyre_pf",
 				ResourceQuantity: "2",
-				FlexDevice:       "PF",
 			}
-			if len(nodeFilter) > 0 {
-				smallToyPodData.NodeSelectorNode = nodeFilter[0]
-			}
-			smallToyYaml := testutils.YamlFromTemplate(testutils.WorkloadPodTemplate, smallToyPodData)
-			_, err = testutils.CreateResourceFromYaml(ctx, dynClient, discoClient, "spyre-apps", smallToyYaml)
-			Expect(err).To(BeNil())
-			By("wait small toy to run successfully")
-			Eventually(func(g Gomega) {
-				pod, err := k8sClientset.CoreV1().Pods("spyre-apps").Get(ctx, smallToyPodData.Name, metav1.GetOptions{})
-				g.Expect(err).To(BeNil())
-				log, err := testutils.GetPodLog(ctx, k8sClientset, "app", *pod)
-				g.Expect(err).To(BeNil())
-				if strings.Contains(log, "FAILED") {
-					Fail(fmt.Sprintf("%s workload log: %s", smallToyPodData.Name, log))
-				}
-				g.Expect(pod.Status.Phase).To(BeEquivalentTo("Succeeded"))
-			}).WithTimeout(720 * time.Second).WithPolling(5 * time.Second).Should(Succeed())
+			createPodFromTemplateAndWait(ctx, pfPodData, nodeFilter, testutils.PodTemplate, "Running")
 		})
 	})
 
@@ -557,11 +491,10 @@ var _ = Describe("integration test", Label("integration"), Ordered, ContinueOnFa
 			}
 			renewSpyreAppsNamespace(ctx)
 		})
-		// Since we only have a single node, skipping this.
-		PIt("verify Pod deployment", func() {
-			// Need three worker nodes to run this test.
+		// Requires >= 3 worker nodes; skipped at runtime on smaller clusters.
+		It("verify Pod deployment", func() {
+			requireMultiNode(3)
 			workers = testutils.GetWorkerNodeNames(ctx, k8sClientset)
-			Expect(len(workers)).To(BeNumerically(">=", 3))
 
 			// Two of the workers need to have Spyre devices.
 			spyreWorkers = testutils.GetSpyreWorkerNodeNames(ctx, k8sClientset)

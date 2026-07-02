@@ -43,6 +43,15 @@ func TestIntegration(t *testing.T) {
 	RunSpecs(t, "Spyre Operator Integration test Suite")
 }
 
+// requireMultiNode skips the current spec if the cluster does not have at least min
+// worker nodes. It must be called from within a spec body (It/BeforeEach/etc.),
+// not at spec-tree construction time, since nodeNames is populated in BeforeSuite.
+func requireMultiNode(min int) {
+	if len(nodeNames) < min {
+		Skip(fmt.Sprintf("requires >= %d worker nodes, cluster has %d", min, len(nodeNames)))
+	}
+}
+
 var _ = BeforeSuite(func() {
 	log.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 	ctx := context.Background()

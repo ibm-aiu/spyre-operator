@@ -25,3 +25,12 @@ rules:
   - get
   - list
   - watch
+- apiGroups: ["resource.k8s.io"]
+  resources:
+  - resourceclaims
+  - deviceclasses
+  - resourceslices
+  verbs:
+  - get
+  - list
+  - watch
