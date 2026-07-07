@@ -1,0 +1,23 @@
+name: Test Build Image
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+    - sunya-ch-test-build
+
+permissions:
+  contents: read
+  packages: write # Crucial for pushing to ghcr.io
+
+env:
+  SDK_VERSION: 1.38.0
+  DOCKER: docker
+
+jobs:
+  build-test:
+    uses: ibm-aiu/spyre-operator-actions/.github/workflows/build-image.yaml@sunya-ch-set-arch-build
+    with:
+      image_name: spyre-operator
+      pre_build_command: make vendor
+      push: false
