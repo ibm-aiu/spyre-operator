@@ -1,6 +1,6 @@
 module github.com/ibm-aiu/spyre-operator
 
-go 1.25.9
+go 1.26.4
 
 require (
 	github.com/cert-manager/cert-manager v1.18.5

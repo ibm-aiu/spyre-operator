@@ -6,7 +6,6 @@ export GOTOOLCHAIN	= auto
 export GOPROXY		= https://proxy.golang.org,direct
 GOLANG_VERSION		?= $(shell cd $(REPO_ROOT) && go list -f {{.GoVersion}} -m)
 
-BUILDER_IMAGE		?= registry.access.redhat.com/ubi9/go-toolset:1.25.9-1778675823
 MAKEFILE_PATH		:= $(abspath $(lastword $(MAKEFILE_LIST)))
 REPO_ROOT 			:= $(abspath $(patsubst %/,%,$(dir $(MAKEFILE_PATH))))
 CURRENT_DIR			:= $(shell pwd)
@@ -453,7 +452,6 @@ docker-build: vendor ## Build sypre operator image for the build host architectu
 	$(DOCKER) build $(DOCKER_BUILD_OPTS) --pull \
 	--tag $(IMAGE) \
 	--build-arg VERSION="$(VERSION)" \
-	--build-arg BUILDER_IMAGE="$(BUILDER_IMAGE)" \
 	--build-arg BUILD_FLAGS="$(DOCKER_GO_BUILD_FLAGS)" \
 	--build-arg GOPROXY="$(GOPROXY)" \
 	--file $(DOCKERFILE) $(CURDIR)
