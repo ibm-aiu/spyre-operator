@@ -1,0 +1,22 @@
+# +-------------------------------------------------------------------+
+# | Copyright (c) 2025, 2026 IBM Corp.                                |
+# | SPDX-License-Identifier: Apache-2.0                               |
+# +-------------------------------------------------------------------+
+
+# Managed VF counterpart of 0550_resourceclaimtemplate_managed_pf.yaml. See that
+# file for why PF and VF devices are requested through separate templates.
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaimTemplate
+metadata:
+  name: spyre-card-management-vf
+  namespace: "FILLED BY THE OPERATOR"
+  labels:
+    app: cardmgmt
+spec:
+  spec:
+    devices:
+      requests:
+      - name: spyre-managed-vf
+        exactly:
+          deviceClassName: spyre-managed-vf
+          allocationMode: All
