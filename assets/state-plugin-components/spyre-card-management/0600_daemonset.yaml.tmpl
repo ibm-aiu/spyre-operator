@@ -21,7 +21,9 @@ spec:
     spec:
       nodeSelector:
         ibm.com/spyre.present: "true"
-      schedulerName: spyre-scheduler
+      # schedulerName is deliberately unset here. TransformCardManagement sets
+      # it to spyre-scheduler only for the device-plugin path; DRA-based
+      # allocation uses the default scheduler.
       serviceAccountName: spyre-card-management
       priorityClassName: system-node-critical
       securityContext:
