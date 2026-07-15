@@ -637,6 +637,65 @@ var _ = Describe("Transform", func() {
 				}
 			})
 		})
+
+		Context("DRA resource claim", func() {
+			newDraPolicy := func(dra bool) *spyrev1alpha1.SpyreClusterPolicy {
+				return &spyrev1alpha1.SpyreClusterPolicy{
+					Spec: spyrev1alpha1.SpyreClusterPolicySpec{
+						DevicePlugin: spyrev1alpha1.DevicePluginSpec{
+							DRADriver: dra,
+						},
+						CardManagement: spyrev1alpha1.CardManagementSpec{
+							Enabled: true,
+						},
+					},
+				}
+			}
+
+			It("injects resource claims when DRA driver is enabled", func() {
+				ds := newDaemonset("test-cardmgmt")
+				ds.Spec.Template.Spec.NodeSelector = map[string]string{
+					"kubernetes.io/hostname": "test-node",
+				}
+				// existing cpu/memory limits must be preserved (not clobbered)
+				cpuLimit := resource.MustParse("1000m")
+				ds.Spec.Template.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{corev1.ResourceCPU: cpuLimit},
+				}
+
+				err := TransformCardManagement(ds, newDraPolicy(true), nil, false)
+				Expect(err).To(BeNil())
+
+				claims := ds.Spec.Template.Spec.ResourceClaims
+				Expect(claims).To(HaveLen(1))
+				Expect(claims[0].Name).To(Equal(spyreconst.CardManagementPodResourceClaimName))
+				Expect(claims[0].ResourceClaimTemplateName).NotTo(BeNil())
+				Expect(*claims[0].ResourceClaimTemplateName).To(Equal(spyreconst.CardManagementResourceClaimTemplateName))
+
+				containerClaims := ds.Spec.Template.Spec.Containers[0].Resources.Claims
+				Expect(containerClaims).To(HaveLen(2))
+				Expect(containerClaims[0].Name).To(Equal(spyreconst.CardManagementPodResourceClaimName))
+				Expect(containerClaims[0].Request).To(Equal(spyreconst.DRADeviceRequestPf))
+				Expect(containerClaims[1].Name).To(Equal(spyreconst.CardManagementPodResourceClaimName))
+				Expect(containerClaims[1].Request).To(Equal(spyreconst.DRADeviceRequestPrivilegedVf))
+
+				// cpu/memory limits preserved, no device-plugin extended resources
+				Expect(ds.Spec.Template.Spec.Containers[0].Resources.Limits).To(HaveKeyWithValue(corev1.ResourceCPU, cpuLimit))
+			})
+
+			It("does not inject resource claims when DRA driver is disabled", func() {
+				ds := newDaemonset("test-cardmgmt")
+				ds.Spec.Template.Spec.NodeSelector = map[string]string{
+					"kubernetes.io/hostname": "test-node",
+				}
+
+				err := TransformCardManagement(ds, newDraPolicy(false), nil, false)
+				Expect(err).To(BeNil())
+
+				Expect(ds.Spec.Template.Spec.ResourceClaims).To(BeEmpty())
+				Expect(ds.Spec.Template.Spec.Containers[0].Resources.Claims).To(BeEmpty())
+			})
+		})
 	})
 
 	Context("hardware mount", func() {

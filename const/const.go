@@ -87,6 +87,21 @@ const (
 	CardManagementConfigName = "spyre-cardmgmt-config"
 	CardManagementConfigFile = "aiucardmgmt.ini"
 
+	// DRA (Dynamic Resource Allocation) card management.
+	// CardManagementResourceClaimTemplateName is the name of the
+	// ResourceClaimTemplate object (see
+	// `assets/state-plugin-components/spyre-card-management/0550_resourceclaimtemplate.yaml`)
+	// that the card-management Pod references when DevicePlugin.DRADriver is enabled.
+	CardManagementResourceClaimTemplateName = "spyre-card-management"
+	// CardManagementPodResourceClaimName is the pod-local name used in
+	// pod.spec.resourceClaims and referenced from container.resources.claims.
+	CardManagementPodResourceClaimName = "spyre-cards"
+	// DRADeviceRequestPf and DRADeviceRequestPrivilegedVf are the request names
+	// defined in the ResourceClaimTemplate. They must match the request names in
+	// the YAML asset and target the spyre-pf / spyre-privileged-vf DeviceClasses.
+	DRADeviceRequestPf           = "spyre-pf"
+	DRADeviceRequestPrivilegedVf = "spyre-privileged-vf"
+
 	// config paths
 	DefaultSenlibConfigFilename = "senlib_config.json"
 

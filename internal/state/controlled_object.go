@@ -63,6 +63,7 @@ var (
 		"PersistentVolume":               NewPersistentVolume,
 		"PersistentVolumeClaim":          NewPersistentVolumeClaim,
 		"DeviceClass":                    NewDeviceClass,
+		"ResourceClaimTemplate":          NewResourceClaimTemplate,
 	}
 )
 
@@ -1416,6 +1417,47 @@ func (obj *DeviceClass) Fetch(ctx context.Context,
 func (obj *DeviceClass) Sync(ctx context.Context,
 	k8sClient client.Client) (client.Object, error) {
 	getObj := &resourcev1.DeviceClass{}
+	namespacedName := types.NamespacedName{Name: obj.loadedObj.Name, Namespace: obj.loadedObj.Namespace}
+	err := k8sClient.Get(ctx, namespacedName, getObj)
+	if err != nil {
+		return nil, err //nolint:wrapcheck
+	}
+	obj.syncOwners(&getObj.ObjectMeta)
+	getObj.Spec = obj.loadedObj.Spec
+	return getObj, nil
+}
+
+type ResourceClaimTemplate struct {
+	*DefaultControlledObject
+	loadedObj *resourcev1.ResourceClaimTemplate
+	spec      resourcev1.ResourceClaimTemplateSpec
+}
+
+func NewResourceClaimTemplate(defaultObj *DefaultControlledObject,
+	runtimeObj runtime.Object, targetNamespace string) (ControlledObject, error) {
+	if obj, ok := runtimeObj.(*resourcev1.ResourceClaimTemplate); ok {
+		obj.Namespace = defaultObj.Namespace
+		defaultObj.Object = obj
+		return &ResourceClaimTemplate{
+			DefaultControlledObject: defaultObj,
+			loadedObj:               obj,
+			spec:                    obj.Spec,
+		}, nil
+	}
+	return nil, spyreerr.ErrParseFile
+}
+
+func (obj *ResourceClaimTemplate) Fetch(ctx context.Context,
+	k8sClient client.Client) (client.Object, error) {
+	fetchObj := &resourcev1.ResourceClaimTemplate{}
+	namespacedName := types.NamespacedName{Name: obj.loadedObj.Name, Namespace: obj.loadedObj.Namespace}
+	err := k8sClient.Get(ctx, namespacedName, fetchObj)
+	return fetchObj, err //nolint:wrapcheck
+}
+
+func (obj *ResourceClaimTemplate) Sync(ctx context.Context,
+	k8sClient client.Client) (client.Object, error) {
+	getObj := &resourcev1.ResourceClaimTemplate{}
 	namespacedName := types.NamespacedName{Name: obj.loadedObj.Name, Namespace: obj.loadedObj.Namespace}
 	err := k8sClient.Get(ctx, namespacedName, getObj)
 	if err != nil {
