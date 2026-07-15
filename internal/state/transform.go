@@ -398,6 +398,19 @@ func TransformCardManagement(obj *appsv1.DaemonSet,
 		return nil
 	}
 
+	// When the DRA driver is used, request devices through the
+	// ResourceClaimTemplate instead of device-plugin extended resources. Device
+	// selection is handled at schedule time by the DeviceClass selectors, so this
+	// does not depend on node capacity.
+	if clusterPolicy.Spec.DevicePlugin.DRADriver {
+		injectCardManagementResourceClaim(obj)
+		return nil
+	}
+
+	// Device-plugin allocation relies on the spyre-scheduler extender to
+	// account for extended resources across the PF/VF resource pools.
+	obj.Spec.Template.Spec.SchedulerName = spyreconst.SpyreSchedulerName
+
 	// update number of spyre cards
 	if cluster == nil {
 		return nil // tentatively skip
@@ -431,6 +444,29 @@ func TransformCardManagement(obj *appsv1.DaemonSet,
 		break
 	}
 	return nil
+}
+
+// injectCardManagementResourceClaim wires the card-management Pod to the DRA
+// ResourceClaimTemplate, binding the container to the spyre PF and privileged VF
+// device requests. Only the container's resource claims are set; existing
+// cpu/memory limits and requests from the manifest are preserved.
+//
+// The manifest leaves SchedulerName unset, so the Pod uses the default
+// scheduler here: device selection is handled by the DRA scheduler plugin via
+// the ResourceClaimTemplate, so the spyre-scheduler extender is not needed.
+func injectCardManagementResourceClaim(obj *appsv1.DaemonSet) {
+	templateName := spyreconst.CardManagementResourceClaimTemplateName
+	claimName := spyreconst.CardManagementPodResourceClaimName
+	obj.Spec.Template.Spec.ResourceClaims = []corev1.PodResourceClaim{
+		{
+			Name:                      claimName,
+			ResourceClaimTemplateName: &templateName,
+		},
+	}
+	obj.Spec.Template.Spec.Containers[0].Resources.Claims = []corev1.ResourceClaim{
+		{Name: claimName, Request: spyreconst.DRADeviceRequestPf},
+		{Name: claimName, Request: spyreconst.DRADeviceRequestPrivilegedVf},
+	}
 }
 
 // mountCardManagementClaim mounts a PersistentVolumeClaim to a Deployment.

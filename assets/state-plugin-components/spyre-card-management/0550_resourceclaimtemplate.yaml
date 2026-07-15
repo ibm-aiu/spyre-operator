@@ -1,0 +1,30 @@
+# +-------------------------------------------------------------------+
+# | Copyright (c) 2025, 2026 IBM Corp.                                |
+# | SPDX-License-Identifier: Apache-2.0                               |
+# +-------------------------------------------------------------------+
+
+# This ResourceClaimTemplate is created unconditionally as part of the
+# spyre-card-management component. It is inert on its own: a ResourceClaim is
+# only instantiated when a Pod references it via resourceClaimTemplateName.
+# In device-plugin mode nothing references it, so it has no effect. The
+# card-management DaemonSet references it only when DevicePlugin.DRADriver is
+# enabled (see TransformCardManagement in internal/state/transform.go).
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaimTemplate
+metadata:
+  name: spyre-card-management
+  namespace: "FILLED BY THE OPERATOR"
+  labels:
+    app: cardmgmt
+spec:
+  spec:
+    devices:
+      requests:
+      - name: spyre-pf
+        exactly:
+          deviceClassName: spyre-pf
+          allocationMode: All
+      - name: spyre-privileged-vf
+        exactly:
+          deviceClassName: spyre-privileged-vf
+          allocationMode: All

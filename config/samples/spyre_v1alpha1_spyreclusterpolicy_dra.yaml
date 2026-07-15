@@ -1,0 +1,76 @@
+# Copyright (c) 2025, 2026 IBM Corp.
+# SPDX-License-Identifier: Apache-2.0
+#
+#  Remarks:
+#   This sample enables the DRA (Dynamic Resource Allocation) driver instead of
+#   the classic device plugin allocation path.
+#
+#   When .spec.devicePlugin.draDriver is true, the operator deploys the DRA
+#   driver DaemonSet (dra-driver-spyre) instead of the device plugin DaemonSet,
+#   and Card Management (when enabled) uses a DRA ResourceClaimTemplate for its
+#   runner pods.
+#
+#   IMPORTANT: there is no dedicated image field for the DRA driver. The DRA
+#   driver DaemonSet reuses .spec.devicePlugin.{repository,image,version}, the
+#   same fields the device plugin uses. Because only one of the two DaemonSets
+#   is deployed at a time, when draDriver is true you MUST point these fields at
+#   the DRA driver image (dra-driver-spyre), NOT the device plugin image.
+#
+#   DRA requires the DynamicResourceAllocation feature to be enabled on the
+#   cluster (resource.k8s.io/v1, Kubernetes 1.34+).
+#
+#   This sample contains some images built only for x86 architecture.
+#   To enable card management and metrics exporter, please make sure to update
+#   the image for your architecture.
+#
+#   .spec.devicePlugin.initContainer is currently available for x86 architecture.
+#   Please remove the initContainer section for unsupported architecture.
+#
+apiVersion: spyre.ibm.com/v1alpha1
+kind: SpyreClusterPolicy
+metadata:
+  name: spyreclusterpolicy
+spec:
+  devicePlugin:
+    # Enable the DRA driver instead of the classic device plugin allocation.
+    draDriver: true
+    # With draDriver: true these image fields select the DRA driver DaemonSet
+    # image (dra-driver-spyre), not the device plugin image.
+    repository: "docker.io/spyre-operator"
+    image: "dra-driver-spyre"
+    version: 1.4.0-dev
+    configPath: /etc/aiu
+    configName: senlib_config.json
+    initContainer:
+      repository: "docker.io/spyre-operator"
+      image: "spyre-device-plugin-init"
+      version: 1.4.0-dev
+      executePolicy: IfNotPresent
+  cardManagement:
+    enabled: true
+    repository: "docker.io/spyre-operator"
+    image: "aiucardmgmt"
+    version: 1.4.0-dev
+    config:
+      spyreFilter: "."
+      pfRunnerImage: "docker.io/spyre-operator/spyredriver-image:latest"
+      vfRunnerImage: "docker.io/spyre-operator/spyredriver-image:latest"
+  scheduler:
+    repository: "docker.io/spyre-operator"
+    image: "spyre-scheduler"
+    version: 1.4.0-dev
+  podValidator:
+    enabled: true
+    repository: "docker.io/spyre-operator"
+    image: "spyre-webhook-validator"
+    version: 1.4.0-dev
+  metricsExporter:
+    enabled: false
+    repository: "docker.io/spyre-operator"
+    image: "spyre-exporter"
+    version: 1.4.0-dev
+  healthChecker:
+    enabled: false
+    repository: "docker.io/spyre-operator"
+    image: "spyre-health-checker"
+    version: 1.4.0-dev
