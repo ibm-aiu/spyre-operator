@@ -23,8 +23,8 @@ function validate_environment() {
 		make -f ${REPO_ROOT_DIR}/Makefile kustomize
 	fi
 
-	if ! command -v oc 1 2>&1 >/dev/null; then
-		if crc version 2>&1 >/dev/null; then
+	if ! command -v oc >/dev/null 2>&1; then
+		if crc version >/dev/null 2>&1; then
 			eval $(crc oc-env)
 		else
 			echo "oc not found in path, is required"
@@ -35,16 +35,40 @@ function validate_environment() {
 	echo "Done."
 }
 
+# wait for the marketplace catalog source ($1) to be serving before subscribing against it
+function wait_for_catalog_source() {
+	local name=$1
+	local namespace="openshift-marketplace"
+	for _ in $(seq 1 60); do
+		oc -n "$namespace" get catalogsource "$name" &>/dev/null && break
+		sleep 10
+	done
+	oc -n "$namespace" wait catalogsource/"$name" --for=jsonpath='{.status.connectionState.lastObservedState}'=READY --timeout=600s
+}
+
 # wait for "Succeed" in phase of CSV instance generated from the subscription ($2) in namespace ($1)
 function wait_for_operator() {
 	local namespace=$1
 	local sub_name=$2
-	oc -n $namespace wait sub/$sub_name --for=jsonpath='{.status.state}'=AtLatestKnown --timeout=600s
-	csv_name=$(oc -n $namespace get sub $sub_name -o yaml | ${YQ} '.status.currentCSV')
-	oc -n $namespace wait csv/$csv_name --for=jsonpath='{.status.phase}'=Succeeded --timeout=600s
+	# poll until OLM resolves the subscription to a CSV, otherwise currentCSV is null and the wait below has nothing to target
+	local csv_name=""
+	for _ in $(seq 1 60); do
+		csv_name=$(oc -n "$namespace" get sub "$sub_name" -o jsonpath='{.status.currentCSV}' 2>/dev/null)
+		[ -n "$csv_name" ] && break
+		sleep 10
+	done
+	if [ -z "$csv_name" ]; then
+		echo "ERROR: subscription ${namespace}/${sub_name} did not resolve to a CSV within timeout." >&2
+		oc -n "$namespace" get sub "$sub_name" -o yaml >&2 || true
+		return 1
+	fi
+	oc -n "$namespace" wait csv/"$csv_name" --for=jsonpath='{.status.phase}'=Succeeded --timeout=600s
 }
 
 function deploy_dependencies() {
+
+	# ensure the catalog serving the dependent operators is ready before subscribing
+	wait_for_catalog_source redhat-operators
 
 	# deploy operators
 	oc apply -f $MANIFEST_PATH/dependencies/nfd/operator.yaml
