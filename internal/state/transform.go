@@ -253,6 +253,7 @@ func transformDevicePluginInitContainer(obj *appsv1.DaemonSet,
 
 // TransformPodValidator transforms pod validator deployment
 func TransformPodValidator(obj *appsv1.Deployment, clusterPolicy *spyrev1alpha1.SpyreClusterPolicy) error {
+	applyExperimentalModes(&(obj.Spec.Template.Spec.Containers[0]), clusterPolicy.Spec.ExperimentalMode)
 	if err := TransformDeployment(obj, &clusterPolicy.Spec.PodValidator.DeploymentConfig,
 		clusterPolicy.Spec.PodValidator.Replicas); err != nil {
 		return fmt.Errorf("failed to transform deployment: %w", err)

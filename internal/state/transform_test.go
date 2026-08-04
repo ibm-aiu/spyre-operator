@@ -956,6 +956,51 @@ var _ = Describe("Transform", func() {
 		},
 		)
 	})
+
+	DescribeTable("TransformPodValidator - EXTERNAL_DEVICE_RESERVATION_MODE env var",
+		func(enabledModes []spyrev1alpha1.SpyreClusterPolicyExperimentalMode, expectEnvPresent bool) {
+			deploy := newDeployment("spyre-webhook-validator", 1)
+			cp := &spyrev1alpha1.SpyreClusterPolicy{
+				Spec: spyrev1alpha1.SpyreClusterPolicySpec{
+					ExperimentalMode: enabledModes,
+					PodValidator: spyrev1alpha1.PodValidatorSpec{
+						DeploymentConfig: spyrev1alpha1.DeploymentConfig{
+							Repository:      "registry.example.com",
+							Image:           "spyre-webhook-validator",
+							Version:         "latest",
+							ImagePullPolicy: string(corev1.PullAlways),
+						},
+						Enabled: true,
+					},
+				},
+			}
+			err := TransformPodValidator(deploy, cp)
+			Expect(err).To(BeNil())
+
+			envMap := make(map[string]string)
+			for _, env := range deploy.Spec.Template.Spec.Containers[0].Env {
+				envMap[env.Name] = env.Value
+			}
+			envKey := spyrev1alpha1.ReservationMode.EnvKey()
+			if expectEnvPresent {
+				Expect(envMap).To(HaveKeyWithValue(envKey, spyreconst.ModeEnabledValue))
+			} else {
+				Expect(envMap).NotTo(HaveKey(envKey))
+			}
+		},
+		Entry("ReservationMode disabled - env var absent",
+			[]spyrev1alpha1.SpyreClusterPolicyExperimentalMode{},
+			false),
+		Entry("ReservationMode enabled - env var set to 1",
+			[]spyrev1alpha1.SpyreClusterPolicyExperimentalMode{spyrev1alpha1.ReservationMode},
+			true),
+		Entry("Other mode enabled - env var absent",
+			[]spyrev1alpha1.SpyreClusterPolicyExperimentalMode{spyrev1alpha1.PerDeviceAllocationMode},
+			false),
+		Entry("ReservationMode + other mode enabled - env var set to 1",
+			[]spyrev1alpha1.SpyreClusterPolicyExperimentalMode{spyrev1alpha1.ReservationMode, spyrev1alpha1.PerDeviceAllocationMode},
+			true),
+	)
 })
 
 // volumesContains checks host path volumes.

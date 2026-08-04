@@ -24,8 +24,6 @@ spec:
         image: "FILLED BY THE OPERATOR"
         imagePullPolicy: Always
         env:
-        - name: SCHEDULER_ENABLED
-          value: "true"
         - name: LOGLEVEL
           value: "debug"
         ports:
