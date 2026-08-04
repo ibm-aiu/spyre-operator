@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	spyrev1alpha1 "github.com/ibm-aiu/spyre-operator/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
@@ -33,11 +35,12 @@ import (
 )
 
 var (
-	OpNs       = "spyre-operator"
-	K8sClient  client.Client
-	testEnv    *envtest.Environment
-	Cfg        *rest.Config
-	AssetsPath = filepath.Join("..", "..", "assets")
+	OpNs         = "spyre-operator"
+	DependencyNs = []string{"openshift-config-managed"}
+	K8sClient    client.Client
+	testEnv      *envtest.Environment
+	Cfg          *rest.Config
+	AssetsPath   = filepath.Join("..", "..", "assets")
 
 	// StateScheme, StateClient are commonly used for all unit tests except state_controller
 	StateScheme *runtime.Scheme
@@ -92,6 +95,15 @@ var _ = BeforeSuite(func() {
 	ns.Name = OpNs
 	err = K8sClient.Create(ctx, ns)
 	Expect(err).To(BeNil())
+	By("creating dependent namespace")
+	for _, depNs := range DependencyNs {
+		depNsObj := &corev1.Namespace{}
+		depNsObj.Name = depNs
+		err = K8sClient.Create(ctx, depNsObj)
+		if err != nil && !k8serrors.IsAlreadyExists(err) {
+			Expect(err).To(BeNil())
+		}
+	}
 	By("initializing state scheme")
 	StateScheme = runtime.NewScheme()
 	clientgoscheme.AddToScheme(StateScheme)

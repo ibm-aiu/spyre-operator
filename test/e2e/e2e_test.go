@@ -268,6 +268,13 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 			tc.TestSinglePod(ctx, k8sClientset, spyreV2Client, []string{}, v1.PodPending)
 		})
 
+		It("reports spyre_device_state metric on the metrics endpoint", func() {
+			By("fetching metrics from the health-checker service")
+			body := FetchHealthCheckerMetrics(ctx, k8sClientset)
+			By("checking spyre_device_state key is present")
+			Expect(body).To(ContainSubstring("spyre_device_state"))
+		})
+
 		AfterAll(func() {
 			By("disabling health checker in the cluster policy")
 			clusterPolicy := &spyrev1alpha1.SpyreClusterPolicy{}

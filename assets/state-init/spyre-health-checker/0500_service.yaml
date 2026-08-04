@@ -1,0 +1,20 @@
+#  Copyright (c) 2025, 2026 IBM Corp.
+#  SPDX-License-Identifier: Apache-2.0
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: spyre-health-checker
+  name: spyre-health-checker
+  namespace: "FILLED BY THE OPERATOR"
+  annotations:
+    prometheus.io/target: "true"
+spec:
+  selector:
+    app: spyre-health-checker
+  ports:
+  - name: metrics
+    port: 8081
+    protocol: TCP
+    targetPort: metrics
+  type: ClusterIP

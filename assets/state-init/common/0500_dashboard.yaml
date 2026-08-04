@@ -324,6 +324,214 @@ data:
             },
             {
                 "collapse": false,
+                "height": "300px",
+                "panels": [
+                    {
+                        "aliasColors": {
+
+                        },
+                        "datasource": "$datasource",
+                        "id": 10,
+                        "span": 6,
+                        "styles": [
+                            {
+                                "alias": "Time",
+                                "dateFormat": "YYYY-MM-DD HH:mm:ss",
+                                "pattern": "Time",
+                                "type": "hidden"
+                            },
+                            {
+                                "alias": "Node",
+                                "colorMode": null,
+                                "colors": [],
+                                "dateFormat": "YYYY-MM-DD HH:mm:ss",
+                                "decimals": 2,
+                                "link": false,
+                                "pattern": "node",
+                                "thresholds": [],
+                                "type": "string",
+                                "unit": "short"
+                            },
+                            {
+                                "alias": "State",
+                                "colorMode": null,
+                                "colors": [],
+                                "dateFormat": "YYYY-MM-DD HH:mm:ss",
+                                "decimals": 2,
+                                "link": false,
+                                "pattern": "state",
+                                "thresholds": [],
+                                "type": "string",
+                                "unit": "short"
+                            },
+                            {
+                                "alias": "Device Type",
+                                "colorMode": null,
+                                "colors": [],
+                                "dateFormat": "YYYY-MM-DD HH:mm:ss",
+                                "decimals": 2,
+                                "link": false,
+                                "pattern": "devicetype",
+                                "thresholds": [],
+                                "type": "string",
+                                "unit": "short"
+                            },
+                            {
+                                "alias": "Count",
+                                "colorMode": null,
+                                "colors": [],
+                                "dateFormat": "YYYY-MM-DD HH:mm:ss",
+                                "decimals": 0,
+                                "link": false,
+                                "pattern": "Value #A",
+                                "thresholds": [],
+                                "type": "number",
+                                "unit": "short"
+                            },
+                            {
+                                "alias": "",
+                                "colorMode": null,
+                                "colors": [],
+                                "dateFormat": "YYYY-MM-DD HH:mm:ss",
+                                "decimals": 2,
+                                "pattern": "/.*/",
+                                "thresholds": [],
+                                "type": "string",
+                                "unit": "short"
+                            }
+                        ],
+                        "targets": [
+                            {
+                                "expr": "sum by (node, state, devicetype) (spyre_device_state{node=~\"$node\"})",
+                                "format": "table",
+                                "instant": true,
+                                "legendFormat": "",
+                                "refId": "A"
+                            }
+                        ],
+                        "thresholds": [],
+                        "timeFrom": null,
+                        "timeShift": null,
+                        "title": "Device State Count by Node / State / Type",
+                        "tooltip": {
+                            "shared": true,
+                            "sort": 0,
+                            "value_type": "individual"
+                        },
+                        "transform": "table",
+                        "type": "table",
+                        "xaxis": {
+                            "buckets": null,
+                            "mode": "time",
+                            "name": null,
+                            "show": true,
+                            "values": []
+                        },
+                        "yaxes": [
+                            {
+                                "format": "short",
+                                "label": null,
+                                "logBase": 1,
+                                "max": null,
+                                "min": 0,
+                                "show": true
+                            },
+                            {
+                                "format": "short",
+                                "label": null,
+                                "logBase": 1,
+                                "max": null,
+                                "min": null,
+                                "show": false
+                            }
+                        ]
+                    },
+                    {
+                        "aliasColors": {
+
+                        },
+                        "bars": true,
+                        "dashLength": 10,
+                        "dashes": false,
+                        "datasource": "$datasource",
+                        "fill": 1,
+                        "id": 11,
+                        "legend": {
+                            "avg": false,
+                            "current": false,
+                            "max": false,
+                            "min": false,
+                            "show": true,
+                            "total": false,
+                            "values": false
+                        },
+                        "lines": false,
+                        "linewidth": 1,
+                        "links": [],
+                        "nullPointMode": "null as zero",
+                        "percentage": false,
+                        "pointradius": 5,
+                        "points": false,
+                        "renderer": "flot",
+                        "seriesOverrides": [],
+                        "spaceLength": 10,
+                        "span": 6,
+                        "stack": true,
+                        "steppedLine": false,
+                        "targets": [
+                            {
+                                "expr": "sum by (node, state, devicetype) (spyre_device_state{node=~\"$node\"})",
+                                "format": "time_series",
+                                "legendFormat": "{{node}} / {{devicetype}} / {{state}}",
+                                "refId": "A"
+                            }
+                        ],
+                        "thresholds": [],
+                        "timeFrom": null,
+                        "timeShift": null,
+                        "title": "Device State Distribution",
+                        "tooltip": {
+                            "shared": true,
+                            "sort": 2,
+                            "value_type": "individual"
+                        },
+                        "type": "graph",
+                        "xaxis": {
+                            "buckets": null,
+                            "mode": "time",
+                            "name": null,
+                            "show": true,
+                            "values": []
+                        },
+                        "yaxes": [
+                            {
+                                "format": "short",
+                                "label": null,
+                                "logBase": 1,
+                                "max": null,
+                                "min": 0,
+                                "show": true
+                            },
+                            {
+                                "format": "short",
+                                "label": null,
+                                "logBase": 1,
+                                "max": null,
+                                "min": null,
+                                "show": false
+                            }
+                        ]
+                    }
+                ],
+                "repeat": null,
+                "repeatIteration": null,
+                "repeatRowId": null,
+                "showTitle": true,
+                "title": "Spyre Device State",
+                "titleSize": "h6"
+            },
+            {
+                "collapse": false,
                 "height": "250px",
                 "panels": [
                             {

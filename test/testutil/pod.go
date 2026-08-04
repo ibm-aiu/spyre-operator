@@ -605,3 +605,44 @@ func ExecCommand(ctx context.Context, config *rest.Config, clientset *kubernetes
 
 	return stdout.String(), nil
 }
+
+// FetchHealthCheckerMetrics spawns a temporary pod that curls the health-checker
+// metrics endpoint and returns the raw response body.
+func FetchHealthCheckerMetrics(ctx context.Context, k8sClientset *kubernetes.Clientset) string {
+	url := fmt.Sprintf("http://%s.%s:%d/metrics", healthCheckerName, OperatorNamespace, healthCheckerMetricsPort)
+	podName := "health-checker-metrics-fetcher"
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: OperatorNamespace,
+		},
+		Spec: corev1.PodSpec{
+			RestartPolicy: corev1.RestartPolicyNever,
+			Containers: []corev1.Container{
+				{
+					Name:            "fetcher",
+					Image:           containerTestImage,
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Command:         []string{"/bin/sh", "-c"},
+					Args:            []string{fmt.Sprintf("curl -sf %s", url)},
+				},
+			},
+		},
+	}
+	_, err := k8sClientset.CoreV1().Pods(OperatorNamespace).Create(ctx, pod, metav1.CreateOptions{})
+	Expect(err).To(BeNil())
+
+	var body string
+	Eventually(func(g Gomega) {
+		p, err := k8sClientset.CoreV1().Pods(OperatorNamespace).Get(ctx, podName, metav1.GetOptions{})
+		g.Expect(err).To(BeNil())
+		g.Expect(p.Status.Phase).To(BeElementOf(corev1.PodSucceeded, corev1.PodFailed))
+		g.Expect(p.Status.Phase).To(Equal(corev1.PodSucceeded))
+		body, err = GetPodLog(ctx, k8sClientset, "fetcher", *p)
+		g.Expect(err).To(BeNil())
+	}).WithTimeout(3 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
+
+	err = k8sClientset.CoreV1().Pods(OperatorNamespace).Delete(ctx, podName, metav1.DeleteOptions{})
+	Expect(err).To(BeNil())
+	return body
+}
