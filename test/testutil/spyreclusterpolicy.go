@@ -239,6 +239,8 @@ func CheckOperatorAssetsRunning(ctx context.Context, spyreV2Client client.Client
 				printMessageIfPodNotRunning(healthCheckerPod)
 				g.Expect(healthCheckerPod.Status.Phase).To(BeEquivalentTo(v1.PodRunning))
 			}
+			_, err = k8sClientset.CoreV1().Services(OperatorNamespace).Get(ctx, healthCheckerName, metav1.GetOptions{})
+			g.Expect(err).To(BeNil())
 		}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
 	} else {
 		Eventually(func(g Gomega) {

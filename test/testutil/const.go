@@ -35,6 +35,8 @@ const (
 	packageServerLabel                = "app=packageserver"
 	cardManagementName                = "spyre-card-management"
 	metricsExporterName               = "spyre-metrics-exporter"
+	healthCheckerName                 = "spyre-health-checker"
+	healthCheckerMetricsPort          = 8081
 	podValidatorName                  = "spyre-webhook-validator"
 	podResource                       = "pods.v1."
 	catalogSourceResource             = "catalogsources.v1alpha1.operators.coreos.com"
