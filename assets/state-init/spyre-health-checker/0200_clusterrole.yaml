@@ -14,3 +14,12 @@ rules:
   - use
   resourceNames:
   - spyre-operator-nonroot
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - pods/log
+  verbs:
+  - get
+  - list
+  - watch
