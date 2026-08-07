@@ -776,6 +776,9 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 		})
 
 		BeforeAll(func() {
+			if nodeArchitecture == "s390x" {
+				Skip("DRA Driver tests not supported on s390x")
+			}
 			By("ensuring all pods are deleted")
 			WaitUntilNoPod(ctx, k8sClientset, spyreV2Client, testNamespace, targetNodeName)
 			By("enabling dra-driver")
