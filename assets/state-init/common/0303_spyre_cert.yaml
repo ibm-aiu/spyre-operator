@@ -27,3 +27,6 @@ spec:
   issuerRef:
     name: spyre-ca-issuer
     kind: Issuer
+  subject:
+    organizations:
+    - "spyre-operator"
