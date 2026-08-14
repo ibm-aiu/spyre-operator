@@ -374,7 +374,7 @@ var _ = Describe("integration test", Label("integration"), Ordered, ContinueOnFa
 		var avif []string
 		var pod11data, pod2data testutils.PodTemplateData
 
-		BeforeEach(func() {
+		BeforeAll(func() {
 			renewSpyreAppsNamespace(ctx)
 		})
 
