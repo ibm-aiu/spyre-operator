@@ -6,7 +6,7 @@ metadata:
   name: spyre-operator
   namespace: spyre-operator
 spec:
-  channel: "fast-v1.3"
+  channel: "fast-v1.4"
   name: spyre-operator
   source: ibm-spyre-operators
   sourceNamespace: openshift-marketplace

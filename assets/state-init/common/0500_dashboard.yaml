@@ -953,6 +953,758 @@ data:
                 "showTitle": true,
                 "title": "Spyre Card Usage",
                 "titleSize": "h6"
+            },
+            {
+                "collapse": false,
+                "height": "250px",
+                "panels": [
+                    {
+                        "aliasColors": {},
+                        "bars": false,
+                        "dashLength": 10,
+                        "dashes": false,
+                        "datasource": "$datasource",
+                        "fill": 1,
+                        "id": 7,
+                        "legend": {
+                            "avg": false,
+                            "current": true,
+                            "max": true,
+                            "min": false,
+                            "show": true,
+                            "total": false,
+                            "values": true
+                        },
+                        "lines": true,
+                        "linewidth": 2,
+                        "links": [],
+                        "nullPointMode": "null as zero",
+                        "percentage": false,
+                        "pointradius": 5,
+                        "points": false,
+                        "renderer": "flot",
+                        "seriesOverrides": [],
+                        "spaceLength": 10,
+                        "span": 4,
+                        "stack": false,
+                        "steppedLine": false,
+                        "targets": [
+                            {
+                                "expr": "spyre_vf_power_watts{node=~\"$node\"}",
+                                "format": "time_series",
+                                "legendFormat": "{{busid}} - {{node}}",
+                                "refId": "A"
+                            }
+                        ],
+                        "thresholds": [],
+                        "timeFrom": null,
+                        "timeShift": null,
+                        "title": "VF Power Consumption",
+                        "tooltip": {
+                            "shared": true,
+                            "sort": 2,
+                            "value_type": "individual"
+                        },
+                        "type": "graph",
+                        "xaxis": {
+                            "buckets": null,
+                            "mode": "time",
+                            "name": null,
+                            "show": true,
+                            "values": []
+                        },
+                        "yaxes": [
+                            {
+                                "format": "watt",
+                                "label": "Power (W)",
+                                "logBase": 1,
+                                "max": null,
+                                "min": 0,
+                                "show": true
+                            },
+                            {
+                                "format": "short",
+                                "label": null,
+                                "logBase": 1,
+                                "max": null,
+                                "min": null,
+                                "show": false
+                            }
+                        ]
+                    },
+                    {
+                        "aliasColors": {},
+                        "bars": false,
+                        "dashLength": 10,
+                        "dashes": false,
+                        "datasource": "$datasource",
+                        "fill": 1,
+                        "id": 8,
+                        "legend": {
+                            "avg": false,
+                            "current": true,
+                            "max": true,
+                            "min": false,
+                            "show": true,
+                            "total": false,
+                            "values": true
+                        },
+                        "lines": true,
+                        "linewidth": 2,
+                        "links": [],
+                        "nullPointMode": "null as zero",
+                        "percentage": false,
+                        "pointradius": 5,
+                        "points": false,
+                        "renderer": "flot",
+                        "seriesOverrides": [],
+                        "spaceLength": 10,
+                        "span": 4,
+                        "stack": false,
+                        "steppedLine": false,
+                        "targets": [
+                            {
+                                "expr": "spyre_vf_temperature_celsius{node=~\"$node\"}",
+                                "format": "time_series",
+                                "legendFormat": "{{busid}} - {{node}}",
+                                "refId": "A"
+                            }
+                        ],
+                        "thresholds": [
+                            {
+                                "colorMode": "critical",
+                                "fill": true,
+                                "line": true,
+                                "op": "gt",
+                                "value": 85
+                            }
+                        ],
+                        "timeFrom": null,
+                        "timeShift": null,
+                        "title": "VF Temperature",
+                        "tooltip": {
+                            "shared": true,
+                            "sort": 2,
+                            "value_type": "individual"
+                        },
+                        "type": "graph",
+                        "xaxis": {
+                            "buckets": null,
+                            "mode": "time",
+                            "name": null,
+                            "show": true,
+                            "values": []
+                        },
+                        "yaxes": [
+                            {
+                                "format": "celsius",
+                                "label": "Temperature (°C)",
+                                "logBase": 1,
+                                "max": null,
+                                "min": 0,
+                                "show": true
+                            },
+                            {
+                                "format": "short",
+                                "label": null,
+                                "logBase": 1,
+                                "max": null,
+                                "min": null,
+                                "show": false
+                            }
+                        ]
+                    },
+                    {
+                        "aliasColors": {},
+                        "bars": false,
+                        "dashLength": 10,
+                        "dashes": false,
+                        "datasource": "$datasource",
+                        "fill": 1,
+                        "id": 9,
+                        "legend": {
+                            "avg": true,
+                            "current": true,
+                            "max": true,
+                            "min": false,
+                            "show": true,
+                            "total": false,
+                            "values": true
+                        },
+                        "lines": true,
+                        "linewidth": 2,
+                        "links": [],
+                        "nullPointMode": "null as zero",
+                        "percentage": false,
+                        "pointradius": 5,
+                        "points": false,
+                        "renderer": "flot",
+                        "seriesOverrides": [],
+                        "spaceLength": 10,
+                        "span": 4,
+                        "stack": false,
+                        "steppedLine": false,
+                        "targets": [
+                            {
+                                "expr": "spyre_vf_read_memory_bytes{node=~\"$node\"}",
+                                "format": "time_series",
+                                "legendFormat": "Read Total - {{busid}}",
+                                "refId": "A"
+                            },
+                            {
+                                "expr": "spyre_vf_write_memory_bytes{node=~\"$node\"}",
+                                "format": "time_series",
+                                "legendFormat": "Write Total - {{busid}}",
+                                "refId": "B"
+                            }
+                        ],
+                        "thresholds": [],
+                        "timeFrom": null,
+                        "timeShift": null,
+                        "title": "VF Memory R/W Total",
+                        "tooltip": {
+                            "shared": true,
+                            "sort": 2,
+                            "value_type": "individual"
+                        },
+                        "type": "graph",
+                        "xaxis": {
+                            "buckets": null,
+                            "mode": "time",
+                            "name": null,
+                            "show": true,
+                            "values": []
+                        },
+                        "yaxes": [
+                            {
+                                "format": "bytes",
+                                "label": "Total Bytes",
+                                "logBase": 1,
+                                "max": null,
+                                "min": 0,
+                                "show": true
+                            },
+                            {
+                                "format": "short",
+                                "label": null,
+                                "logBase": 1,
+                                "max": null,
+                                "min": null,
+                                "show": false
+                            }
+                        ]
+                    }
+                ],
+                "repeat": null,
+                "repeatIteration": null,
+                "repeatRowId": null,
+                "showTitle": true,
+                "title": "VF Metrics - Power, Temperature & Memory R/W Total",
+                "titleSize": "h6"
+            },
+            {
+                "collapse": false,
+                "height": "250px",
+                "panels": [
+                    {
+                        "aliasColors": {},
+                        "bars": false,
+                        "dashLength": 10,
+                        "dashes": false,
+                        "datasource": "$datasource",
+                        "fill": 1,
+                        "id": 10,
+                        "legend": {
+                            "avg": true,
+                            "current": true,
+                            "max": true,
+                            "min": false,
+                            "show": true,
+                            "total": false,
+                            "values": true
+                        },
+                        "lines": true,
+                        "linewidth": 2,
+                        "links": [],
+                        "nullPointMode": "null as zero",
+                        "percentage": false,
+                        "pointradius": 5,
+                        "points": false,
+                        "renderer": "flot",
+                        "seriesOverrides": [],
+                        "spaceLength": 10,
+                        "span": 6,
+                        "stack": false,
+                        "steppedLine": false,
+                        "targets": [
+                            {
+                                "expr": "spyre_vf_avg_memory_bytes{node=~\"$node\"}",
+                                "format": "time_series",
+                                "legendFormat": "Avg - {{busid}}",
+                                "refId": "A"
+                            },
+                            {
+                                "expr": "spyre_vf_peak_memory_bytes{node=~\"$node\"}",
+                                "format": "time_series",
+                                "legendFormat": "Peak - {{busid}}",
+                                "refId": "B"
+                            }
+                        ],
+                        "thresholds": [],
+                        "timeFrom": null,
+                        "timeShift": null,
+                        "title": "VF Memory Usage",
+                        "tooltip": {
+                            "shared": true,
+                            "sort": 2,
+                            "value_type": "individual"
+                        },
+                        "type": "graph",
+                        "xaxis": {
+                            "buckets": null,
+                            "mode": "time",
+                            "name": null,
+                            "show": true,
+                            "values": []
+                        },
+                        "yaxes": [
+                            {
+                                "format": "bytes",
+                                "label": "Memory",
+                                "logBase": 1,
+                                "max": null,
+                                "min": 0,
+                                "show": true
+                            },
+                            {
+                                "format": "short",
+                                "label": null,
+                                "logBase": 1,
+                                "max": null,
+                                "min": null,
+                                "show": false
+                            }
+                        ]
+                    },
+                    {
+                        "aliasColors": {},
+                        "bars": false,
+                        "dashLength": 10,
+                        "dashes": false,
+                        "datasource": "$datasource",
+                        "fill": 1,
+                        "id": 11,
+                        "legend": {
+                            "avg": true,
+                            "current": true,
+                            "max": true,
+                            "min": false,
+                            "show": true,
+                            "total": false,
+                            "values": true
+                        },
+                        "lines": true,
+                        "linewidth": 2,
+                        "links": [],
+                        "nullPointMode": "null as zero",
+                        "percentage": false,
+                        "pointradius": 5,
+                        "points": false,
+                        "renderer": "flot",
+                        "seriesOverrides": [],
+                        "spaceLength": 10,
+                        "span": 6,
+                        "stack": false,
+                        "steppedLine": false,
+                        "targets": [
+                            {
+                                "expr": "rate(spyre_vf_read_memory_bytes{node=~\"$node\"}[5m])",
+                                "format": "time_series",
+                                "legendFormat": "Read - {{busid}}",
+                                "refId": "A"
+                            },
+                            {
+                                "expr": "rate(spyre_vf_write_memory_bytes{node=~\"$node\"}[5m])",
+                                "format": "time_series",
+                                "legendFormat": "Write - {{busid}}",
+                                "refId": "B"
+                            }
+                        ],
+                        "thresholds": [],
+                        "timeFrom": null,
+                        "timeShift": null,
+                        "title": "VF Memory Bandwidth",
+                        "tooltip": {
+                            "shared": true,
+                            "sort": 2,
+                            "value_type": "individual"
+                        },
+                        "type": "graph",
+                        "xaxis": {
+                            "buckets": null,
+                            "mode": "time",
+                            "name": null,
+                            "show": true,
+                            "values": []
+                        },
+                        "yaxes": [
+                            {
+                                "format": "Bps",
+                                "label": "Bandwidth (B/s)",
+                                "logBase": 1,
+                                "max": null,
+                                "min": 0,
+                                "show": true
+                            },
+                            {
+                                "format": "short",
+                                "label": null,
+                                "logBase": 1,
+                                "max": null,
+                                "min": null,
+                                "show": false
+                            }
+                        ]
+                    }
+                ],
+                "repeat": null,
+                "repeatIteration": null,
+                "repeatRowId": null,
+                "showTitle": true,
+                "title": "VF Metrics - Memory Usage & Bandwidth",
+                "titleSize": "h6"
+            },
+            {
+                "collapse": false,
+                "height": "250px",
+                "panels": [
+                    {
+                        "aliasColors": {},
+                        "bars": false,
+                        "dashLength": 10,
+                        "dashes": false,
+                        "datasource": "$datasource",
+                        "fill": 1,
+                        "id": 12,
+                        "legend": {
+                            "avg": true,
+                            "current": true,
+                            "max": true,
+                            "min": false,
+                            "show": true,
+                            "total": false,
+                            "values": true
+                        },
+                        "lines": true,
+                        "linewidth": 2,
+                        "links": [],
+                        "nullPointMode": "null as zero",
+                        "percentage": false,
+                        "pointradius": 5,
+                        "points": false,
+                        "renderer": "flot",
+                        "seriesOverrides": [],
+                        "spaceLength": 10,
+                        "span": 6,
+                        "stack": false,
+                        "steppedLine": false,
+                        "targets": [
+                            {
+                                "expr": "rate(spyre_vf_rxpci_bytes{node=~\"$node\"}[5m])",
+                                "format": "time_series",
+                                "legendFormat": "Host→Device - {{busid}}",
+                                "refId": "A"
+                            },
+                            {
+                                "expr": "rate(spyre_vf_txpci_bytes{node=~\"$node\"}[5m])",
+                                "format": "time_series",
+                                "legendFormat": "Device→Host - {{busid}}",
+                                "refId": "B"
+                            }
+                        ],
+                        "thresholds": [],
+                        "timeFrom": null,
+                        "timeShift": null,
+                        "title": "VF PCIe Bandwidth",
+                        "tooltip": {
+                            "shared": true,
+                            "sort": 2,
+                            "value_type": "individual"
+                        },
+                        "type": "graph",
+                        "xaxis": {
+                            "buckets": null,
+                            "mode": "time",
+                            "name": null,
+                            "show": true,
+                            "values": []
+                        },
+                        "yaxes": [
+                            {
+                                "format": "Bps",
+                                "label": "PCIe Bandwidth (B/s)",
+                                "logBase": 1,
+                                "max": null,
+                                "min": 0,
+                                "show": true
+                            },
+                            {
+                                "format": "short",
+                                "label": null,
+                                "logBase": 1,
+                                "max": null,
+                                "min": null,
+                                "show": false
+                            }
+                        ]
+                    },
+                    {
+                        "aliasColors": {},
+                        "bars": false,
+                        "dashLength": 10,
+                        "dashes": false,
+                        "datasource": "$datasource",
+                        "fill": 1,
+                        "id": 13,
+                        "legend": {
+                            "avg": true,
+                            "current": true,
+                            "max": true,
+                            "min": false,
+                            "show": true,
+                            "total": false,
+                            "values": true
+                        },
+                        "lines": true,
+                        "linewidth": 2,
+                        "links": [],
+                        "nullPointMode": "null as zero",
+                        "percentage": false,
+                        "pointradius": 5,
+                        "points": false,
+                        "renderer": "flot",
+                        "seriesOverrides": [],
+                        "spaceLength": 10,
+                        "span": 6,
+                        "stack": false,
+                        "steppedLine": false,
+                        "targets": [
+                            {
+                                "expr": "rate(spyre_vf_rxpci_bytes{node=~\"$node\"}[5m]) + rate(spyre_vf_txpci_bytes{node=~\"$node\"}[5m])",
+                                "format": "time_series",
+                                "legendFormat": "Total PCIe - {{busid}}",
+                                "refId": "A"
+                            }
+                        ],
+                        "thresholds": [],
+                        "timeFrom": null,
+                        "timeShift": null,
+                        "title": "VF PCIe Total Bandwidth",
+                        "tooltip": {
+                            "shared": true,
+                            "sort": 2,
+                            "value_type": "individual"
+                        },
+                        "type": "graph",
+                        "xaxis": {
+                            "buckets": null,
+                            "mode": "time",
+                            "name": null,
+                            "show": true,
+                            "values": []
+                        },
+                        "yaxes": [
+                            {
+                                "format": "Bps",
+                                "label": "PCIe Bandwidth (B/s)",
+                                "logBase": 1,
+                                "max": null,
+                                "min": 0,
+                                "show": true
+                            },
+                            {
+                                "format": "short",
+                                "label": null,
+                                "logBase": 1,
+                                "max": null,
+                                "min": null,
+                                "show": false
+                            }
+                        ]
+                    }
+                ],
+                "repeat": null,
+                "repeatIteration": null,
+                "repeatRowId": null,
+                "showTitle": true,
+                "title": "VF Metrics - PCIe Bandwidth",
+                "titleSize": "h6"
+            },
+            {
+                "collapse": false,
+                "height": "250px",
+                "panels": [
+                    {
+                        "aliasColors": {},
+                        "bars": false,
+                        "dashLength": 10,
+                        "dashes": false,
+                        "datasource": "$datasource",
+                        "fill": 1,
+                        "id": 14,
+                        "legend": {
+                            "avg": true,
+                            "current": true,
+                            "max": true,
+                            "min": false,
+                            "show": true,
+                            "total": false,
+                            "values": true
+                        },
+                        "lines": true,
+                        "linewidth": 2,
+                        "links": [],
+                        "nullPointMode": "null as zero",
+                        "percentage": false,
+                        "pointradius": 5,
+                        "points": false,
+                        "renderer": "flot",
+                        "seriesOverrides": [],
+                        "spaceLength": 10,
+                        "span": 6,
+                        "stack": false,
+                        "steppedLine": false,
+                        "targets": [
+                            {
+                                "expr": "rate(spyre_vf_rdma_read_bytes{node=~\"$node\"}[5m])",
+                                "format": "time_series",
+                                "legendFormat": "RDMA Read - {{busid}}",
+                                "refId": "A"
+                            },
+                            {
+                                "expr": "rate(spyre_vf_rdma_write_bytes{node=~\"$node\"}[5m])",
+                                "format": "time_series",
+                                "legendFormat": "RDMA Write - {{busid}}",
+                                "refId": "B"
+                            }
+                        ],
+                        "thresholds": [],
+                        "timeFrom": null,
+                        "timeShift": null,
+                        "title": "VF RDMA Bandwidth",
+                        "tooltip": {
+                            "shared": true,
+                            "sort": 2,
+                            "value_type": "individual"
+                        },
+                        "type": "graph",
+                        "xaxis": {
+                            "buckets": null,
+                            "mode": "time",
+                            "name": null,
+                            "show": true,
+                            "values": []
+                        },
+                        "yaxes": [
+                            {
+                                "format": "Bps",
+                                "label": "RDMA Bandwidth (B/s)",
+                                "logBase": 1,
+                                "max": null,
+                                "min": 0,
+                                "show": true
+                            },
+                            {
+                                "format": "short",
+                                "label": null,
+                                "logBase": 1,
+                                "max": null,
+                                "min": null,
+                                "show": false
+                            }
+                        ]
+                    },
+                    {
+                        "aliasColors": {},
+                        "bars": false,
+                        "dashLength": 10,
+                        "dashes": false,
+                        "datasource": "$datasource",
+                        "fill": 1,
+                        "id": 15,
+                        "legend": {
+                            "avg": true,
+                            "current": true,
+                            "max": true,
+                            "min": false,
+                            "show": true,
+                            "total": false,
+                            "values": true
+                        },
+                        "lines": true,
+                        "linewidth": 2,
+                        "links": [],
+                        "nullPointMode": "null as zero",
+                        "percentage": false,
+                        "pointradius": 5,
+                        "points": false,
+                        "renderer": "flot",
+                        "seriesOverrides": [],
+                        "spaceLength": 10,
+                        "span": 6,
+                        "stack": false,
+                        "steppedLine": false,
+                        "targets": [
+                            {
+                                "expr": "rate(spyre_vf_rdma_read_bytes{node=~\"$node\"}[5m]) + rate(spyre_vf_rdma_write_bytes{node=~\"$node\"}[5m])",
+                                "format": "time_series",
+                                "legendFormat": "Total RDMA - {{busid}}",
+                                "refId": "A"
+                            }
+                        ],
+                        "thresholds": [],
+                        "timeFrom": null,
+                        "timeShift": null,
+                        "title": "VF RDMA Total Bandwidth",
+                        "tooltip": {
+                            "shared": true,
+                            "sort": 2,
+                            "value_type": "individual"
+                        },
+                        "type": "graph",
+                        "xaxis": {
+                            "buckets": null,
+                            "mode": "time",
+                            "name": null,
+                            "show": true,
+                            "values": []
+                        },
+                        "yaxes": [
+                            {
+                                "format": "Bps",
+                                "label": "RDMA Bandwidth (B/s)",
+                                "logBase": 1,
+                                "max": null,
+                                "min": 0,
+                                "show": true
+                            },
+                            {
+                                "format": "short",
+                                "label": null,
+                                "logBase": 1,
+                                "max": null,
+                                "min": null,
+                                "show": false
+                            }
+                        ]
+                    }
+                ],
+                "repeat": null,
+                "repeatIteration": null,
+                "repeatRowId": null,
+                "showTitle": true,
+                "title": "VF Metrics - RDMA Bandwidth",
+                "titleSize": "h6"
             }
         ],
         "schemaVersion": 14,
