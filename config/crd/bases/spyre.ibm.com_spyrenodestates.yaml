@@ -102,8 +102,8 @@ spec:
                     [\"0000:00:0a\", \"0000:00:09\"]}\n```\n\nand the creation of
                     a Pod triggers Spyre Pod Resource Watcher to append\nthe Pod information
                     to the Allocation entry.\n\n```\n\n\t{\n\t  \"devices\": [\"000a\",
-                    \"0009\"],\n\t  \"pod\": {\"namespace\":\"myapp\", \"name\": \"mypod\"}\n\t
-                    \ \"pool\": \"spyre_pf\"\n\t}\n\n```"
+                    \"0009\"],\n\t  \"pod\": {\"namespace\":\"myapp\", \"name\": \"mypod\",
+                    \"uid\": \"1c8f...\"}\n\t  \"pool\": \"spyre_pf\"\n\t}\n\n```"
                   properties:
                     devices:
                       items:
@@ -114,6 +114,12 @@ spec:
                         name:
                           type: string
                         namespace:
+                          type: string
+                        uid:
+                          description: |-
+                            UID distinguishes generations of a Pod that reuses a name, which happens
+                            routinely with GitHub Actions Runner Controller runners. Matching on name
+                            alone lets a successor Pod be mistaken for its predecessor.
                           type: string
                       type: object
                     pool:
@@ -183,29 +189,94 @@ spec:
                 x-kubernetes-list-type: map
               reservation:
                 additionalProperties:
-                  description: "Reservation contains a pair of reserved device list
-                    and its requester.\nSpyre Scheduler creates a Reservation, and
-                    Spyre Device Plugin removes it\nat the time of allocation.\n\n```\n\n\t\t{\n\t
-                    \       \"spyre_pf\": {\n\t            \"deviceSets\": [[\"000a\",
-                    \"0009\"], [\"001f\"]],\n\t            \"podsUnderScheduling\":
-                    [\n\t                {\"namespace\": \"myapp\", \"name\": \"app1\"},\n\t
-                    \               {\"namespace\": \"myapp\", \"name\": \"app2\"}]\n\t
-                    \       },\n\t        \"spyre_pf_003d\": {\n\t            \"deviceSets\":
-                    [[\"003d\"]],\n\t            \"podsUnderScheduling\": [{\"namespace\":
-                    \"myapp\", \"name\": \"app3\"}]\n\t        }\n\t\t}\n\n```"
+                  description: "Reservation records which devices are reserved for
+                    which Pods.\nSpyre Scheduler creates a Reservation, and Spyre
+                    Device Plugin removes it\nat the time of allocation.\n\n```\n\n\t\t{\n\t
+                    \       \"spyre_pf\": {\n\t            \"entries\": [\n\t                {\"pod\":
+                    {\"namespace\": \"myapp\", \"name\": \"app1\", \"uid\": \"1c8f...\"},\n\t
+                    \                \"devices\": [\"000a\", \"0009\"], \"reservedAt\":
+                    \"2026-08-21T01:23:45Z\"},\n\t                {\"pod\": {\"namespace\":
+                    \"myapp\", \"name\": \"app2\", \"uid\": \"97ab...\"},\n\t                 \"devices\":
+                    [\"001f\"], \"reservedAt\": \"2026-08-21T01:23:46Z\"}],\n\t            \"deviceSets\":
+                    [[\"000a\", \"0009\"], [\"001f\"]],\n\t            \"podsUnderScheduling\":
+                    [\n\t                {\"namespace\": \"myapp\", \"name\": \"app1\",
+                    \"uid\": \"1c8f...\"},\n\t                {\"namespace\": \"myapp\",
+                    \"name\": \"app2\", \"uid\": \"97ab...\"}]\n\t        }\n\t\t}\n\n```"
                   properties:
                     deviceSets:
+                      description: |-
+                        DeviceSets lists the reserved device sets, positionally unrelated to
+                        PodsUnderScheduling.
+
+                        Deprecated: derived from Entries. See PodsUnderScheduling.
                       items:
                         items:
                           type: string
                         type: array
                       type: array
+                    entries:
+                      description: |-
+                        Entries is the source of truth: one entry per reserving Pod, binding that
+                        Pod's identity to its devices.
+                      items:
+                        description: |-
+                          ReservationEntry binds one Pod to the exact set of devices reserved for it.
+
+                          Entries is the authoritative representation of a Reservation: because each
+                          entry carries both the owner Pod (including its UID) and that Pod's devices,
+                          consumers never have to guess which device set belongs to which Pod.
+                        properties:
+                          devices:
+                            description: DeviceList is the set of devices reserved
+                              for Pod.
+                            items:
+                              type: string
+                            type: array
+                          pod:
+                            description: Pod is the owner of the reserved devices.
+                            properties:
+                              name:
+                                type: string
+                              namespace:
+                                type: string
+                              uid:
+                                description: |-
+                                  UID distinguishes generations of a Pod that reuses a name, which happens
+                                  routinely with GitHub Actions Runner Controller runners. Matching on name
+                                  alone lets a successor Pod be mistaken for its predecessor.
+                                type: string
+                            type: object
+                          reservedAt:
+                            description: |-
+                              ReservedAt is the time the reservation was created. It is used to keep a
+                              reservation alive for a grace period after its Pod disappears from the
+                              API, so that a device is not handed out again while the previous consumer
+                              is still tearing down.
+                            format: date-time
+                            type: string
+                        required:
+                        - pod
+                        type: object
+                      type: array
                     podsUnderScheduling:
+                      description: |-
+                        PodsUnderScheduling lists the Pods holding a reservation.
+
+                        Deprecated: derived from Entries and kept only so that components which
+                        have not yet been updated keep working during a rolling upgrade. Writers
+                        must call SyncLegacy() before persisting. Will be removed in a future
+                        release.
                       items:
                         properties:
                           name:
                             type: string
                           namespace:
+                            type: string
+                          uid:
+                            description: |-
+                              UID distinguishes generations of a Pod that reuses a name, which happens
+                              routinely with GitHub Actions Runner Controller runners. Matching on name
+                              alone lets a successor Pod be mistaken for its predecessor.
                             type: string
                         type: object
                       type: array
