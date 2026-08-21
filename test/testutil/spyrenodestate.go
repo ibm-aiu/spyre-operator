@@ -93,14 +93,11 @@ func isAvailable(nodeState *spyrev1alpha1.SpyreNodeState, d string) bool {
 			return false
 		}
 	}
-	for _, r := range nodeState.Status.Reservations {
-		for _, ds := range r.DeviceSets {
-			if slices.Contains(ds, d) {
-				return false
-			}
-		}
-	}
-	return true
+	// A reservation written by a component that predates Reservation.Entries
+	// carries only the deprecated fields, so normalize a copy before reading it.
+	status := nodeState.Status.DeepCopy()
+	status.NormalizeReservations()
+	return !slices.Contains(status.ReservedDevices(), d)
 }
 func GetAvailableVFSpyreInterface(ctx context.Context, k8sClientset *kubernetes.Clientset, spyreV2Client client.Client, nodes []string) ([]string, bool) {
 	var availableIfs []string

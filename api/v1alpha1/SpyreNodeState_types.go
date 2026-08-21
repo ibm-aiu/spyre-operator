@@ -9,6 +9,7 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -98,7 +99,7 @@ type SpyreNodeStateStatus struct {
 //
 //	{
 //	  "devices": ["000a", "0009"],
-//	  "pod": {"namespace":"myapp", "name": "mypod"}
+//	  "pod": {"namespace":"myapp", "name": "mypod", "uid": "1c8f..."}
 //	  "pool": "spyre_pf"
 //	}
 //
@@ -109,7 +110,25 @@ type Allocation struct {
 	ResourcePool string   `json:"pool,omitempty"`
 }
 
-// Reservation contains a pair of reserved device list and its requester.
+// ReservationEntry binds one Pod to the exact set of devices reserved for it.
+//
+// Entries is the authoritative representation of a Reservation: because each
+// entry carries both the owner Pod (including its UID) and that Pod's devices,
+// consumers never have to guess which device set belongs to which Pod.
+type ReservationEntry struct {
+	// Pod is the owner of the reserved devices.
+	Pod Pod `json:"pod"`
+	// DeviceList is the set of devices reserved for Pod.
+	DeviceList []string `json:"devices,omitempty"`
+	// ReservedAt is the time the reservation was created. It is used to keep a
+	// reservation alive for a grace period after its Pod disappears from the
+	// API, so that a device is not handed out again while the previous consumer
+	// is still tearing down.
+	// +optional
+	ReservedAt *metav1.Time `json:"reservedAt,omitempty"`
+}
+
+// Reservation records which devices are reserved for which Pods.
 // Spyre Scheduler creates a Reservation, and Spyre Device Plugin removes it
 // at the time of allocation.
 //
@@ -117,26 +136,47 @@ type Allocation struct {
 //
 //		{
 //	        "spyre_pf": {
+//	            "entries": [
+//	                {"pod": {"namespace": "myapp", "name": "app1", "uid": "1c8f..."},
+//	                 "devices": ["000a", "0009"], "reservedAt": "2026-08-21T01:23:45Z"},
+//	                {"pod": {"namespace": "myapp", "name": "app2", "uid": "97ab..."},
+//	                 "devices": ["001f"], "reservedAt": "2026-08-21T01:23:46Z"}],
 //	            "deviceSets": [["000a", "0009"], ["001f"]],
 //	            "podsUnderScheduling": [
-//	                {"namespace": "myapp", "name": "app1"},
-//	                {"namespace": "myapp", "name": "app2"}]
-//	        },
-//	        "spyre_pf_003d": {
-//	            "deviceSets": [["003d"]],
-//	            "podsUnderScheduling": [{"namespace": "myapp", "name": "app3"}]
+//	                {"namespace": "myapp", "name": "app1", "uid": "1c8f..."},
+//	                {"namespace": "myapp", "name": "app2", "uid": "97ab..."}]
 //	        }
 //		}
 //
 // ```
 type Reservation struct {
-	PodsUnderScheduling []Pod      `json:"podsUnderScheduling,omitempty"`
-	DeviceSets          [][]string `json:"deviceSets,omitempty"`
+	// PodsUnderScheduling lists the Pods holding a reservation.
+	//
+	// Deprecated: derived from Entries and kept only so that components which
+	// have not yet been updated keep working during a rolling upgrade. Writers
+	// must call SyncLegacy() before persisting. Will be removed in a future
+	// release.
+	PodsUnderScheduling []Pod `json:"podsUnderScheduling,omitempty"`
+	// DeviceSets lists the reserved device sets, positionally unrelated to
+	// PodsUnderScheduling.
+	//
+	// Deprecated: derived from Entries. See PodsUnderScheduling.
+	DeviceSets [][]string `json:"deviceSets,omitempty"`
+
+	// Entries is the source of truth: one entry per reserving Pod, binding that
+	// Pod's identity to its devices.
+	// +optional
+	Entries []ReservationEntry `json:"entries,omitempty"`
 }
 
 type Pod struct {
 	Name      string `json:"name,omitempty"`
 	Namespace string `json:"namespace,omitempty"`
+	// UID distinguishes generations of a Pod that reuses a name, which happens
+	// routinely with GitHub Actions Runner Controller runners. Matching on name
+	// alone lets a successor Pod be mistaken for its predecessor.
+	// +optional
+	UID types.UID `json:"uid,omitempty"`
 }
 
 //+kubebuilder:object:root=true
