@@ -9,11 +9,14 @@ package client
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
@@ -135,6 +138,14 @@ func (c *SpyreClient) Update(ctx context.Context,
 	return ns, nil
 }
 
+// UpdateStatus writes ns.Status back to the API server.
+//
+// retryOnConflict re-reads the object and replays the caller's whole Status onto
+// it. That discards any status change another writer made in the meantime, so it
+// is only safe when the caller owns the entire status. Prefer
+// MutateNodeStateStatus, which recomputes the change against the fresh object.
+//
+//nolint:dupl // UpdateSpyreClusterPolicyStatus is this same shim for another type.
 func (c *SpyreClient) UpdateStatus(ctx context.Context,
 	ns *spyrev1alpha1.SpyreNodeState, retryOnConflict bool) (*spyrev1alpha1.SpyreNodeState, error) {
 	err := c.k8sClient.Status().Update(ctx, ns, &client.SubResourceUpdateOptions{})
@@ -145,7 +156,9 @@ func (c *SpyreClient) UpdateStatus(ctx context.Context,
 				return fmt.Errorf("failed to get SpyreNodeState: %w, retry", err)
 			}
 			nodeState.Status = ns.Status
-			if err = c.k8sClient.Update(ctx, nodeState, &client.UpdateOptions{}); err == nil {
+			// Status is a subresource, so a plain Update silently drops every
+			// status change and reports success.
+			if err = c.k8sClient.Status().Update(ctx, nodeState, &client.SubResourceUpdateOptions{}); err == nil {
 				ns = nodeState
 				return nil
 			}
@@ -156,6 +169,83 @@ func (c *SpyreClient) UpdateStatus(ctx context.Context,
 		return nil, fmt.Errorf("failed to update SpyreNodeState status: %w", err)
 	}
 	return ns, nil
+}
+
+// ErrNoStatusChange tells MutateNodeStateStatus that the mutation turned out to
+// be unnecessary, so no write should be attempted. It is not an error: the
+// mutation reports success.
+var ErrNoStatusChange = errors.New("no status change required")
+
+// MutateNodeStateStatus applies mutate to the SpyreNodeState of node nodeName and
+// writes the resulting status back, retrying the whole read-modify-write cycle
+// when another writer gets there first.
+//
+// Recomputing the change against a freshly read object on every attempt is what
+// makes this safe under contention: a caller that instead retries a status it
+// built once will keep sending the same stale resourceVersion and exhaust its
+// retries, or - worse - overwrite whoever won. Reservations on the object are
+// normalized before mutate runs, so mutate always sees Reservation.Entries
+// populated even if the last writer only knew the deprecated fields.
+//
+// mutate may return ErrNoStatusChange to finish successfully without writing.
+//
+// An error from mutate is returned unchanged, so a caller can still match on it:
+// it usually describes why the change could not be computed (for instance which
+// device was unavailable) and is what the scheduler reports to the user. Only a
+// failure of the read-modify-write cycle itself gets node context added.
+func (c *SpyreClient) MutateNodeStateStatus(ctx context.Context, nodeName string,
+	mutate func(*spyrev1alpha1.SpyreNodeState) error) (*spyrev1alpha1.SpyreNodeState, error) {
+	var result *spyrev1alpha1.SpyreNodeState
+	var mutateErr error
+	err := retry.RetryOnConflict(nodeStateUpdateBackoff, func() error {
+		mutateErr = nil
+		nodeState, err := c.GetSpyreNodeState(ctx, nodeName)
+		if err != nil {
+			return fmt.Errorf("failed to get SpyreNodeState: %w", err)
+		}
+		nodeState.Status.NormalizeReservations()
+		if err := mutate(nodeState); err != nil {
+			if errors.Is(err, ErrNoStatusChange) {
+				result = nodeState
+				return nil
+			}
+			mutateErr = err
+			return err
+		}
+		if err := c.k8sClient.Status().Update(ctx, nodeState, &client.SubResourceUpdateOptions{}); err != nil {
+			// A conflict here is expected whenever another scheduling cycle or
+			// the device plugin touched the node state; RetryOnConflict will
+			// re-read and let mutate recompute against the new state.
+			if k8serr.IsConflict(err) {
+				klog.Infof("SpyreNodeState status update conflicted for node %s, retrying: %v", nodeName, err)
+			}
+			// Wrapping keeps IsConflict working - it unwraps - so RetryOnConflict
+			// still recognizes the conflict.
+			return fmt.Errorf("failed to update SpyreNodeState status: %w", err)
+		}
+		result = nodeState
+		return nil
+	})
+	if err != nil {
+		if mutateErr != nil {
+			return nil, mutateErr
+		}
+		return nil, fmt.Errorf("failed to mutate SpyreNodeState status of node %s: %w", nodeName, err)
+	}
+	return result, nil
+}
+
+// nodeStateUpdateBackoff gives the read-modify-write cycle more attempts than
+// retry.DefaultRetry's five. A node that hosts a runner set sees a new single-card
+// Pod every second or two, so several scheduling cycles and the device plugin can
+// all be writing the same SpyreNodeState; each attempt is a fresh Get plus one
+// Update, so losing a few races is normal rather than a sign of trouble. The
+// backoff still tops out well under a second in total.
+var nodeStateUpdateBackoff = wait.Backoff{
+	Steps:    10,
+	Duration: 10 * time.Millisecond,
+	Factor:   1.4,
+	Jitter:   0.2,
 }
 
 func (c *SpyreClient) GetSpyreClusterPolicy(ctx context.Context, name string) (*spyrev1alpha1.SpyreClusterPolicy, error) {
@@ -189,7 +279,7 @@ func (c *SpyreClient) DeleteSpyreClusterPolicy(ctx context.Context, name string,
 }
 
 // UpdateSpyreClusterPolicyStatus updates status of SpyreClusterPolicy resource
-func (c *SpyreClient) UpdateSpyreClusterPolicyStatus(ctx context.Context, p *spyrev1alpha1.SpyreClusterPolicy, retryOnConflict bool) (*spyrev1alpha1.SpyreClusterPolicy, error) { //nolint:lll
+func (c *SpyreClient) UpdateSpyreClusterPolicyStatus(ctx context.Context, p *spyrev1alpha1.SpyreClusterPolicy, retryOnConflict bool) (*spyrev1alpha1.SpyreClusterPolicy, error) { //nolint:lll,dupl // same shim as UpdateStatus, for another type
 	err := c.k8sClient.Status().Update(ctx, p, &client.SubResourceUpdateOptions{})
 	if retryOnConflict && k8serr.IsConflict(err) {
 		err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {

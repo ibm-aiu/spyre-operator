@@ -191,6 +191,14 @@ func (s *SpyreNodeStateState) isActivePod(ctx context.Context, logger logr.Logge
 		key := client.ObjectKey{Namespace: podNamespace, Name: podName}
 		err := s.k8sClient.Get(ctx, key, pod)
 		if err == nil {
+			// A Pod that merely reuses the recorded name is a different Pod, and
+			// the allocation it belongs to is stale rather than active.
+			if allocation.Pod.UID != "" && pod.UID != allocation.Pod.UID {
+				logger.V(1).Info("allocation refers to an earlier generation of the pod",
+					"pod", fmt.Sprintf("%s/%s", podNamespace, podName),
+					"allocatedUID", allocation.Pod.UID, "currentUID", pod.UID)
+				return false
+			}
 			return true
 		} else if !apierrors.IsNotFound(err) {
 			// Error other than not found - log but continue checking
