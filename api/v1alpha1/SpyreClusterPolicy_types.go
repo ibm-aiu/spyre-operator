@@ -172,6 +172,9 @@ type ExternalInitContainerSpec struct {
 
 	// DeploymentConfig defines deployment configuration of init container
 	DeploymentConfig `json:",inline"`
+
+	// Runtime define deploy configuration of runtime init container
+	Runtime *DeploymentConfig `json:"runtime,omitempty"`
 }
 
 // DeviceConfigSpec defines the configuration for Spyre devices

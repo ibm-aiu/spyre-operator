@@ -82,6 +82,8 @@ const (
 	MonitorPortName            = "spyre-metrics"
 	DefaultMonitorPort         = int32(8082)
 	MonitorContainerName       = "spyre-monitor"
+	RuntimeInitContainerName   = "init-senlib"
+	DataInitContainerName      = "init-data"
 	// constants regarding card management source
 	CardManagementClaimName  = "cardmgmt"
 	CardManagementConfigName = "spyre-cardmgmt-config"

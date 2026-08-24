@@ -20,7 +20,7 @@ replacements:
 images:
 - name: controller
   newName: docker.io/spyre-operator/spyre-operator
-  newTag: 1.4.0-dev
+  newTag: 1.4.0
 labels:
 - includeSelectors: true
   pairs:

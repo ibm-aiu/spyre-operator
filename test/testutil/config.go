@@ -41,6 +41,7 @@ func (config *TestConfig) SetRepositories() {
 	config.setRepositoryIfEmpty(&config.CatalogSource)
 	config.setRepositoryIfEmpty(&config.DevicePlugin)
 	config.setRepositoryIfEmpty(&config.DevicePluginInit.ImageVersion)
+	config.setRepositoryIfEmpty(&config.DevicePluginInit.Runtime)
 	config.setRepositoryIfEmpty(&config.DraDriver)
 	config.setRepositoryIfEmpty(&config.Exporter.ImageVersion)
 	config.setRepositoryIfEmpty(&config.ExporterMockUser)
@@ -72,6 +73,7 @@ type OptionalComponent struct {
 type DevicePluginInitConfig struct {
 	OptionalComponent `yaml:",inline"`
 	ExecutePolicy     spyrev1alpha1.ExecutePolicy `yaml:"executePolicy,omitempty"`
+	Runtime           ImageVersion                `yaml:"runtime,omitempty"`
 }
 
 type CardManagementConfig struct {
