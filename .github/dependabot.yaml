@@ -23,6 +23,8 @@ updates:
     versions: ["*"]
   - dependency-name: "github.com/onsi/ginkgo/v2"
     versions: ["*"]
+  reviewers:
+  - "sunya-ch"
 - package-ecosystem: docker
   directory: /
   schedule:
@@ -30,3 +32,5 @@ updates:
   ignore:
   - dependency-name: "registry.access.redhat.com/ubi9-micro"
     update-types: ["version-update:semver-major", "version-update:semver-minor"]
+  reviewers:
+  - "sunya-ch"
