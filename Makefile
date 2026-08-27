@@ -34,7 +34,7 @@ OPERATOR_MAKE_ENV_FILE = $(REPO_ROOT)/local.mk
 KUBECTL             ?= $(shell command -v oc 2> /dev/null || echo kubectl)
 OC                  ?= $(shell command -v oc)
 OPERATOR_NAMESPACE  ?= spyre-operator
-DEFAULT_CHANNEL		?=fast-v1.3
+DEFAULT_CHANNEL		?=fast-v1.4
 CHANNELS            ?= $(DEFAULT_CHANNEL)
 
 # Operating system
