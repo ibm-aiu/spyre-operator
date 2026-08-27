@@ -75,6 +75,16 @@ spec:
           ExecStart=/usr/bin/chcon -R -t container_file_t /usr/local/etc/device-plugins/metadata
           RemainAfterExit=true
 
+          # Mount device-plugins to dra-driver-spyre for init-container
+          # Unmount if already mounted and remove directory if exists
+          ExecStart=/bin/bash -c 'mountpoint -q /usr/local/etc/dra-driver-spyre && umount /usr/local/etc/dra-driver-spyre || true'
+          ExecStart=/usr/bin/rm -rf /usr/local/etc/dra-driver-spyre
+          ExecStart=/usr/bin/mkdir -p /usr/local/etc/dra-driver-spyre
+          ExecStart=/usr/bin/mount --bind /usr/local/etc/device-plugins /usr/local/etc/dra-driver-spyre
+          ExecStart=/usr/bin/chmod 770 /usr/local/etc/dra-driver-spyre
+          ExecStart=/usr/bin/chcon -R -t container_file_t /usr/local/etc/dra-driver-spyre
+          RemainAfterExit=true
+
           [Install]
           WantedBy=multi-user.target
         enabled: true
