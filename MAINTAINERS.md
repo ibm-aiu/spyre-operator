@@ -1,6 +1,6 @@
 # MAINTAINERS
 
-* Tatsuhiro Chiba - [@tatsuhiro-c](https://github.com/tatsuhiro-c)
+* Tatsuhiro Chiba - [@tatsuhirochiba](https://github.com/tatsuhirochiba)
 * Takuya Mishina - [@TMISHINA](https://github.com/TMISHINA)
 * Sunyanan Choochotkaew - [@sunya-ch](https://github.com/sunya-ch)
 * Scott Trent - [@trent-s](https://github.com/trent-s)
