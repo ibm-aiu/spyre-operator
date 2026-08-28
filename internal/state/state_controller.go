@@ -34,7 +34,7 @@ type StateController struct {
 }
 
 var (
-	supportedArchitectures = []string{"amd64", "ppc64le", "s390x"}
+	supportedArchitectures = []string{archAMD64, archPPC64LE, archS390X}
 )
 
 // NewStateController initializes StateController with ClusterState, SpyreNodeState, and DeploymentState

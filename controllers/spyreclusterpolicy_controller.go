@@ -40,6 +40,7 @@ import (
 )
 
 const (
+	shortRequeueAfter           = time.Second
 	staticRequeueAfter          = time.Second * 5
 	SpyreClusterPolicyFinalizer = "finalizers.spyreclusterpolicies.spyre.ibm.com"
 	nfdOSTreeVersionLabelKey    = "feature.node.kubernetes.io/system-os_release.OSTREE_VERSION"
@@ -98,7 +99,7 @@ func (r *SpyreClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.R
 	if err != nil {
 		// Error reading the object - requeue the request.
 		logger.Error(err, "reconciliation failed: unable to get SpyreClusterPolicy")
-		return ctrl.Result{Requeue: true}, fmt.Errorf("error getting cluster policy: %w", err)
+		return ctrl.Result{RequeueAfter: shortRequeueAfter}, fmt.Errorf("error getting cluster policy: %w", err)
 	}
 
 	// Add finalizer to instance
@@ -106,7 +107,7 @@ func (r *SpyreClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.R
 		controllerutil.AddFinalizer(instance, SpyreClusterPolicyFinalizer)
 		err = r.Update(ctx, instance)
 		if err != nil {
-			return ctrl.Result{Requeue: true}, fmt.Errorf("failed to update cluster policy: %w", err)
+			return ctrl.Result{RequeueAfter: shortRequeueAfter}, fmt.Errorf("failed to update cluster policy: %w", err)
 		}
 	}
 
@@ -117,7 +118,7 @@ func (r *SpyreClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.R
 			controllerutil.RemoveFinalizer(instance, SpyreClusterPolicyFinalizer)
 			err := r.Update(ctx, instance)
 			if err != nil {
-				return ctrl.Result{Requeue: true}, fmt.Errorf("failed to update cluster policy finalizers: %w", err)
+				return ctrl.Result{RequeueAfter: shortRequeueAfter}, fmt.Errorf("failed to update cluster policy finalizers: %w", err)
 			}
 			// WARNING: expect only single spyreclusterpolicy in the cluster
 			// This line will be called only once and not blocking the removal of finalizer.
@@ -143,7 +144,7 @@ func (r *SpyreClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.R
 			spyreerr.LogErrUpdate(logger, err)
 			noRequeueResult := result.RequeueAfter == 0
 			if noRequeueResult {
-				return ctrl.Result{RequeueAfter: time.Second}, nil
+				return ctrl.Result{RequeueAfter: shortRequeueAfter}, nil
 			}
 		}
 	}

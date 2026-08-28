@@ -40,24 +40,35 @@ type HostPathMount struct {
 
 const (
 	blockingLabel = "spyre.ibm.com/card-management-disabled"
+
+	archAMD64   = "amd64"
+	archPPC64LE = "ppc64le"
+	archS390X   = "s390x"
+
+	yamlExtension = ".yaml"
+)
+
+var (
+	defaultHwDataMnt = HostPathMount{name: "hwdata", hostPath: "/usr/share/hwdata", containerPath: "/usr/share/hwdata"}
+	defaultVfioMnt   = HostPathMount{name: "vfio", hostPath: "/dev/vfio", containerPath: "/dev/vfio"}
 )
 
 var (
 	// map hw-related host mount for each architecture
 	// architecture is getting from the label "kubernetes.io/arch"
 	hwHostPathMounts = map[string][]HostPathMount{
-		"amd64":   {{name: "hwdata", hostPath: "/usr/share/hwdata", containerPath: "/usr/share/hwdata"}},
-		"ppc64le": {{name: "hwdata", hostPath: "/usr/share/hwdata", containerPath: "/usr/share/hwdata"}},
-		"s390x":   {{name: "hwdata", hostPath: "/usr/share/hwdata", containerPath: "/usr/share/hwdata"}},
+		archAMD64:   {defaultHwDataMnt},
+		archPPC64LE: {defaultHwDataMnt},
+		archS390X:   {defaultHwDataMnt},
 	}
 
 	// map device host mount for each architecture,
 	// used by init container to discover devices and generate topology
 	// architecture is getting from the label "kubernetes.io/arch"
 	deviceHostPathMounts = map[string][]HostPathMount{
-		"amd64":   {{name: "vfio", hostPath: "/dev/vfio", containerPath: "/dev/vfio"}},
-		"ppc64le": {{name: "vfio", hostPath: "/dev/vfio", containerPath: "/dev/vfio"}},
-		"s390x":   {{name: "vfio", hostPath: "/dev/vfio", containerPath: "/dev/vfio"}},
+		archAMD64:   {defaultVfioMnt},
+		archPPC64LE: {defaultVfioMnt},
+		archS390X:   {defaultVfioMnt},
 	}
 )
 
@@ -537,7 +548,7 @@ func applyExecutePolicy(initContainer *corev1.Container, executePolicy *spyrev1a
 // For other architectures: VERIFY_P2P=0 and privileged=false (defaults from YAML, regardless of p2pDMA flag)
 // These defaults can be overridden by user config in applyContainerConfig below
 func applyVerifyP2P(initContainer *corev1.Container, nodeArchitecture string, p2pDMA bool) {
-	if nodeArchitecture == "amd64" && p2pDMA {
+	if nodeArchitecture == archAMD64 && p2pDMA {
 		setContainerEnv(initContainer, "VERIFY_P2P", "1")
 		if initContainer.SecurityContext == nil {
 			initContainer.SecurityContext = &corev1.SecurityContext{}
