@@ -45,7 +45,7 @@ type ControlledComponent struct {
 
 func NewControlledComponent(ctx context.Context, k8sClient client.Client, scheme *runtime.Scheme,
 	componentPath, namespace, name string) (*ControlledComponent, error) {
-	files, err := filePathWalkDir(componentPath, []string{".yaml"})
+	files, err := filePathWalkDir(componentPath, []string{yamlExtension})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list object files in %s: %w", componentPath, err)
 	}

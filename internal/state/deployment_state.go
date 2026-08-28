@@ -80,7 +80,7 @@ func generatePerNodeCardMgmtManifest(ctx context.Context, k8sClient client.Clien
 		tempSuffix = ".tmp"
 	)
 
-	files, err := filePathWalkDir(componentPath, []string{".yaml", ".yaml.tmpl"})
+	files, err := filePathWalkDir(componentPath, []string{yamlExtension, yamlExtension + ".tmpl"})
 	if err != nil {
 		return fmt.Errorf("failed to generate per-node card-management manifests: %w", err)
 	}
