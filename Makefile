@@ -194,7 +194,7 @@ $(GINKGO):$(LOCALBIN)
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download and install setup-envtest
 $(ENVTEST):$(LOCALBIN)
-	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@v0.0.0-20240624150636-162a113134de
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@v0.24.1
 
 GOLANGCI_LINT_INSTALL_SCRIPT ?= 'https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh'
 .PHONY: golangci-lint
