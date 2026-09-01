@@ -30,6 +30,7 @@ type TestConfig struct {
 	HealthChecker    OptionalComponent      `yaml:"healthChecker"`
 	CatalogSource    ImageVersion           `yaml:"catalog"`
 	ExporterMockUser ImageVersion           `yaml:"mockUser"`
+	SmallToy         OptionalComponent      `yaml:"smallToy"`
 	CardManagement   CardManagementConfig   `yaml:"cardManagement"`
 	HasDevice        bool                   `yaml:"hasDevice"`
 	PseudoDeviceMode bool                   `yaml:"pseudoDeviceMode"`
@@ -50,6 +51,7 @@ func (config *TestConfig) SetRepositories() {
 	config.setRepositoryIfEmpty(&config.PodValidator.ImageVersion)
 	config.setRepositoryIfEmpty(&config.HealthChecker.ImageVersion)
 	config.setRepositoryIfEmpty(&config.CardManagement.ImageVersion)
+	config.setRepositoryIfEmpty(&config.SmallToy.ImageVersion)
 }
 
 func (config *TestConfig) setRepositoryIfEmpty(img *ImageVersion) {

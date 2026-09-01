@@ -396,7 +396,7 @@ integration-test: ginkgo jq ensure-deps ## Run integration test on the cluster p
 	$(YQ) eval -i '.exporter.enabled=true' ${REPO_ROOT}/test/config.yaml
 	$(YQ) eval -i '.healthChecker.enabled=true' ${REPO_ROOT}/test/config.yaml
 	$(YQ) eval -i '.hasDevice=true' ${REPO_ROOT}/test/config.yaml
-	OC=$(OC) $(GINKGO) run --label-filter=$(INTEGRATION_TEST_LABEL) --seed 777 --cover --coverprofile=coverage-report.out -v ./test/integration/...
+	OC=$(OC) $(GINKGO) run --timeout=2h --label-filter=$(INTEGRATION_TEST_LABEL) --seed 777 --cover --coverprofile=coverage-report.out -v ./test/integration/...
 
 .PHONY: e2e-test
 e2e-test: ginkgo jq ensure-deps ## Run e2e test on the cluster pointed to in the current KUBECONFIG (expecting NFD instance running)

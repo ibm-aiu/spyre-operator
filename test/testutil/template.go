@@ -133,6 +133,67 @@ data:
       }
     }
 `
+
+// SmallToyJobTemplate runs the small-toy workload on a Spyre PF until it exits.
+// Keep the command literal: html/template escapes interpolated values.
+const SmallToyJobTemplate = `
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{.Name}}
+  labels:
+    app: {{.Name}}
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app: {{.Name}}
+    spec:
+      restartPolicy: Never
+      schedulerName: spyre-scheduler
+      containers:
+      - name: small-toy
+        image: {{.Image}}
+        imagePullPolicy: Always
+        # Need to set workingDir to writable path
+        workingDir: /tmp
+        # 1. Quick generate topo.json
+        # 2. Assign rank from topo file to generate env.sh
+        # 3. Apply env.sh to set env values
+        # 4. Run small-toy
+        command:
+        - /bin/bash
+        - -c
+        - |
+          /opt/ibm/spyre/bin/aiu-discover-topo -j /tmp/topo.json &&
+          python3 /opt/ibm/spyre/bin/aiu-assign-ranks.py \
+          -t /tmp/topo.json \
+          -i /etc/aiu/senlib_config.json \
+          -o /tmp/senlib_config.json.new \
+          -e /tmp/env.sh &&
+          source /tmp/env.sh &&
+          export PATH=/opt/ibm/spyre/runtime/bin:$PATH &&
+          python3 -m torch.distributed.run \
+              --nproc-per-node ${AIU_WORLD_SIZE} \
+              /usr/local/lib/python3.12/site-packages/aiu_fms_testing_utils/scripts/small-toy.py \
+              --backend aiu
+        resources:
+          limits:
+            {{.ResourceName}}: {{.ResourceQuantity}}
+        env:
+        - name: FLEX_COMPUTE
+          value: SENTIENT
+        - name: FLEX_DEVICE
+          value: PF
+        - name: FLEX_HDMA_MODE_FULL
+          value: "1"
+        - name: DEEPTOOLS_PATH
+          value: /opt/ibm/spyre/deeptools/share
+        - name: SENLIB_INSTALL_DIR
+          value: /opt/ibm/spyre/senlib
+`
+
 const CurlPodTemplate = `
 apiVersion: v1
 kind: Pod
