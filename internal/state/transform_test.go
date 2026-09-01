@@ -200,6 +200,7 @@ var _ = Describe("Transform", func() {
 
 	Context("init container", func() {
 		ctx := context.Background()
+		runtimeValidConfig := ValidDeploymentConfig("init-runtime-image")
 
 		It("init container can be loaded", func() {
 			dsPath := filepath.Join(AssetsPath, "state-core-components", "spyre-device-plugin", "0500_daemonset.yaml")
@@ -215,8 +216,9 @@ var _ = Describe("Transform", func() {
 			controlledDs, ok := controlledObj.(*DevicePluginDaemonset)
 			Expect(ok).To(BeTrue())
 			spec := controlledDs.GetSpec()
-			Expect(len(spec.Spec.InitContainers)).To(Equal(1))
-			Expect(spec.Spec.InitContainers[0].Name).To(BeEquivalentTo("init-data"))
+			Expect(len(spec.Spec.InitContainers)).To(Equal(2))
+			Expect(spec.Spec.InitContainers[0].Name).To(BeEquivalentTo("init-senlib"))
+			Expect(spec.Spec.InitContainers[1].Name).To(BeEquivalentTo("init-data"))
 		})
 
 		DescribeTable("transform init container config", func(nodeArchitecture string, pseudoMode, hasInit, hasImage, expectedInit bool) {
@@ -228,7 +230,7 @@ var _ = Describe("Transform", func() {
 			}
 
 			initContainer := corev1.Container{
-				Name: "app",
+				Name: spyreconst.DataInitContainerName,
 				Args: []string{"command"},
 			}
 			devicePlugin := newDaemonset("device-plugin")
@@ -387,6 +389,95 @@ var _ = Describe("Transform", func() {
 				[]corev1.EnvVar{{Name: "VERIFY_P2P", Value: "1"}}, []corev1.EnvVar{{Name: "VERIFY_P2P", Value: "0"}}),
 			Entry("p2pDMA=false - other env", false, []corev1.EnvVar{{Name: "foo", Value: "bar"}},
 				[]corev1.EnvVar{{Name: "foo", Value: "bar"}, {Name: "VERIFY_P2P", Value: "0"}}),
+		)
+
+		DescribeTable("runtime init container (init-senlib) handling", func(
+			hasRuntimeInitContainer bool,
+			runtimeConfig *spyrev1alpha1.DeploymentConfig,
+			pseudoMode bool,
+			expectedRuntimePresent bool,
+		) {
+			// template
+			dataInitContainer := corev1.Container{
+				Name: spyreconst.DataInitContainerName,
+			}
+			devicePlugin := newDaemonset("device-plugin")
+			if hasRuntimeInitContainer {
+				runtimeInitContainer := corev1.Container{
+					Name: spyreconst.RuntimeInitContainerName,
+				}
+				devicePlugin.Spec.Template.Spec.InitContainers = []corev1.Container{
+					runtimeInitContainer, dataInitContainer,
+				}
+			} else {
+				devicePlugin.Spec.Template.Spec.InitContainers = []corev1.Container{dataInitContainer}
+			}
+
+			dataConfig := ValidDeploymentConfig("init-data-image")
+			// cluster policy
+			config := spyrev1alpha1.SpyreClusterPolicySpec{
+				DevicePlugin: spyrev1alpha1.DevicePluginSpec{
+					DeploymentConfig: ValidDeploymentConfig("device-plugin"),
+					InitContainer: &spyrev1alpha1.ExternalInitContainerSpec{
+						DeploymentConfig: dataConfig,
+						Runtime:          runtimeConfig,
+					},
+				},
+			}
+			if pseudoMode {
+				config.ExperimentalMode = []spyrev1alpha1.SpyreClusterPolicyExperimentalMode{
+					spyrev1alpha1.PseudoDeviceMode,
+				}
+			}
+
+			err := TransformDevicePlugin(devicePlugin, &config, DefaultArchitecture, zapcore.InfoLevel, false)
+			Expect(err).To(BeNil())
+
+			// Build a name → container map for easy lookup
+			containerByName := make(map[string]corev1.Container)
+			for _, c := range devicePlugin.Spec.Template.Spec.InitContainers {
+				containerByName[c.Name] = c
+			}
+
+			By("checking data init container is always present")
+			Expect(containerByName).To(HaveKey(spyreconst.DataInitContainerName))
+
+			By("checking runtime init container presence")
+			if expectedRuntimePresent {
+				Expect(containerByName).To(HaveKey(spyreconst.RuntimeInitContainerName),
+					"runtime init container should be present")
+			} else {
+				Expect(containerByName).NotTo(HaveKey(spyreconst.RuntimeInitContainerName),
+					"runtime init container should have been removed")
+			}
+
+			By("checking data init container image is applied from InitContainer.DeploymentConfig")
+			expectedDataImage, err := spyrev1alpha1.ImagePath(dataConfig.Repository, dataConfig.Image, dataConfig.Version)
+			Expect(err).To(BeNil())
+			Expect(containerByName[spyreconst.DataInitContainerName].Image).To(Equal(expectedDataImage))
+
+			By("checking runtime init container image is applied from Runtime DeploymentConfig")
+			if expectedRuntimePresent {
+				expectedRuntimeImage, err := spyrev1alpha1.ImagePath(
+					runtimeConfig.Repository, runtimeConfig.Image, runtimeConfig.Version)
+				Expect(err).To(BeNil())
+				Expect(containerByName[spyreconst.RuntimeInitContainerName].Image).To(Equal(expectedRuntimeImage))
+			}
+
+			By("checking volume mounts on data init container")
+			mnts := DeviceHostPathMounts[DefaultArchitecture]
+			mountsContains(containerByName[spyreconst.DataInitContainerName].VolumeMounts, mnts, true)
+		},
+			Entry("no runtime init container, no runtime config - only data init kept",
+				false, nil, false, false),
+			Entry("runtime init present, runtime config nil - runtime removed, data init image applied",
+				true, nil, false, false),
+			Entry("runtime init present, runtime config set - both kept with correct images",
+				true, &runtimeValidConfig, false, true),
+			Entry("runtime init present, runtime config set, pseudo mode - runtime removed",
+				true, &runtimeValidConfig, true, false),
+			Entry("runtime init present, pseudo mode, no runtime config - runtime removed",
+				true, nil, true, false),
 		)
 	})
 

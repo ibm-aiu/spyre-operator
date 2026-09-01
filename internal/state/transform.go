@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	spyrev1alpha1 "github.com/ibm-aiu/spyre-operator/api/v1alpha1"
@@ -240,8 +241,12 @@ func transformDevicePluginInitContainer(obj *appsv1.DaemonSet,
 		obj.Spec.Template.Spec.InitContainers = []corev1.Container{}
 		return nil
 	}
+	dataInitIndex, err := transformRuntimeInitContainer(obj, config)
+	if dataInitIndex == -1 {
+		return fmt.Errorf("cannot find index of %s in init containers", spyreconst.DataInitContainerName)
+	}
 
-	if err := applyContainerConfig(&obj.Spec.Template.Spec.InitContainers[0],
+	if err := applyContainerConfig(&obj.Spec.Template.Spec.InitContainers[dataInitIndex],
 		&config.DevicePlugin.InitContainer.DeploymentConfig); err != nil {
 		obj.Spec.Template.Spec.InitContainers = []corev1.Container{}
 		return err
@@ -251,15 +256,57 @@ func transformDevicePluginInitContainer(obj *appsv1.DaemonSet,
 		obj.Spec.Template.Spec.InitContainers = []corev1.Container{}
 		return fmt.Errorf("unsupported architecture %s, please remove .spec.devicePlugin.initContainer", nodeArchitecture)
 	}
-	applyExecutePolicy(&obj.Spec.Template.Spec.InitContainers[0],
+	if dataInitIndex >= 0 {
+		mntPaths := deviceHostPathMounts[nodeArchitecture] // already check found
+		for _, mnt := range mntPaths {
+			addVolumeMount(&obj.Spec.Template.Spec.InitContainers[dataInitIndex], mnt.name, mnt.containerPath, true)
+		}
+	}
+	applyExecutePolicy(&obj.Spec.Template.Spec.InitContainers[dataInitIndex],
 		config.DevicePlugin.InitContainer.ExecutePolicy)
-	applyVerifyP2P(&obj.Spec.Template.Spec.InitContainers[0], nodeArchitecture,
+	applyVerifyP2P(&obj.Spec.Template.Spec.InitContainers[dataInitIndex], nodeArchitecture,
 		config.DevicePlugin.P2PDMA)
 
 	// update env from experimental modes
-	applyExperimentalModes(&(obj.Spec.Template.Spec.InitContainers[0]), config.ExperimentalMode)
+	applyExperimentalModes(&(obj.Spec.Template.Spec.InitContainers[dataInitIndex]), config.ExperimentalMode)
 
+	if err != nil {
+		return fmt.Errorf("failed to transform runtime init container: %w", err)
+	}
 	return nil
+}
+
+// transformRuntimeInitContainer transforms the runtime init container for device plugin.
+func transformRuntimeInitContainer(obj *appsv1.DaemonSet,
+	config *spyrev1alpha1.SpyreClusterPolicySpec) (int, error) {
+	dataInitIndex := -1
+	senlibInitIndex := -1
+	remove := false
+	for i, container := range obj.Spec.Template.Spec.InitContainers {
+		switch container.Name {
+		case spyreconst.RuntimeInitContainerName:
+			senlibInitIndex = i
+			if config.ExperimentalModeEnabled(spyrev1alpha1.PseudoDeviceMode) ||
+				config.DevicePlugin.InitContainer.Runtime == nil {
+				remove = true
+			} else if err := applyContainerConfig(&obj.Spec.Template.Spec.InitContainers[i],
+				config.DevicePlugin.InitContainer.Runtime); err != nil {
+				return dataInitIndex, fmt.Errorf("failed to apply runtime init container config: %w", err)
+			}
+		case spyreconst.DataInitContainerName:
+			dataInitIndex = i
+		}
+		if senlibInitIndex >= 0 && dataInitIndex >= 0 {
+			break
+		}
+	}
+	if remove {
+		obj.Spec.Template.Spec.InitContainers = slices.Delete(obj.Spec.Template.Spec.InitContainers, senlibInitIndex, senlibInitIndex+1)
+		if senlibInitIndex < dataInitIndex {
+			dataInitIndex--
+		}
+	}
+	return dataInitIndex, nil
 }
 
 // TransformPodValidator transforms pod validator deployment

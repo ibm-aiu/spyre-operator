@@ -264,6 +264,31 @@ spec:
         path: devicePlugin.initContainer.resources
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:resourceRequirements
+      - description: 'Optional: List of arguments'
+        displayName: Arguments
+        path: devicePlugin.initContainer.runtime.args
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text
+      - description: 'Optional: List of environment variables'
+        displayName: Environment Variables
+        path: devicePlugin.initContainer.runtime.env
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text
+      - description: Image pull policy
+        displayName: Image Pull Policy
+        path: devicePlugin.initContainer.runtime.imagePullPolicy
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:imagePullPolicy
+      - description: Image pull secrets
+        displayName: Image pull secrets
+        path: devicePlugin.initContainer.runtime.imagePullSecrets
+        x-descriptors:
+        - urn:alm:descriptor:io.kubernetes:Secret
+      - description: 'Optional: Define resources requests and limits for each pod'
+        displayName: Resource Requirements
+        path: devicePlugin.initContainer.runtime.resources
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:resourceRequirements
       - description: 'Optional: Define resources requests and limits for each pod'
         displayName: Resource Requirements
         path: devicePlugin.resources

@@ -25,6 +25,33 @@ spec:
       priorityClassName: system-node-critical
       serviceAccountName: dra-driver-spyre
       initContainers:
+      - name: init-senlib
+        image: "FILLED BY THE OPERATOR"
+        securityContext:
+          runAsUser: 1001
+          runAsGroup: 0
+          runAsNonRoot: true
+          privileged: false
+          seLinuxOptions:
+            type: spc_t
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          mkdir -p /mnt/spyre/bin /mnt/spyre/senlib
+          cp -a /opt/ibm/spyre/bin/.    /mnt/spyre/bin/
+          cp -a /opt/ibm/spyre/senlib/. /mnt/spyre/senlib/
+          cp -a /usr/lib64/libhwloc.so*    /mnt/spyre/senlib/lib/
+          cp -a /usr/lib64/libboost_*.so*  /mnt/spyre/senlib/lib/
+          cp -a /usr/lib64/libicu*.so*     /mnt/spyre/senlib/lib/
+          cp -a /usr/lib64/libudev.so*      /mnt/spyre/senlib/lib/ 2> /dev/null || true
+          cp -a /usr/lib64/libpciaccess.so* /mnt/spyre/senlib/lib/ 2> /dev/null || true
+          cp -a /usr/lib64/libOpenCL.so*    /mnt/spyre/senlib/lib/ 2> /dev/null || true
+          cp -a /usr/lib64/libpython3.12.so* /mnt/spyre/senlib/lib/
+        volumeMounts:
+        - name: spyre-senlib
+          mountPath: /mnt/spyre
       - name: init-data
         image: "FILLED BY THE OPERATOR"
         securityContext:
@@ -51,6 +78,9 @@ spec:
         - name: dra-driver-config
           mountPath: /usr/local/etc/device-plugins # common local path for init container
           readOnly: false
+        - name: spyre-senlib
+          mountPath: /opt/ibm/spyre
+          readOnly: true
       nodeSelector:
         ibm.com/spyre.present: "true"
       tolerations:
@@ -135,3 +165,5 @@ spec:
       - name: senlib-config-template
         configMap:
           name: senlib-config-template
+      - name: spyre-senlib
+        emptyDir: {}

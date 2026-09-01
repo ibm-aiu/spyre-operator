@@ -382,7 +382,7 @@ func UpdateInitContainer(ctx context.Context, spyreV2Client client.Client, k8sCl
 
 func EnableInitContainer(clusterPolicy *spyrev1alpha1.SpyreClusterPolicy,
 	testConfig TestConfig, executePolicy spyrev1alpha1.ExecutePolicy) {
-	clusterPolicy.Spec.DevicePlugin.InitContainer = &spyrev1alpha1.ExternalInitContainerSpec{
+	initContainer := &spyrev1alpha1.ExternalInitContainerSpec{
 		DeploymentConfig: spyrev1alpha1.DeploymentConfig{
 			Repository:      testConfig.DevicePluginInit.Repository,
 			Image:           testConfig.DevicePluginInit.Image,
@@ -391,6 +391,15 @@ func EnableInitContainer(clusterPolicy *spyrev1alpha1.SpyreClusterPolicy,
 		},
 		ExecutePolicy: &executePolicy,
 	}
+	if testConfig.DevicePluginInit.Runtime.Image != "" {
+		initContainer.Runtime = &spyrev1alpha1.DeploymentConfig{
+			Repository:      testConfig.DevicePluginInit.Runtime.Repository,
+			Image:           testConfig.DevicePluginInit.Runtime.Image,
+			Version:         testConfig.DevicePluginInit.Runtime.Version,
+			ImagePullPolicy: testConfig.DevicePluginInit.Runtime.ImagePullPolicy,
+		}
+	}
+	clusterPolicy.Spec.DevicePlugin.InitContainer = initContainer
 }
 
 func DisableInitContainer(clusterPolicy *spyrev1alpha1.SpyreClusterPolicy) {

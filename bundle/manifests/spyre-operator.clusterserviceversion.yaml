@@ -69,7 +69,7 @@ metadata:
     capabilities: Basic Install
     categories: AI/Machine Learning
     containerImage: docker.io/spyre-operator/spyre-operator:1.4.0
-    createdAt: "2026-06-23T02:19:41Z"
+    createdAt: "2026-08-24T10:00:13Z"
     description: Operator for IBM Spyre devices
     features.operators.openshift.io/disconnected: "false"
     features.operators.openshift.io/fips-compliant: "false"
@@ -174,6 +174,31 @@ spec:
       - description: 'Optional: Define resources requests and limits for each pod'
         displayName: Resource Requirements
         path: devicePlugin.initContainer.resources
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:resourceRequirements
+      - description: 'Optional: List of arguments'
+        displayName: Arguments
+        path: devicePlugin.initContainer.runtime.args
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text
+      - description: 'Optional: List of environment variables'
+        displayName: Environment Variables
+        path: devicePlugin.initContainer.runtime.env
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text
+      - description: Image pull policy
+        displayName: Image Pull Policy
+        path: devicePlugin.initContainer.runtime.imagePullPolicy
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:imagePullPolicy
+      - description: Image pull secrets
+        displayName: Image pull secrets
+        path: devicePlugin.initContainer.runtime.imagePullSecrets
+        x-descriptors:
+        - urn:alm:descriptor:io.kubernetes:Secret
+      - description: 'Optional: Define resources requests and limits for each pod'
+        displayName: Resource Requirements
+        path: devicePlugin.initContainer.runtime.resources
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:resourceRequirements
       - description: 'Optional: Define resources requests and limits for each pod'
