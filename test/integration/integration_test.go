@@ -24,7 +24,6 @@ import (
 	k8sErrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -35,7 +34,6 @@ const (
 	smallToyCompletionTimeout = 30 * time.Minute
 )
 
-var discoClient *discovery.DiscoveryClient
 var amd64arch bool
 var ppc64le bool
 var nodeFilter []string
@@ -52,8 +50,6 @@ var _ = Describe("integration test", Label("integration", "cardmgmt"), Ordered, 
 
 	BeforeAll(func() {
 		var err error
-		discoClient, err = discovery.NewDiscoveryClientForConfig(config)
-		Expect(err).To(BeNil())
 		amd64arch, err = testutils.IsAmd64Arch(ctx, k8sClientset)
 		Expect(err).To(BeNil())
 		ppc64le, err = testutils.IsPpc64LeArch(ctx, k8sClientset)
@@ -278,8 +274,6 @@ var _ = Describe("integration test", Label("integration"), Ordered, ContinueOnFa
 	ctx := context.Background()
 	BeforeAll(func() {
 		var err error
-		discoClient, err = discovery.NewDiscoveryClientForConfig(config)
-		Expect(err).To(BeNil())
 		amd64arch, err = testutils.IsAmd64Arch(ctx, k8sClientset)
 		Expect(err).To(BeNil())
 		ppc64le, err = testutils.IsPpc64LeArch(ctx, k8sClientset)
