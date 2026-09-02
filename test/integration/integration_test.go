@@ -24,18 +24,14 @@ import (
 	k8sErrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
-	// smallToyStartTimeout covers the multi-GB workload image pull.
-	smallToyStartTimeout = 20 * time.Minute
-	// smallToyCompletionTimeout covers the workload run once the Pod has started.
+	smallToyStartTimeout      = 20 * time.Minute
 	smallToyCompletionTimeout = 30 * time.Minute
 )
 
-var discoClient *discovery.DiscoveryClient
 var amd64arch bool
 var ppc64le bool
 var nodeFilter []string
@@ -52,8 +48,6 @@ var _ = Describe("integration test", Label("integration", "cardmgmt"), Ordered, 
 
 	BeforeAll(func() {
 		var err error
-		discoClient, err = discovery.NewDiscoveryClientForConfig(config)
-		Expect(err).To(BeNil())
 		amd64arch, err = testutils.IsAmd64Arch(ctx, k8sClientset)
 		Expect(err).To(BeNil())
 		ppc64le, err = testutils.IsPpc64LeArch(ctx, k8sClientset)
@@ -278,8 +272,6 @@ var _ = Describe("integration test", Label("integration"), Ordered, ContinueOnFa
 	ctx := context.Background()
 	BeforeAll(func() {
 		var err error
-		discoClient, err = discovery.NewDiscoveryClientForConfig(config)
-		Expect(err).To(BeNil())
 		amd64arch, err = testutils.IsAmd64Arch(ctx, k8sClientset)
 		Expect(err).To(BeNil())
 		ppc64le, err = testutils.IsPpc64LeArch(ctx, k8sClientset)
@@ -660,16 +652,16 @@ var _ = Describe("integration test", Label("integration"), Ordered, ContinueOnFa
 	})
 
 	// This runs last so the long image pull and device hold do not affect other specs.
-	Context("PF workload Job runs to completion", Ordered, func() {
+	Context("PF workload Job utilizes Spyre card", Ordered, func() {
 		BeforeAll(func() {
 			if !itConfig.SmallToy.Enabled {
-				Skip("Skip test due to small toy workload is disabled")
+				Skip("Skip test since small toy workload is disabled")
 			}
 			if ppc64le {
-				Skip("tests skipped due to cluster is ppc64le")
+				Skip("tests skipped since cluster is ppc64le")
 			}
 			if !itConfig.HasDevice {
-				Skip("Skip test due to no real Spyre device: the aiu backend cannot run on a pseudo device")
+				Skip("Skip test since no real Spyre device: the aiu backend cannot run on a pseudo device")
 			}
 			renewSpyreAppsNamespace(ctx)
 		})
@@ -678,9 +670,9 @@ var _ = Describe("integration test", Label("integration"), Ordered, ContinueOnFa
 			testutils.DeleteJob(ctx, k8sClientset, "spyre-apps", testutils.SmallToyJobName, testutils.SmallToyJobLabel)
 		})
 
-		It("can run the small-toy workload to completion on a Spyre PF", func() {
+		It("can run the small-toy workload on a Spyre PF", func() {
 			avif, found := testutils.GetAvailableSpyreInterface(ctx, k8sClientset, spyreV2Client, []string{})
-			Expect(found).To(BeTrue(), "At least need 1 Spyre PCIs but got: %d", len(avif))
+			Expect(found).To(BeTrue(), "At least need 1 Spyre PCI but got: %d", len(avif))
 
 			jobData := testutils.PodTemplateData{
 				Name:             testutils.SmallToyJobName,

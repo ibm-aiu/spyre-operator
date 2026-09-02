@@ -20,6 +20,7 @@ import (
 	. "github.com/onsi/gomega"
 	nfdv1alpha1 "github.com/openshift/cluster-nfd-operator/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -32,6 +33,7 @@ import (
 
 var k8sClientset *kubernetes.Clientset
 var dynClient *dynamic.DynamicClient
+var discoClient *discovery.DiscoveryClient
 var scheme = runtime.NewScheme()
 var spyreV2Client client.Client
 var itConfig testutil.TestConfig
@@ -82,6 +84,9 @@ var _ = BeforeSuite(func() {
 	spyreV2Client, err = client.New(config, client.Options{Scheme: scheme})
 	Expect(err).To(BeNil())
 	dynClient, err = dynamic.NewForConfig(config)
+	Expect(err).To(BeNil())
+	// AfterSuite needs this too, so it cannot be built in a BeforeAll
+	discoClient, err = discovery.NewDiscoveryClientForConfig(config)
 	Expect(err).To(BeNil())
 	err = spyrev1alpha1.AddToScheme(scheme)
 	Expect(err).To(BeNil())
