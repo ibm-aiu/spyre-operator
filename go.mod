@@ -9,7 +9,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/onsi/ginkgo/v2 v2.28.1
-	github.com/onsi/gomega v1.41.0
+	github.com/onsi/gomega v1.43.0
 	github.com/openshift/api v0.0.0-20251217143335-482f1b56dcc4
 	github.com/openshift/cluster-nfd-operator v0.0.0-20250608084427-c57e91e1a0c8
 	github.com/openshift/secondary-scheduler-operator v0.0.0-20220308123520-e9a43b481448
