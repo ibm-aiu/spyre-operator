@@ -275,6 +275,77 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 			Expect(body).To(ContainSubstring("spyre_device_state"))
 		})
 
+		It("runs ras-watcher test pod and health checker detects card 0000:40:00.0 as unhealthy", func() {
+			if !testConfig.PseudoDeviceMode {
+				Skip("only available for pseudo device mode")
+			}
+			rasWatcherBadCard := "0000:40:00.0"
+			rasWatcherPodName := "ras-watcher-test"
+
+			By("enabling default mode")
+			enabledModes := DefaultModes()
+			UpdateModes(ctx, spyreV2Client, k8sClientset, len(nodeNames), enabledModes, testConfig.PseudoDeviceMode, spyrev1alpha1.Ready)
+
+			By("deploying ras-watcher test pod with failing card " + rasWatcherBadCard)
+			rasWatcherPod := BuildPod(rasWatcherPodName, testNamespace, "ibm.com/spyre_pf_0000_40_00.0", 1, targetNodeName, true)
+			rasWatcherPod.Spec.RestartPolicy = v1.RestartPolicyNever
+			rasWatcherPod.Spec.Containers[0].Args = []string{
+				`echo ' INFO 03.08.2026 14:24:30.833658 [              pf_interface.cpp: 192] Reusing PfInterface for SEN:VFIO:TYPE1:0000:40:00.0, usage = 2'` + "\n" +
+					`echo ' ERRR 03.08.2026 14:25:26.392028 [  response_block_interface.cpp: 181] Exceeded max iterations waiting for a response block.  Executing LX logout'` + "\n" +
+					`echo 'C++ exception with description "{"action":"reset","category":"hardware","name":"RAS::CBRB::ResponseTimeout","severity":"ERROR","type":"runtime_error"}" thrown in the test body.'` + "\n" +
+					`echo '[  FAILED  ] XXXXX.Open'` + "\n" +
+					`exit 1`,
+			}
+			_, err := k8sClientset.CoreV1().Pods(testNamespace).Create(ctx, rasWatcherPod, metav1.CreateOptions{})
+			Expect(err).To(BeNil())
+
+			By("waiting for ras-watcher test pod to reach Failed phase")
+			Eventually(func(g Gomega) {
+				pod, err := k8sClientset.CoreV1().Pods(testNamespace).Get(ctx, rasWatcherPodName, metav1.GetOptions{})
+				g.Expect(err).To(BeNil())
+				g.Expect(pod.Status.Phase).To(Equal(v1.PodFailed))
+			}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
+
+			By("waiting for health checker to detect " + rasWatcherBadCard + " as unhealthy")
+			Eventually(func(g Gomega) {
+				spyrens, err := GetSpyreNodeState(ctx, spyreV2Client, targetNodeName)
+				g.Expect(err).To(BeNil())
+				found := false
+				for _, unhealthyDevice := range spyrens.Status.UnhealthyDevices {
+					if unhealthyDevice.ID == rasWatcherBadCard {
+						found = true
+						break
+					}
+				}
+				g.Expect(found).To(BeTrue(), "expected %s to appear in UnhealthyDevices", rasWatcherBadCard)
+				for _, device := range spyrens.Spec.SpyreInterfaces {
+					if device.PciAddress == rasWatcherBadCard {
+						g.Expect(device.Health).To(Equal(spyrev1alpha1.SpyreUnhealthy))
+					}
+				}
+			}).WithTimeout(300 * time.Second).WithPolling(10 * time.Second).Should(Succeed())
+
+			By("cleaning up ras-watcher test pod")
+			err = k8sClientset.CoreV1().Pods(testNamespace).Delete(ctx, rasWatcherPodName, metav1.DeleteOptions{})
+			Expect(err).To(BeNil())
+			Eventually(func(g Gomega) {
+				_, err := k8sClientset.CoreV1().Pods(testNamespace).Get(ctx, rasWatcherPodName, metav1.GetOptions{})
+				g.Expect(errors.IsNotFound(err)).To(BeTrue())
+			}).WithTimeout(2 * time.Minute).WithPolling(5 * time.Second).Should(Succeed())
+
+			By("must not allocate bad card 0000:40:00.0 detected by RAS watcher")
+			// With 0000:40:00.0 unhealthy (detected by RAS watcher), requesting all
+			// goodPFNum cards must stay Pending because the bad card is excluded.
+			tc := TestCase{
+				Prefix:        petname.Generate(2, "-") + "-ras-bad",
+				TestNamespace: testNamespace,
+				ResourceName:  spyrePf,
+				Quantity:      int64(goodPFNum),
+				NodeName:      targetNodeName,
+			}
+			tc.TestSinglePod(ctx, k8sClientset, spyreV2Client, []string{}, v1.PodPending)
+		})
+
 		AfterAll(func() {
 			By("disabling health checker in the cluster policy")
 			clusterPolicy := &spyrev1alpha1.SpyreClusterPolicy{}
