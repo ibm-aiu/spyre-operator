@@ -82,6 +82,10 @@ func (c *ControlledComponent) ExportSetName(name string) {
 	c.name = name
 }
 
+func (c *ControlledComponent) ExportSetNamespace(namespace string) {
+	c.namespace = namespace
+}
+
 func (c *ControlledComponent) ExportSetClient(client client.Client) {
 	c.client = client
 }

@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strconv"
 
+	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	spyrev1alpha1 "github.com/ibm-aiu/spyre-operator/api/v1alpha1"
 	spyreconst "github.com/ibm-aiu/spyre-operator/const"
 	"github.com/ibm-aiu/spyre-operator/internal/state"
@@ -423,6 +424,121 @@ var _ = Describe("ControlledComponent", Ordered, func() {
 			component := &ControlledComponent{}
 			component.ExportSetName(componentName)
 			Expect(component.GetName()).To(Equal(componentName))
+		})
+
+		It("can clear cert secret", func() {
+			certName := "dummy-cert"
+			secretName := "dummy-secret"
+
+			cert := &certmanagerv1.Certificate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      certName,
+					Namespace: OpNs,
+				},
+				Spec: certmanagerv1.CertificateSpec{
+					SecretName: secretName,
+				},
+			}
+			err := K8sClient.Create(ctx, cert)
+			Expect(err).To(BeNil())
+
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      secretName,
+					Namespace: OpNs,
+				},
+			}
+			err = K8sClient.Create(ctx, secret)
+			Expect(err).To(BeNil())
+
+			// Construct a controlled object for the certificate
+			defaultObj, err := NewDefaultObject(ctx, "Certificate", OpNs, cert)
+			Expect(err).To(BeNil())
+			controlledObj, err := NewCertificate(defaultObj, cert, OpNs)
+			Expect(err).To(BeNil())
+
+			component := &ControlledComponent{}
+			component.ExportSetName("common")
+			component.ExportSetNamespace(OpNs)
+			component.ExportSetClient(K8sClient)
+			component.SetObjects([]ControlledObject{controlledObj})
+
+			// Running Clear should delete both the Certificate and the Secret
+			err = component.Clear(ctx)
+			Expect(err).To(BeNil())
+
+			// Verify they are deleted
+			checkCert := &certmanagerv1.Certificate{}
+			err = K8sClient.Get(ctx, client.ObjectKey{Name: certName, Namespace: OpNs}, checkCert)
+			Expect(errors.IsNotFound(err)).To(BeTrue())
+
+			checkSecret := &corev1.Secret{}
+			err = K8sClient.Get(ctx, client.ObjectKey{Name: secretName, Namespace: OpNs}, checkSecret)
+			Expect(errors.IsNotFound(err)).To(BeTrue())
+
+			// No error when not found
+			err = component.Clear(ctx)
+			Expect(err).To(BeNil())
+		})
+
+		It("can clear validator serving cert secret", func() {
+			serviceName := "spyre-webhook-validator-test"
+			secretName := "spyre-validator-webhook-secret-test"
+
+			service := &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      serviceName,
+					Namespace: OpNs,
+					Annotations: map[string]string{
+						"service.beta.openshift.io/serving-cert-secret-name": secretName,
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{Port: 443},
+					},
+				},
+			}
+			err := K8sClient.Create(ctx, service)
+			Expect(err).To(BeNil())
+
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      secretName,
+					Namespace: OpNs,
+				},
+			}
+			err = K8sClient.Create(ctx, secret)
+			Expect(err).To(BeNil())
+
+			// Construct a controlled object for the Service
+			defaultObj, err := NewDefaultObject(ctx, "Service", OpNs, service)
+			Expect(err).To(BeNil())
+			controlledObj, err := NewService(defaultObj, service, OpNs)
+			Expect(err).To(BeNil())
+
+			component := &ControlledComponent{}
+			component.ExportSetName(spyreconst.ValidatorResourceName)
+			component.ExportSetNamespace(OpNs)
+			component.ExportSetClient(K8sClient)
+			component.SetObjects([]ControlledObject{controlledObj})
+
+			// Running Clear should delete both the Service and the Secret
+			err = component.Clear(ctx)
+			Expect(err).To(BeNil())
+
+			// Verify they are deleted
+			checkService := &corev1.Service{}
+			err = K8sClient.Get(ctx, client.ObjectKey{Name: serviceName, Namespace: OpNs}, checkService)
+			Expect(errors.IsNotFound(err)).To(BeTrue())
+
+			checkSecret := &corev1.Secret{}
+			err = K8sClient.Get(ctx, client.ObjectKey{Name: secretName, Namespace: OpNs}, checkSecret)
+			Expect(errors.IsNotFound(err)).To(BeTrue())
+
+			// No error when not found
+			err = component.Clear(ctx)
+			Expect(err).To(BeNil())
 		})
 	})
 
