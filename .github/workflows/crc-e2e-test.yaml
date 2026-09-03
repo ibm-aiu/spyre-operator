@@ -1,0 +1,66 @@
+# +-------------------------------------------------------------------+
+# | Copyright (c) 2025, 2026 IBM Corp.                                |
+# | SPDX-License-Identifier: Apache-2.0                               |
+# +-------------------------------------------------------------------+
+
+name: CRC End to End Test
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: 'GitHub runner to use for the test'
+        required: false
+        type: string
+        default: 'ubuntu-24.04'
+      branch-name:
+        description: 'Branch name to checkout from spyre-operator repo'
+        required: false
+        type: string
+        default: 'main'
+      registry:
+        description: 'Container registry (e.g., ghcr.io/ibm-aiu)'
+        required: false
+        type: string
+        default: 'ghcr.io/ibm-aiu'
+      pr-url:
+        description: 'GitHub Pull Request URL to test. If provided, will fetch and
+          test the PR branch.'
+        required: false
+        type: string
+      operator-version:
+        description: 'Spyre operator tag to run in test'
+        required: false
+        type: string
+      operator-channel:
+        description: 'Operator channel'
+        required: false
+        type: string
+
+concurrency:
+  group: crc-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+  pull-requests: write
+
+jobs:
+  crc-e2e-test:
+    uses: ibm-aiu/spyre-operator-actions/.github/workflows/crc-e2e-test.yaml@main
+    with:
+      runner: ${{ inputs.runner || 'ubuntu-24.04' }}
+      # On pull_request: check out the PR head branch; on workflow_dispatch: use input or current branch
+      branch-name: ${{ inputs.branch-name || github.head_ref || github.ref_name }}
+      registry: ${{ inputs.registry || 'ghcr.io/ibm-aiu' }}
+      # On pull_request: automatically pass the PR URL so the image is built from the PR branch
+      pr-url: ${{ inputs.pr-url || (github.event_name == 'pull_request' && github.event.pull_request.html_url
+        || '') }}
+      operator-version: ${{ inputs.operator-version || '' }}
+      operator-channel: ${{ inputs.operator-channel || '' }}
+    secrets:
+      crc-pull-secret: ${{ secrets.CRC_PULL_SECRET_SUNYACH }}
+      github-token: ${{ secrets.GITHUB_TOKEN }}
