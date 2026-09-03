@@ -142,6 +142,16 @@ func RestartOperator(g Gomega, ctx context.Context, testConfig TestConfig, k8sCl
 }
 
 func deployCatalogSource(ctx context.Context, testConfig TestConfig, k8sClientset *kubernetes.Clientset, dynClient dynamic.Interface) {
+	By("waiting for packageserver to be ready")
+	Eventually(func(g Gomega) {
+		pods := GetPodsWithLabels(ctx, k8sClientset, g, OperatorLifecycleManagerNamespace, packageServerLabel, "")
+		g.Expect(pods).ToNot(BeEmpty())
+		for _, p := range pods {
+			printMessageIfPodNotRunning(p)
+			g.Expect(p.Status.Phase).To(BeEquivalentTo(v1.PodRunning))
+		}
+	}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
+
 	By("deploying catalog source")
 	catalogSource := map[string]interface{}{
 		"apiVersion": "operators.coreos.com/v1alpha1",
@@ -172,7 +182,15 @@ func deployCatalogSource(ctx context.Context, testConfig TestConfig, k8sClientse
 		g.Expect(err).To(BeNil())
 		pods := GetPodsWithLabels(ctx, k8sClientset, g, MarketPlaceNamespace, "olm.catalogSource=ibm-spyre-operators", "")
 		g.Expect(pods).To(HaveLen(1))
-		g.Expect(pods[0].Status.Phase).To(BeEquivalentTo(v1.PodRunning))
+		pod := pods[0]
+		printMessageIfPodNotRunning(pod)
+		if len(pod.Status.ContainerStatuses) > 0 && pod.Status.ContainerStatuses[0].State.Waiting != nil {
+			_, _ = fmt.Fprintf(GinkgoWriter, "catalog source pod %s/%s waiting: reason=%s message=%s\n",
+				pod.Namespace, pod.Name,
+				pod.Status.ContainerStatuses[0].State.Waiting.Reason,
+				pod.Status.ContainerStatuses[0].State.Waiting.Message)
+		}
+		g.Expect(pod.Status.Phase).To(BeEquivalentTo(v1.PodRunning))
 	}).WithTimeout(10 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
 }
 
