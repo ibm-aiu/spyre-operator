@@ -50,7 +50,7 @@ permissions:
 
 jobs:
   crc-e2e-test:
-    uses: ibm-aiu/spyre-operator-actions/.github/workflows/crc-e2e-test.yaml@main
+    uses: ibm-aiu/spyre-operator-actions/.github/workflows/crc-e2e-test.yaml@E2E_CRC_x86
     with:
       runner: ${{ inputs.runner || 'ubuntu-24.04' }}
       # On pull_request: check out the PR head branch; on workflow_dispatch: use input or current branch
