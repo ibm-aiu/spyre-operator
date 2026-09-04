@@ -69,7 +69,7 @@ metadata:
     capabilities: Basic Install
     categories: AI/Machine Learning
     containerImage: docker.io/spyre-operator/spyre-operator:1.4.0
-    createdAt: "2026-08-24T10:00:13Z"
+    createdAt: "2026-09-04T02:46:37Z"
     description: Operator for IBM Spyre devices
     features.operators.openshift.io/disconnected: "false"
     features.operators.openshift.io/fips-compliant: "false"

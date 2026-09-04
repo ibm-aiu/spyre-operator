@@ -89,7 +89,7 @@ var _ = Describe("ControlledObject", Ordered, func() {
 		anSpyreFilter := "myfilter"
 		pfImage := "pfimage"
 		vfImage := "vfimage"
-		defaultRunnerImage := "docker.io/spyre-operator/spyredriver-image:latest"
+		defaultRunnerImage := ""
 
 		DescribeTable("aiucardmgmt.ini", func(disableVfMode bool, cardMgmtConfig *spyrev1alpha1.CardManagementConfig,
 			expectedSpyreFilter, expectedPfImage, expectedVfImage string) {

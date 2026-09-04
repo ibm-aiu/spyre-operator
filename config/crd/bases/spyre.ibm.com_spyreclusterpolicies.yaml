@@ -63,6 +63,7 @@ spec:
                       config (spyrecardmgmg.ini).
                     properties:
                       pfRunnerImage:
+                        default: ""
                         description: PfRunnerImage specifies pfimage_URL
                         type: string
                       spyreFilter:
@@ -70,6 +71,7 @@ spec:
                         description: SpyreFilter specifies spyrefilter value
                         type: string
                       vfRunnerImage:
+                        default: ""
                         description: VfRunnerImage specifies vfimage_URL
                         type: string
                     type: object
@@ -1585,7 +1587,7 @@ spec:
                       type: string
                     type: array
                   metricsPath:
-                    default: /data
+                    default: ""
                     description: MetricsPath defines a target metrics path at container
                     type: string
                   nodeSelector:

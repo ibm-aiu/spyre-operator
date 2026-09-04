@@ -725,6 +725,7 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 			Expect(err).To(BeNil())
 			clusterPolicy.Spec.MetricsExporter.Enabled = true
 			clusterPolicy.Spec.MetricsExporter.NodeSelector = map[string]string{"kubernetes.io/hostname": targetNodeName}
+			clusterPolicy.Spec.MetricsExporter.MetricsPath = "/data" // where the metrics file is copied by mock user.
 			UpdateClusterPolicy(ctx, spyreV2Client, k8sClientset, clusterPolicy, len(nodeNames), spyrev1alpha1.Ready)
 		})
 

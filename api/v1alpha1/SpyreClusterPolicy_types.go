@@ -213,11 +213,11 @@ type CardManagementConfig struct {
 	SpyreFilter *string `json:"spyreFilter,omitempty" yaml:"spyreFilter,omitempty"`
 
 	// PfRunnerImage specifies pfimage_URL
-	// +kubebuilder:default="docker.io/spyre-operator/spyredriver-image:latest"
+	// +kubebuilder:default=""
 	PfRunnerImage *string `json:"pfRunnerImage,omitempty" yaml:"pfRunnerImage,omitempty"`
 
 	// VfRunnerImage specifies vfimage_URL
-	// +kubebuilder:default="docker.io/spyre-operator/spyredriver-image:latest"
+	// +kubebuilder:default=""
 	VfRunnerImage *string `json:"vfRunnerImage,omitempty" yaml:"vfRunnerImage,omitempty"`
 }
 
@@ -228,7 +228,7 @@ type MetricsExporterSpec struct {
 	// +kubebuilder:default=false
 	Enabled bool `json:"enabled,omitempty"`
 
-	// +kubebuilder:default=/data
+	// +kubebuilder:default=""
 	// MetricsPath defines a target metrics path at container
 	MetricsPath string `json:"metricsPath,omitempty"`
 
