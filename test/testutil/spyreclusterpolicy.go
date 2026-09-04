@@ -9,6 +9,8 @@ package testutil
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -149,6 +151,7 @@ func DeployClusterPolicy(ctx context.Context, testConfig TestConfig, k8sClientse
 	By("creating cluster policy state")
 	err := spyreV2Client.Create(ctx, clusterPolicy, &client.CreateOptions{})
 	Expect(err).To(BeNil())
+	checkInitContainerRuntimeAccepted(ctx, spyreV2Client, testConfig)
 	WaitForSpyreClusterPolicyState(ctx, spyreV2Client, k8sClientset, nodeCount, spyrev1alpha1.Ready)
 }
 
@@ -171,17 +174,56 @@ func UpdateClusterPolicy(ctx context.Context, spyreV2Client client.Client, k8sCl
 	WaitForSpyreClusterPolicyState(ctx, spyreV2Client, k8sClientset, nodeCount, expectedState)
 }
 
+// checkInitContainerRuntimeAccepted fails when the API server pruned the runtime init
+// container config, which happens when the installed CRD predates that field.
+func checkInitContainerRuntimeAccepted(ctx context.Context, spyreV2Client client.Client, testConfig TestConfig) {
+	if !testConfig.DevicePluginInit.Enabled || testConfig.DevicePluginInit.Runtime.Image == "" {
+		return
+	}
+	By("checking the cluster policy kept the runtime init container config")
+	var clusterPolicy spyrev1alpha1.SpyreClusterPolicy
+	err := spyreV2Client.Get(ctx,
+		client.ObjectKey{Namespace: metav1.NamespaceAll, Name: ClusterPolicyName}, &clusterPolicy)
+	Expect(err).To(BeNil())
+	Expect(clusterPolicy.Spec.DevicePlugin.InitContainer).NotTo(BeNil(),
+		"spec.devicePlugin.initContainer was dropped by the API server")
+	Expect(clusterPolicy.Spec.DevicePlugin.InitContainer.Runtime).NotTo(BeNil(),
+		"spec.devicePlugin.initContainer.runtime was dropped by the API server: the installed "+
+			"SpyreClusterPolicy CRD is older than the test config. Rebuild and republish the "+
+			"operator bundle and catalog images.")
+}
+
 func WaitForSpyreClusterPolicyState(ctx context.Context, spyreV2Client client.Client, k8sClientset *kubernetes.Clientset, nodeCount int, expectedState spyrev1alpha1.State) {
-	defer CheckOperatorAssetsRunning(ctx, spyreV2Client, k8sClientset, nodeCount)
+	reached := false
+	defer func() {
+		// on failure report what the Pods are doing instead of piling on more timeouts
+		if !reached {
+			DumpPodStatus(ctx, k8sClientset, OperatorNamespace)
+			return
+		}
+		CheckOperatorAssetsRunning(ctx, spyreV2Client, k8sClientset, nodeCount)
+	}()
 	By("polling for status update of the cluster policy")
+	terminalPolls := 0
 	Eventually(func(g Gomega) {
 		var clusterPolicy spyrev1alpha1.SpyreClusterPolicy
 		err := spyreV2Client.Get(ctx,
 			client.ObjectKey{Namespace: metav1.NamespaceAll, Name: ClusterPolicyName}, &clusterPolicy)
 		g.Expect(err).To(BeNil())
+		// give up on a Pod that cannot recover instead of waiting out the whole timeout
+		if failures := TerminalPodFailures(ctx, k8sClientset, OperatorNamespace); len(failures) > 0 {
+			terminalPolls++
+			if terminalPolls >= terminalPollCount {
+				StopTrying(fmt.Sprintf("Pod failure in %s will not recover:\n  %s",
+					OperatorNamespace, strings.Join(failures, "\n  "))).Now()
+			}
+		} else {
+			terminalPolls = 0
+		}
 		// now make sure that the reconciliation has occurred.
 		g.Expect(clusterPolicy.Status.State).To(Equal(expectedState))
 	}).WithTimeout(20 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
+	reached = true
 }
 
 func CheckOperatorAssetsRunning(ctx context.Context, spyreV2Client client.Client, k8sClientset *kubernetes.Clientset, nodeCount int) {

@@ -24,11 +24,16 @@ import (
 	k8sErrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var discoClient *discovery.DiscoveryClient
+const (
+	// smallToyStartTimeout covers the multi-GB workload image pull.
+	smallToyStartTimeout = 20 * time.Minute
+	// smallToyCompletionTimeout covers the workload run once the Pod has started.
+	smallToyCompletionTimeout = 30 * time.Minute
+)
+
 var amd64arch bool
 var ppc64le bool
 var nodeFilter []string
@@ -45,8 +50,6 @@ var _ = Describe("integration test", Label("integration", "cardmgmt"), Ordered, 
 
 	BeforeAll(func() {
 		var err error
-		discoClient, err = discovery.NewDiscoveryClientForConfig(config)
-		Expect(err).To(BeNil())
 		amd64arch, err = testutils.IsAmd64Arch(ctx, k8sClientset)
 		Expect(err).To(BeNil())
 		ppc64le, err = testutils.IsPpc64LeArch(ctx, k8sClientset)
@@ -271,8 +274,6 @@ var _ = Describe("integration test", Label("integration"), Ordered, ContinueOnFa
 	ctx := context.Background()
 	BeforeAll(func() {
 		var err error
-		discoClient, err = discovery.NewDiscoveryClientForConfig(config)
-		Expect(err).To(BeNil())
 		amd64arch, err = testutils.IsAmd64Arch(ctx, k8sClientset)
 		Expect(err).To(BeNil())
 		ppc64le, err = testutils.IsPpc64LeArch(ctx, k8sClientset)
@@ -645,6 +646,88 @@ var _ = Describe("integration test", Label("integration"), Ordered, ContinueOnFa
 					}
 				}
 			}).WithTimeout(30 * time.Second).WithPolling(5 * time.Second).Should(Succeed())
+		})
+	})
+
+	// This runs last so the long image pull and device hold do not affect other specs.
+	Context("PF workload Job runs to completion", Ordered, func() {
+		BeforeAll(func() {
+			if !itConfig.SmallToy.Enabled {
+				Skip("Skip test due to small toy workload is disabled")
+			}
+			if ppc64le {
+				Skip("tests skipped due to cluster is ppc64le")
+			}
+			if !itConfig.HasDevice {
+				Skip("Skip test due to no real Spyre device: the aiu backend cannot run on a pseudo device")
+			}
+			renewSpyreAppsNamespace(ctx)
+		})
+
+		AfterAll(func() {
+			testutils.DeleteJob(ctx, k8sClientset, "spyre-apps", testutils.SmallToyJobName, testutils.SmallToyJobLabel)
+		})
+
+		It("can run the small-toy workload to completion on a Spyre PF", func() {
+			avif, found := testutils.GetAvailableSpyreInterface(ctx, k8sClientset, spyreV2Client, []string{})
+			Expect(found).To(BeTrue(), "At least need 1 Spyre PCIs but got: %d", len(avif))
+
+			jobData := testutils.PodTemplateData{
+				Name:             testutils.SmallToyJobName,
+				Image:            itConfig.SmallToy.GetImage(),
+				ResourceName:     "ibm.com/spyre_pf",
+				ResourceQuantity: "1",
+			}
+			yaml := testutils.YamlFromTemplate(testutils.SmallToyJobTemplate, jobData)
+			By(fmt.Sprintf("deploying the small-toy Job:\n%s", printFile(yaml)))
+			_, err := testutils.CreateResourceFromYaml(ctx, dynClient, discoClient, "spyre-apps", yaml)
+			Expect(err).To(BeNil(), "expect no error but get error in job: %s", printFile(yaml))
+
+			jobPod := testutils.WaitForJobPodRunning(ctx, k8sClientset, "spyre-apps", testutils.SmallToyJobName,
+				testutils.SmallToyJobLabel, testutils.SmallToyContainerName, smallToyStartTimeout)
+			nodeName := jobPod.Spec.NodeName
+			Expect(nodeName).NotTo(BeEmpty(), "expect the workload Pod to be scheduled on a node")
+
+			By("check SpyreNodeState has allocated device for the workload Pod")
+			Eventually(func(g Gomega) {
+				current, err := k8sClientset.CoreV1().Pods("spyre-apps").Get(ctx, jobPod.Name, metav1.GetOptions{})
+				g.Expect(err).To(BeNil())
+				spyrens, err := testutils.GetSpyreNodeState(ctx, spyreV2Client, nodeName)
+				g.Expect(err).To(BeNil())
+				num := testutils.NumDeviceSpyrensForPod(jobPod.Name, "spyre-apps", spyrens.Status)
+				// The device is released when the workload exits, leaving nothing to assert on.
+				if num == 0 && current.Status.Phase != corev1.PodRunning {
+					By(fmt.Sprintf("workload already left Running (%s): allocation window not observable",
+						current.Status.Phase))
+					return
+				}
+				g.Expect(num).To(BeNumerically("==", 1))
+			}).WithTimeout(60 * time.Second).WithPolling(5 * time.Second).Should(Succeed())
+
+			testutils.WaitForJobSucceeded(ctx, k8sClientset, "spyre-apps", testutils.SmallToyJobName,
+				testutils.SmallToyJobLabel, testutils.SmallToyContainerName, smallToyCompletionTimeout)
+
+			By("check the workload container exited with code 0")
+			completed, err := k8sClientset.CoreV1().Pods("spyre-apps").Get(ctx, jobPod.Name, metav1.GetOptions{})
+			Expect(err).To(BeNil())
+			Expect(completed.Status.ContainerStatuses).To(HaveLen(1))
+			terminated := completed.Status.ContainerStatuses[0].State.Terminated
+			Expect(terminated).NotTo(BeNil(), "expect the workload container to be terminated")
+			Expect(terminated.ExitCode).To(BeEquivalentTo(0), "reason: %s", terminated.Reason)
+
+			// Recorded for diagnosis; the exit code above is the assertion on the outcome.
+			By("record the workload log")
+			workloadLog, err := testutils.GetPodLog(ctx, k8sClientset, testutils.SmallToyContainerName, *completed)
+			Expect(err).To(BeNil())
+			By(fmt.Sprintf("log of %s/%s:\n%s", completed.Namespace, completed.Name, workloadLog))
+
+			By("check SpyreNodeState has de-allocated device for the workload Pod")
+			Eventually(func(g Gomega) {
+				spyrens, err := testutils.GetSpyreNodeState(ctx, spyreV2Client, nodeName)
+				g.Expect(err).To(BeNil())
+				num := testutils.NumDeviceSpyrensForPod(jobPod.Name, "spyre-apps", spyrens.Status)
+				g.Expect(num).To(BeNumerically("==", 0))
+			}).WithTimeout(60 * time.Second).WithPolling(5 * time.Second).Should(Succeed())
 		})
 	})
 })
