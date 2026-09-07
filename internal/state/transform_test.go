@@ -728,6 +728,128 @@ var _ = Describe("Transform", func() {
 				}
 			})
 		})
+
+		Context("health API sidecar", func() {
+			newCardManagementDaemonset := func() *appsv1.DaemonSet {
+				ds := newDaemonset("test-cardmgmt")
+				ds.Spec.Template.Spec.Containers[0].Name = "app"
+				ds.Spec.Template.Spec.NodeSelector = map[string]string{
+					"kubernetes.io/hostname": "test-node",
+				}
+				ds.Spec.Template.Spec.InitContainers = []corev1.Container{
+					{
+						Name: spyreconst.CardManagementHealthApiInitContainerName,
+					},
+				}
+				ds.Spec.Template.Spec.Containers = append(ds.Spec.Template.Spec.Containers, corev1.Container{
+					Name: spyreconst.CardManagementHealthApiContainerName,
+					VolumeMounts: []corev1.VolumeMount{
+						{Name: spyreconst.CardManagementHealthApiSocketVolumeName, MountPath: spyreconst.CardManagementHealthApiSocketMountPath},
+					},
+				})
+				ds.Spec.Template.Spec.Volumes = []corev1.Volume{
+					{Name: spyreconst.CardManagementHealthApiSocketVolumeName},
+				}
+				return ds
+			}
+
+			It("removes the sidecar container, init container, and volume when disabled", func() {
+				ds := newCardManagementDaemonset()
+				cp := &spyrev1alpha1.SpyreClusterPolicy{
+					Spec: spyrev1alpha1.SpyreClusterPolicySpec{
+						CardManagement: spyrev1alpha1.CardManagementSpec{
+							Enabled: true,
+						},
+					},
+				}
+				err := TransformCardManagement(ds, cp, nil, false)
+				Expect(err).To(BeNil())
+
+				for _, c := range ds.Spec.Template.Spec.Containers {
+					Expect(c.Name).NotTo(Equal(spyreconst.CardManagementHealthApiContainerName))
+				}
+				for _, c := range ds.Spec.Template.Spec.InitContainers {
+					Expect(c.Name).NotTo(Equal(spyreconst.CardManagementHealthApiInitContainerName))
+				}
+				for _, v := range ds.Spec.Template.Spec.Volumes {
+					Expect(v.Name).NotTo(Equal(spyreconst.CardManagementHealthApiSocketVolumeName))
+				}
+			})
+
+			It("configures the sidecar container and init container image when enabled", func() {
+				ds := newCardManagementDaemonset()
+				cp := &spyrev1alpha1.SpyreClusterPolicy{
+					Spec: spyrev1alpha1.SpyreClusterPolicySpec{
+						CardManagement: spyrev1alpha1.CardManagementSpec{
+							Enabled: true,
+							HealthApi: &spyrev1alpha1.HealthApiSpec{
+								Enabled: true,
+								DeploymentConfig: spyrev1alpha1.DeploymentConfig{
+									Image:           "aiu-cardmgmt-health-api",
+									Version:         "v1.0.0",
+									ImagePullPolicy: "Always",
+									Env: []corev1.EnvVar{
+										{Name: "LOG_LEVEL", Value: "DEBUG"},
+									},
+								},
+							},
+						},
+					},
+				}
+				err := TransformCardManagement(ds, cp, nil, false)
+				Expect(err).To(BeNil())
+
+				var healthApiContainer *corev1.Container
+				for i, c := range ds.Spec.Template.Spec.Containers {
+					if c.Name == spyreconst.CardManagementHealthApiContainerName {
+						healthApiContainer = &ds.Spec.Template.Spec.Containers[i]
+						break
+					}
+				}
+				Expect(healthApiContainer).NotTo(BeNil())
+				Expect(healthApiContainer.Image).To(Equal("aiu-cardmgmt-health-api:v1.0.0"))
+				Expect(healthApiContainer.ImagePullPolicy).To(Equal(corev1.PullAlways))
+				Expect(healthApiContainer.VolumeMounts).To(HaveLen(1))
+				found := false
+				for _, env := range healthApiContainer.Env {
+					if env.Name == "LOG_LEVEL" {
+						Expect(env.Value).To(Equal("DEBUG"))
+						found = true
+					}
+				}
+				Expect(found).To(BeTrue())
+
+				var initContainer *corev1.Container
+				for i, c := range ds.Spec.Template.Spec.InitContainers {
+					if c.Name == spyreconst.CardManagementHealthApiInitContainerName {
+						initContainer = &ds.Spec.Template.Spec.InitContainers[i]
+						break
+					}
+				}
+				Expect(initContainer).NotTo(BeNil())
+				Expect(initContainer.Image).To(Equal(healthApiContainer.Image))
+				Expect(initContainer.ImagePullPolicy).To(Equal(healthApiContainer.ImagePullPolicy))
+			})
+
+			It("errors when enabled but the template has no health-api container", func() {
+				ds := newDaemonset("test-cardmgmt")
+				ds.Spec.Template.Spec.NodeSelector = map[string]string{
+					"kubernetes.io/hostname": "test-node",
+				}
+				cp := &spyrev1alpha1.SpyreClusterPolicy{
+					Spec: spyrev1alpha1.SpyreClusterPolicySpec{
+						CardManagement: spyrev1alpha1.CardManagementSpec{
+							Enabled: true,
+							HealthApi: &spyrev1alpha1.HealthApiSpec{
+								Enabled: true,
+							},
+						},
+					},
+				}
+				err := TransformCardManagement(ds, cp, nil, false)
+				Expect(err).NotTo(BeNil())
+			})
+		})
 	})
 
 	Context("hardware mount", func() {
