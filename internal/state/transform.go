@@ -346,6 +346,9 @@ func TransformCardManagement(obj *appsv1.DaemonSet,
 	if err := applyDeployConfig(&obj.Spec.Template, &clusterPolicy.Spec.CardManagement.DeploymentConfig); err != nil {
 		return fmt.Errorf("failed to transform deployment: %w", err)
 	}
+	if err := transformCardManagementHealthApi(obj, clusterPolicy.Spec.CardManagement.HealthApi); err != nil {
+		return fmt.Errorf("failed to transform health API sidecar: %w", err)
+	}
 	if pvcExists {
 		mountCardManagementClaim(obj, spyreconst.CardManagementClaimName)
 	}
@@ -419,6 +422,59 @@ func TransformCardManagement(obj *appsv1.DaemonSet,
 			}
 		}
 		break
+	}
+	return nil
+}
+
+// transformCardManagementHealthApi adds/configures or removes the health-api sidecar
+// container (and its supporting init container and volume), based on whether it is
+// enabled in the SpyreClusterPolicy. The container, init container, and volume are
+// always present in the DaemonSet template; this either configures them for real or
+// strips them back out before the object is ever synced.
+func transformCardManagementHealthApi(obj *appsv1.DaemonSet, healthApi *spyrev1alpha1.HealthApiSpec) error {
+	spec := &obj.Spec.Template.Spec
+	containerIdx := -1
+	for i, c := range spec.Containers {
+		if c.Name == spyreconst.CardManagementHealthApiContainerName {
+			containerIdx = i
+			break
+		}
+	}
+
+	if healthApi == nil || !healthApi.Enabled {
+		if containerIdx >= 0 {
+			spec.Containers = slices.Delete(spec.Containers, containerIdx, containerIdx+1)
+		}
+		for i, c := range spec.InitContainers {
+			if c.Name == spyreconst.CardManagementHealthApiInitContainerName {
+				spec.InitContainers = slices.Delete(spec.InitContainers, i, i+1)
+				break
+			}
+		}
+		for i, v := range spec.Volumes {
+			if v.Name == spyreconst.CardManagementHealthApiSocketVolumeName {
+				spec.Volumes = slices.Delete(spec.Volumes, i, i+1)
+				break
+			}
+		}
+		return nil
+	}
+
+	if containerIdx < 0 {
+		return fmt.Errorf("cannot find %s container in card management DaemonSet template",
+			spyreconst.CardManagementHealthApiContainerName)
+	}
+	if err := applyContainerConfig(&spec.Containers[containerIdx], &healthApi.DeploymentConfig); err != nil {
+		return fmt.Errorf("failed to apply health API container config: %w", err)
+	}
+
+	// the chmod init container just needs to run the same image as the health API sidecar.
+	for i, c := range spec.InitContainers {
+		if c.Name == spyreconst.CardManagementHealthApiInitContainerName {
+			spec.InitContainers[i].Image = spec.Containers[containerIdx].Image
+			spec.InitContainers[i].ImagePullPolicy = spec.Containers[containerIdx].ImagePullPolicy
+			break
+		}
 	}
 	return nil
 }
