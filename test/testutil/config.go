@@ -30,6 +30,7 @@ type TestConfig struct {
 	HealthChecker    OptionalComponent      `yaml:"healthChecker"`
 	CatalogSource    ImageVersion           `yaml:"catalog"`
 	ExporterMockUser ImageVersion           `yaml:"mockUser"`
+	Runtime          ImageVersion           `yaml:"runtime"`
 	SmallToy         OptionalComponent      `yaml:"smallToy"`
 	CardManagement   CardManagementConfig   `yaml:"cardManagement"`
 	HasDevice        bool                   `yaml:"hasDevice"`
@@ -42,7 +43,6 @@ func (config *TestConfig) SetRepositories() {
 	config.setRepositoryIfEmpty(&config.CatalogSource)
 	config.setRepositoryIfEmpty(&config.DevicePlugin)
 	config.setRepositoryIfEmpty(&config.DevicePluginInit.ImageVersion)
-	config.setRepositoryIfEmpty(&config.DevicePluginInit.Runtime)
 	config.setRepositoryIfEmpty(&config.DraDriver)
 	config.setRepositoryIfEmpty(&config.Exporter.ImageVersion)
 	config.setRepositoryIfEmpty(&config.ExporterMockUser)
@@ -50,6 +50,7 @@ func (config *TestConfig) SetRepositories() {
 	config.setRepositoryIfEmpty(&config.Scheduler)
 	config.setRepositoryIfEmpty(&config.PodValidator.ImageVersion)
 	config.setRepositoryIfEmpty(&config.HealthChecker.ImageVersion)
+	config.setRepositoryIfEmpty(&config.Runtime)
 	config.setRepositoryIfEmpty(&config.CardManagement.ImageVersion)
 	config.setRepositoryIfEmpty(&config.SmallToy.ImageVersion)
 }
@@ -75,7 +76,6 @@ type OptionalComponent struct {
 type DevicePluginInitConfig struct {
 	OptionalComponent `yaml:",inline"`
 	ExecutePolicy     spyrev1alpha1.ExecutePolicy `yaml:"executePolicy,omitempty"`
-	Runtime           ImageVersion                `yaml:"runtime,omitempty"`
 }
 
 type CardManagementConfig struct {

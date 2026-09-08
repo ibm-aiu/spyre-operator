@@ -28,6 +28,34 @@ spec:
         effect: NoSchedule
       priorityClassName: system-node-critical
       serviceAccount: spyre-metrics-exporter
+      initContainers:
+      - name: init-ctk
+        image: "FILLED BY THE OPERATOR"
+        securityContext:
+          runAsUser: 1001
+          runAsGroup: 0
+          runAsNonRoot: true
+          privileged: false
+          seLinuxOptions:
+            type: spc_t
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          mkdir -p /mnt/spyre/senlib/etc /mnt/spyre/senlib/lib
+          cp -a /opt/ibm/spyre/senlib/etc/. /mnt/spyre/senlib/etc/
+          cp -a /opt/ibm/spyre/senlib/lib/.       /mnt/spyre/senlib/lib/
+          cp -a /opt/ibm/spyre/aiu-monitor/lib/.  /mnt/spyre/senlib/lib/
+          cp -a /usr/lib64/libhwloc.so*           /mnt/spyre/senlib/lib/
+          cp -a /usr/lib64/libboost_*.so*         /mnt/spyre/senlib/lib/
+          cp -a /usr/lib64/libicu*.so*            /mnt/spyre/senlib/lib/
+          cp -a /usr/lib64/libudev.so*            /mnt/spyre/senlib/lib/ 2> /dev/null || true
+          cp -a /usr/lib64/libpciaccess.so*       /mnt/spyre/senlib/lib/ 2> /dev/null || true
+          cp -a /usr/lib64/libOpenCL.so*          /mnt/spyre/senlib/lib/ 2> /dev/null || true
+        volumeMounts:
+        - name: spyre-senlib
+          mountPath: /mnt/spyre
       containers:
       - image: "FILLED BY THE OPERATOR"
         name: spyre-metrics-exporter
@@ -56,6 +84,14 @@ spec:
           mountPath: /tmp/spyre-config
         - name: spyre-metrics
           mountPath: /tmp/spyre-metrics
+        - name: spyre-senlib
+          mountPath: /opt/ibm/spyre/senlib/lib
+          subPath: senlib/lib
+          readOnly: true
+        - name: spyre-senlib
+          mountPath: /opt/ibm/spyre/senlib/etc
+          subPath: senlib/etc
+          readOnly: true
         securityContext:
           privileged: true
       volumes:
@@ -67,3 +103,5 @@ spec:
         hostPath:
           path: /usr/local/etc/device-plugins/spyre-metrics
           type: DirectoryOrCreate
+      - name: spyre-senlib
+        emptyDir: {}

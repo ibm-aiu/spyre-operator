@@ -76,6 +76,10 @@ var (
 // TransformMetricsExporter transforms metrics exporter daemonset with required config as per Spyre device
 func TransformMetricsExporter(obj *appsv1.DaemonSet,
 	config *spyrev1alpha1.SpyreClusterPolicySpec, nodeArchitecture string) error {
+	if err := transformMetricsExporterInitContainer(obj, config); err != nil {
+		return fmt.Errorf("failed to transform init container: %w", err)
+	}
+
 	if config.MetricsExporter.MetricsPath != "" {
 		setContainerEnv(&obj.Spec.Template.Spec.Containers[0],
 			spyreconst.MetricsContainerPathKey, config.MetricsExporter.MetricsPath)
@@ -100,6 +104,23 @@ func TransformMetricsExporter(obj *appsv1.DaemonSet,
 	// apply common deploy config
 	if err := applyDeployConfig(&obj.Spec.Template, &config.MetricsExporter.DeploymentConfig); err != nil {
 		return err
+	}
+	return nil
+}
+
+func transformMetricsExporterInitContainer(obj *appsv1.DaemonSet,
+	config *spyrev1alpha1.SpyreClusterPolicySpec) error {
+	noInitContainerTemplate := len(obj.Spec.Template.Spec.InitContainers) == 0
+	// Skip if no init container template or no config provided or pseudomode
+	if noInitContainerTemplate || config.MetricsExporter.Runtime == nil ||
+		config.ExperimentalModeEnabled(spyrev1alpha1.PseudoDeviceMode) {
+		obj.Spec.Template.Spec.InitContainers = []corev1.Container{}
+		return nil
+	}
+	if err := applyContainerConfig(&obj.Spec.Template.Spec.InitContainers[0],
+		config.MetricsExporter.Runtime); err != nil {
+		obj.Spec.Template.Spec.InitContainers = []corev1.Container{}
+		return fmt.Errorf("failed to apply: %w", err)
 	}
 	return nil
 }

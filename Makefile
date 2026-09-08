@@ -50,7 +50,7 @@ export TEST_CONFIG
 # Integration test configuration variables
 # This LABEL only runs operator related tests
 INTEGRATION_TEST_LABEL ?= "integration && !cardmgmt"
-E2E_TEST_LABEL ?= "e2e && !prop-deps"
+E2E_TEST_LABEL ?= "e2e"
 
 # detect-secrets
 DETECT_SECRETS_GIT ?= "https://github.com/ibm/detect-secrets.git@master\#egg=detect-secrets"

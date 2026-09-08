@@ -221,6 +221,66 @@ var _ = Describe("Transform", func() {
 			Expect(spec.Spec.InitContainers[1].Name).To(BeEquivalentTo("init-data"))
 		})
 
+		It("metrics exporter init container can be loaded", func() {
+			dsPath := filepath.Join(AssetsPath, "state-plugin-components", "spyre-metrics-exporter", "0500_daemonset.yaml")
+			runtimeObj, gvk, err := DecodeFromFile(StateScheme, dsPath)
+			Expect(err).To(BeNil())
+			defaultObj, err := NewDefaultObject(ctx, gvk.Kind, OpNs, runtimeObj)
+			Expect(err).To(BeNil())
+			controlledObj, err := NewDaemonSet(defaultObj, runtimeObj, OpNs)
+			Expect(err).To(BeNil())
+			controlledDs, ok := controlledObj.(*MetricsExporterDaemonset)
+			Expect(ok).To(BeTrue())
+
+			spec := controlledDs.GetSpec()
+			Expect(spec.Spec.InitContainers).To(HaveLen(1))
+			Expect(spec.Spec.InitContainers[0].Name).To(Equal("init-ctk"))
+		})
+
+		DescribeTable("transform metrics exporter init container config", func(pseudoMode, hasInit, hasImage, expectedInit bool) {
+			metricsExporter := newDaemonset("metrics-exporter")
+			if hasInit {
+				metricsExporter.Spec.Template.Spec.InitContainers = []corev1.Container{{
+					Name: "init-ctk",
+				}}
+			}
+
+			var config spyrev1alpha1.SpyreClusterPolicySpec
+			if pseudoMode {
+				config.ExperimentalMode = []spyrev1alpha1.SpyreClusterPolicyExperimentalMode{
+					spyrev1alpha1.PseudoDeviceMode,
+				}
+			}
+			initConfig := ValidDeploymentConfig("metrics-init")
+			initConfig.Args = []string{"--configure"}
+			initConfig.Env = []corev1.EnvVar{{Name: "INIT_MODE", Value: "metrics"}}
+			if hasImage {
+				config.MetricsExporter.Runtime = &initConfig
+			}
+
+			err := TransformMetricsExporter(metricsExporter, &config, DefaultArchitecture)
+			Expect(err).To(BeNil())
+			Expect(len(metricsExporter.Spec.Template.Spec.InitContainers) > 0).To(Equal(expectedInit))
+
+			if expectedInit && hasImage {
+				initContainer := metricsExporter.Spec.Template.Spec.InitContainers[0]
+				expectedImage, err := spyrev1alpha1.ImagePath(initConfig.Repository, initConfig.Image, initConfig.Version)
+				Expect(err).To(BeNil())
+				Expect(initContainer.Image).To(Equal(expectedImage))
+				Expect(initContainer.Args).To(Equal(initConfig.Args))
+				Expect(initContainer.Env).To(ContainElement(corev1.EnvVar{Name: "INIT_MODE", Value: "metrics"}))
+			}
+		},
+			Entry("non-pseudo, without init template, no image", false, false, false, false),
+			Entry("non-pseudo, without init template, with image", false, false, true, false),
+			Entry("non-pseudo, with init template, no image", false, true, false, false),
+			Entry("non-pseudo, with init template, with image", false, true, true, true),
+			Entry("pseudo, without init template, no image", true, false, false, false),
+			Entry("pseudo, without init template, with image", true, false, true, false),
+			Entry("pseudo, with init template, no image", true, true, false, false),
+			Entry("pseudo, with init template, with image", true, true, true, false),
+		)
+
 		DescribeTable("transform init container config", func(nodeArchitecture string, pseudoMode, hasInit, hasImage, expectedInit bool) {
 			mnts, found := DeviceHostPathMounts[nodeArchitecture]
 			if !found {

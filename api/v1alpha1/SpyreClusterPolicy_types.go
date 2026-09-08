@@ -240,6 +240,10 @@ type MetricsExporterSpec struct {
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Optional
 	Port *int32 `json:"port,omitempty"`
+
+	// Runtime define deploy configuration of runtime init container
+	// provides spyre-runtime with monitor library which is required for reading PF metric files
+	Runtime *DeploymentConfig `json:"runtime,omitempty"`
 }
 
 // SchedulerSpec defines the properties for device-plugin deployment

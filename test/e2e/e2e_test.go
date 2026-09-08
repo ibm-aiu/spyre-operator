@@ -59,8 +59,8 @@ var AllocationMetricLabels = func(namespace, name, nodeName string) string {
 	return fmt.Sprintf(`spyre_allocation{namespace="%s",node="%s",pod="%s",spyre="[0-9a-fA-F:.]+"}`, namespace, nodeName, name)
 }
 
-var TempMetricLabels = func(namespace, name, nodeName string) string {
-	return fmt.Sprintf(`spyre_usage_temperature_celsius{namespace="%s",node="%s",pod="%s",probe="0",spyre="[0-9a-fA-F:.]+"}`, namespace, nodeName, name)
+var PowerMetricLabels = func(namespace, name, nodeName string) string {
+	return fmt.Sprintf(`spyre_power_watts{namespace="%s",node="%s",pod="%s",spyre="[0-9a-fA-F:.]+",type="[pv]f"}`, namespace, nodeName, name)
 }
 
 var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
@@ -710,11 +710,11 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 		})
 	})
 
-	Context("Metric exporter", Label("prop-deps"), Ordered, func() {
+	Context("Metric exporter", Ordered, func() {
 		ctx := context.Background()
 		mockUserContainer := "app"
 		getMetricsKeyFuncs := []func(namespace, name, nodeName string) string{
-			AllocationMetricLabels, TempMetricLabels,
+			AllocationMetricLabels, PowerMetricLabels,
 		}
 
 		BeforeAll(func() {

@@ -42,26 +42,24 @@ draDriver:
   imagePullPolicy: Always
 exporter:
   enabled: false
-  image: spyre-exporter
-  version: 1.3.0
+  image: spyre-metrics-exporter
+  version: 1.4.0-dev
   imagePullPolicy: Always
-  repository: quay.io/ibm-aiu
 mockUser:
   image: spyre-mock-user
-  version: 1.3.0
+  version: 1.4.0-dev
   imagePullPolicy: Always
-  repository: quay.io/ibm-aiu
 devicePluginInit:
   enabled: true
   image: spyre-device-plugin-init
   version: 1.4.0-dev
   imagePullPolicy: Always
   executePolicy: IfNotPresent
-  runtime:
-    image: spyre-runtime
-    version: v1.3.0
-    imagePullPolicy: Always
-    repository: quay.io/ibm-aiu
+runtime:
+  image: spyre-runtime
+  version: v1.3.0
+  imagePullPolicy: Always
+  repository: quay.io/ibm-aiu
 smallToy: # PF workload run on Spyre card; this is only consumed by integration test
   enabled: true
   image: aiu-fms-testing-utils
