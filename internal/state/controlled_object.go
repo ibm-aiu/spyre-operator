@@ -667,6 +667,16 @@ func (obj *DaemonSet) Ready(ctx context.Context, k8sClient client.Client) bool {
 		return false
 	}
 
+	// New: spec has been written but the controller hasn't
+	// observed the new generation yet — status is stale, not ready.
+	if getObj.Status.ObservedGeneration < getObj.Generation {
+		logger.Info("controller has not observed the latest generation yet",
+			"name", getObj.Name,
+			"generation", getObj.Generation,
+			"observedGeneration", getObj.Status.ObservedGeneration)
+		return false
+	}
+
 	if strings.HasPrefix(obj.Name, "spyre-card-management") {
 		s := getObj.Status
 		n := s.DesiredNumberScheduled
@@ -688,6 +698,11 @@ func (obj *DaemonSet) Ready(ctx context.Context, k8sClient client.Client) bool {
 	if getObj.Status.NumberUnavailable > 0 {
 		logger.Info("number of unavailable pods in daemon set greater than zero",
 			"name", getObj.Name, "unavailable", getObj.Status.NumberUnavailable)
+		return false
+	}
+	if getObj.Status.UpdatedNumberScheduled != getObj.Status.DesiredNumberScheduled {
+		logger.Info("number of updated pods in daemon is not equal to desired number yet",
+			"name", getObj.Name, "updated", getObj.Status.UpdatedNumberScheduled)
 		return false
 	}
 	return true

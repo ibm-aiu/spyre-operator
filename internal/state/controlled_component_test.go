@@ -554,6 +554,7 @@ func updateNumberUnavailable(ctx context.Context, component *ControlledComponent
 	Expect(ok).To(BeTrue())
 
 	// expected
+	deploy.Status.ObservedGeneration = deploy.Generation
 	deploy.Status.DesiredNumberScheduled = 1
 
 	// actual
