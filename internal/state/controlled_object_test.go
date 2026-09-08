@@ -186,6 +186,53 @@ var _ = Describe("ControlledObject", Ordered, func() {
 			Expect(obj).NotTo(BeNil())
 		})
 	})
+
+	Context("DaemonSet.Ready", func() {
+		var controlledObj ControlledObject
+		var ds *appsv1.DaemonSet
+
+		BeforeEach(func() {
+			runtimeObj, gvk, err := DecodeFromFile(StateScheme, devicePluginDaemonSetPath)
+			Expect(err).To(BeNil())
+			defaultObj, err := NewDefaultObject(ctx, gvk.Kind, OpNs, runtimeObj)
+			Expect(err).To(BeNil())
+			controlledObj, err = NewDaemonSet(defaultObj, runtimeObj, OpNs)
+			Expect(err).To(BeNil())
+			ds = controlledObj.GetObject().(*appsv1.DaemonSet)
+			err = K8sClient.Create(ctx, ds)
+			Expect(err).To(BeNil())
+		})
+
+		AfterEach(func() {
+			err := K8sClient.Delete(ctx, ds)
+			Expect(err).To(BeNil())
+		})
+
+		DescribeTable("returns correct readiness",
+			func(observedGeneration int64, desired, ready, unavailable, updated int32, expectedReady bool) {
+				By("setting daemonset status")
+				ds.Status.ObservedGeneration = observedGeneration
+				ds.Status.DesiredNumberScheduled = desired
+				ds.Status.NumberReady = ready
+				ds.Status.NumberUnavailable = unavailable
+				ds.Status.UpdatedNumberScheduled = updated
+				err := K8sClient.Status().Update(ctx, ds)
+				Expect(err).To(BeNil())
+				Expect(controlledObj.Ready(ctx, K8sClient)).To(Equal(expectedReady))
+			},
+			Entry("not ready when ObservedGeneration lags Generation",
+				int64(0), int32(2), int32(2), int32(0), int32(2), false),
+			Entry("not ready when NumberReady is zero",
+				int64(1), int32(2), int32(0), int32(0), int32(2), false),
+			Entry("not ready when NumberUnavailable is greater than zero",
+				int64(1), int32(2), int32(2), int32(1), int32(2), false),
+			Entry("not ready when UpdatedNumberScheduled does not equal DesiredNumberScheduled",
+				int64(1), int32(2), int32(2), int32(0), int32(1), false),
+			Entry("ready when all conditions are satisfied",
+				int64(1), int32(2), int32(2), int32(0), int32(2), true),
+		)
+	})
+
 })
 
 func checkModeEnable(ds *appsv1.DaemonSet, mode spyrev1alpha1.SpyreClusterPolicyExperimentalMode, expectedFound bool, expectedValue string) {
