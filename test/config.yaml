@@ -5,7 +5,7 @@ hasDevice: false
 pseudoDeviceMode: true
 workloadImage: docker.io/spyre-operator/x86_64/dd2/e2e_stable:2025_09_06
 nodeName: "" # Provide actual hostname with Spyre cards or integration test will fail
-defaultChannel: "fast-v1.3"
+defaultChannel: "fast-v1.4"
 catalog:
   image: spyre-operator-catalog
   version: 1.4.0-dev

@@ -107,6 +107,9 @@ var _ = BeforeSuite(func() {
 })
 
 var _ = AfterSuite(func(ctx SpecContext) {
+	if k8sClientset == nil {
+		return
+	}
 	renewSpyreAppsNamespace(ctx)
 	testutil.UninstallOperator(ctx, k8sClientset, dynClient, spyreV2Client, itConfig.HasDevice, nodeNames)
 }, NodeTimeout(time.Minute*3))

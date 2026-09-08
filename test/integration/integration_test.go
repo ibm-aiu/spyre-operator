@@ -489,6 +489,10 @@ var _ = Describe("integration test", Label("integration"), Ordered, ContinueOnFa
 			if ppc64le {
 				Skip("tests skipped due to cluster is ppc64le")
 			}
+
+			// Currently we don't have enough worker nodes, so skipping.
+			Skip("Skipping test due insufficient number of worker nodes.")
+
 			renewSpyreAppsNamespace(ctx)
 		})
 		// Requires >= 3 worker nodes; skipped at runtime on smaller clusters.

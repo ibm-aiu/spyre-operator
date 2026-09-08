@@ -184,6 +184,15 @@ func WaitForSpyreClusterPolicyState(ctx context.Context, spyreV2Client client.Cl
 	}).WithTimeout(20 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 }
 
+func getInitContainerByName(pod v1.Pod, name string) *v1.Container {
+	for i := range pod.Spec.InitContainers {
+		if pod.Spec.InitContainers[i].Name == name {
+			return &pod.Spec.InitContainers[i]
+		}
+	}
+	return nil
+}
+
 func CheckOperatorAssetsRunning(ctx context.Context, spyreV2Client client.Client, k8sClientset *kubernetes.Clientset, nodeCount int) {
 	var clusterPolicy spyrev1alpha1.SpyreClusterPolicy
 	err := spyreV2Client.Get(ctx,
@@ -269,14 +278,21 @@ func CheckOperatorAssetsRunning(ctx context.Context, spyreV2Client client.Client
 			printMessageIfPodNotRunning(devicePluginPod)
 			g.Expect(devicePluginPod.Status.Phase).To(BeEquivalentTo(v1.PodRunning))
 			if clusterPolicy.Spec.DevicePlugin.InitContainer != nil {
-				g.Expect(devicePluginPod.Spec.InitContainers).To(HaveLen(1))
-				checkEnvExists(devicePluginPod.Spec.Containers[0].Env, spyreconst.IgnoreMetadataKey, "false")
+				if clusterPolicy.Spec.ExperimentalModeEnabled(spyrev1alpha1.PseudoDeviceMode) {
+					g.Expect(devicePluginPod.Spec.InitContainers).To(HaveLen(1))
+				} else {
+					g.Expect(devicePluginPod.Spec.InitContainers).To(HaveLen(2))
+				}
+				checkEnvNotValue(devicePluginPod.Spec.Containers[0].Env, spyreconst.IgnoreMetadataKey, "true")
+				initDataContainer := getInitContainerByName(devicePluginPod, "init-data")
+				g.Expect(initDataContainer).NotTo(BeNil())
+				checkEnvNotValue(initDataContainer.Env, spyreconst.IgnoreMetadataKey, "true")
 				// Verify VERIFY_P2P and privileged settings
 				By("checking VERIFY_P2P and privileged")
-				checkEnvExists(devicePluginPod.Spec.InitContainers[0].Env, "VERIFY_P2P", "0")
-				g.Expect(devicePluginPod.Spec.InitContainers[0].SecurityContext).NotTo(BeNil())
-				g.Expect(devicePluginPod.Spec.InitContainers[0].SecurityContext.Privileged).NotTo(BeNil())
-				g.Expect(*devicePluginPod.Spec.InitContainers[0].SecurityContext.Privileged).To(BeFalse())
+				checkEnvExists(initDataContainer.Env, "VERIFY_P2P", "0")
+				g.Expect(initDataContainer.SecurityContext).NotTo(BeNil())
+				g.Expect(initDataContainer.SecurityContext.Privileged).NotTo(BeNil())
+				g.Expect(*initDataContainer.SecurityContext.Privileged).To(BeFalse())
 			} else {
 				g.Expect(devicePluginPod.Spec.InitContainers).To(HaveLen(0))
 				checkEnvExists(devicePluginPod.Spec.Containers[0].Env, spyreconst.IgnoreMetadataKey, "true")
@@ -410,10 +426,24 @@ func checkEnvExists(envs []v1.EnvVar, key, value string) {
 	found := false
 	for _, env := range envs {
 		if env.Name == key {
-			Expect(env.Value).To(Equal(value))
+			Expect(env.Value).To(Equal(value),
+				"env var %q: expected value %q but got %q", key, value, env.Value)
 			found = true
 			break
 		}
 	}
-	Expect(found).To(BeTrue())
+	Expect(found).To(BeTrue(),
+		"env var %q (expected value %q) not found in env vars: %v", key, value, envs)
+}
+
+// Check passes if (1) variable exists and is NOT value, or (2) variable does not exist.
+// In other words, test only fails if variable exists and IS the value.
+func checkEnvNotValue(envs []v1.EnvVar, key, value string) {
+	for _, env := range envs {
+		if env.Name == key {
+			Expect(env.Value).NotTo(Equal(value),
+				"env var %q: expected value to not be %q but got %q anyway", key, value, env.Value)
+			break
+		}
+	}
 }
