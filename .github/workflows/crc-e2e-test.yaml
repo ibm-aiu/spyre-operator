@@ -6,8 +6,6 @@
 name: CRC End to End Test
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
   workflow_dispatch:
     inputs:
       runner:
@@ -39,18 +37,15 @@ on:
         required: false
         type: string
 
+permissions: read-all
+
 concurrency:
   group: crc-e2e-${{ github.ref }}
   cancel-in-progress: true
 
-permissions:
-  contents: read
-  packages: write
-  pull-requests: write
-
 jobs:
   crc-e2e-test:
-    uses: ibm-aiu/spyre-operator-actions/.github/workflows/crc-e2e-test.yaml@main
+    uses: ibm-aiu/spyre-operator-actions/.github/workflows/crc-e2e-test.yaml@sunya-ch-e2e
     with:
       runner: ${{ inputs.runner || 'ubuntu-24.04' }}
       # On pull_request: check out the PR head branch; on workflow_dispatch: use input or current branch
