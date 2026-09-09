@@ -41,20 +41,15 @@ concurrency:
   group: crc-e2e-${{ inputs.branch-name }}
   cancel-in-progress: true
 
-permissions:
-  contents: read
-  packages: write
-  pull-requests: write
+permissions: read-all
 
 jobs:
   crc-e2e-test:
     uses: ibm-aiu/spyre-operator-actions/.github/workflows/crc-e2e-test.yaml@main
     with:
       runner: ${{ inputs.runner }}
-      # On pull_request: check out the PR head branch; on workflow_dispatch: use input or current branch
       branch-name: ${{ inputs.branch-name }}
       registry: ${{ inputs.registry }}
-      # On pull_request: automatically pass the PR URL so the image is built from the PR branch
       pr-url: ${{ inputs.pr-url }}
       operator-version: ${{ inputs.operator-version }}
       operator-channel: ${{ inputs.operator-channel }}
