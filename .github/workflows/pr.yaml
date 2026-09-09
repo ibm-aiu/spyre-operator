@@ -13,7 +13,26 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-permissions: read-all
+permissions:
+  actions: read
+  artifact-metadata: read
+  attestations: read
+  checks: read
+  code-quality: read
+  contents: read
+  deployments: read
+  discussions: read
+  drives: read
+  id-token: write
+  issues: read
+  models: read
+  packages: write
+  pages: read
+  pull-requests: write
+  repository-projects: read
+  security-events: read
+  statuses: read
+  vulnerability-alerts: read
 
 env:
   GOTOOLCHAIN: auto
@@ -62,3 +81,16 @@ jobs:
   unit-test:
     needs: pre-commit
     uses: ibm-aiu/spyre-operator-actions/.github/workflows/unit-test.yaml@main
+
+  e2e-test:
+    needs: unit-test
+    if: contains(github.event.pull_request.labels.*.name, 'ok-to-test')
+    uses: ibm-aiu/spyre-operator-actions/.github/workflows/crc-e2e-test.yaml@main
+    with:
+      runner: ubuntu-24.04
+      branch-name: ${{ github.head_ref }}
+      registry: ghcr.io/ibm-aiu
+      pr-url: ${{ github.event.pull_request.html_url }}
+    secrets:
+      crc-pull-secret: ${{ secrets.CRC_PULL_SECRET }}
+      github-token: ${{ secrets.GITHUB_TOKEN }}
