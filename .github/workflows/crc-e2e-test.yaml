@@ -6,8 +6,6 @@
 name: CRC End to End Test
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
   workflow_dispatch:
     inputs:
       runner:
@@ -40,7 +38,7 @@ on:
         type: string
 
 concurrency:
-  group: crc-e2e-${{ github.ref }}
+  group: crc-e2e-${{ inputs.branch-name }}
   cancel-in-progress: true
 
 permissions:
@@ -52,15 +50,14 @@ jobs:
   crc-e2e-test:
     uses: ibm-aiu/spyre-operator-actions/.github/workflows/crc-e2e-test.yaml@main
     with:
-      runner: ${{ inputs.runner || 'ubuntu-24.04' }}
+      runner: ${{ inputs.runner }}
       # On pull_request: check out the PR head branch; on workflow_dispatch: use input or current branch
-      branch-name: ${{ inputs.branch-name || github.head_ref || github.ref_name }}
-      registry: ${{ inputs.registry || 'ghcr.io/ibm-aiu' }}
+      branch-name: ${{ inputs.branch-name }}
+      registry: ${{ inputs.registry }}
       # On pull_request: automatically pass the PR URL so the image is built from the PR branch
-      pr-url: ${{ inputs.pr-url || (github.event_name == 'pull_request' && github.event.pull_request.html_url
-        || '') }}
-      operator-version: ${{ inputs.operator-version || '' }}
-      operator-channel: ${{ inputs.operator-channel || '' }}
+      pr-url: ${{ inputs.pr-url }}
+      operator-version: ${{ inputs.operator-version }}
+      operator-channel: ${{ inputs.operator-channel }}
     secrets:
       crc-pull-secret: ${{ secrets.CRC_PULL_SECRET }}
       github-token: ${{ secrets.GITHUB_TOKEN }}
