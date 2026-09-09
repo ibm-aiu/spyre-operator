@@ -62,5 +62,5 @@ jobs:
       operator-version: ${{ inputs.operator-version || '' }}
       operator-channel: ${{ inputs.operator-channel || '' }}
     secrets:
-      crc-pull-secret: ${{ secrets.CRC_PULL_SECRET_SUNYACH }}
+      crc-pull-secret: ${{ secrets.CRC_PULL_SECRET }}
       github-token: ${{ secrets.GITHUB_TOKEN }}
