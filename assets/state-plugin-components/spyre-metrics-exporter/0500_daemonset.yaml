@@ -44,6 +44,16 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
+        # SPYRE_METRIC_PATH: directory the exporter scans for VF metric files written by
+        # libaiupti. Must match the container path of the spyre-metrics volume below
+        # (/tmp/spyre-metrics) with the %BUSID wildcard for multi-AIU support.
+        - name: SPYRE_METRIC_PATH
+          value: "/tmp/spyre-metrics/metrics.%BUSID"
+        # AIUPTI_ENABLE_METRICS: tells vf_metrics_manager.py which polling interval to use.
+        # "true" = 100ms (matches libaiupti 100ms sampling). "false" = 1s (default).
+        # The device plugin injects this same variable into workload pods at Allocate() time.
+        - name: AIUPTI_ENABLE_METRICS
+          value: "false"
         resources:
           limits:
             cpu: 1000m
