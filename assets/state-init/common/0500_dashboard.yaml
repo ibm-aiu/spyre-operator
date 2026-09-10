@@ -816,7 +816,7 @@ data:
                         "steppedLine": false,
                         "targets": [
                             {
-                                "expr": "sum(irate(spyre_usage_dmo_dur_mci_read{node=~\"$node\", exported_namespace=~\"$namespace\"}[5m])) by (exported_pod, exported_namespace)",
+                                "expr": "sum(irate(spyre_read_memory_bytes{node=~\"$node\", exported_namespace=~\"$namespace\"}[5m])) by (exported_pod, exported_namespace)",
                                 "format": "time_series",
                                 "legendFormat": "{{exported_pod}}/{{exported_namespace}}",
                                 "legendLink": null
@@ -900,7 +900,7 @@ data:
                         "steppedLine": false,
                         "targets": [
                             {
-                                "expr": "sum(irate(spyre_usage_dmo_dur_mci_write{node=~\"$node\", exported_namespace=~\"$namespace\"}[5m])) by (exported_pod, exported_namespace)",
+                                "expr": "sum(irate(spyre_write_memory_bytes{node=~\"$node\", exported_namespace=~\"$namespace\"}[5m])) by (exported_pod, exported_namespace)",
                                 "format": "time_series",
                                 "legendFormat": "{{exported_pod}}/{{exported_namespace}}",
                                 "legendLink": null

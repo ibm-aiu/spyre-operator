@@ -100,6 +100,14 @@ func ClusterPolicy(testConfig TestConfig, modes []spyrev1alpha1.SpyreClusterPoli
 	} else {
 		DisableInitContainer(clusterPolicy)
 	}
+	if testConfig.Runtime.Image != "" {
+		clusterPolicy.Spec.MetricsExporter.Runtime = &spyrev1alpha1.DeploymentConfig{
+			Repository:      testConfig.Exporter.Repository,
+			Image:           testConfig.Exporter.Image,
+			Version:         testConfig.Exporter.Version,
+			ImagePullPolicy: testConfig.Exporter.ImagePullPolicy,
+		}
+	}
 	if draDriverEnabled {
 		clusterPolicy.Spec.DevicePlugin.DRADriver = true
 		clusterPolicy.Spec.DevicePlugin.DeploymentConfig = spyrev1alpha1.DeploymentConfig{
@@ -177,7 +185,7 @@ func UpdateClusterPolicy(ctx context.Context, spyreV2Client client.Client, k8sCl
 // checkInitContainerRuntimeAccepted fails when the API server pruned the runtime init
 // container config, which happens when the installed CRD predates that field.
 func checkInitContainerRuntimeAccepted(ctx context.Context, spyreV2Client client.Client, testConfig TestConfig) {
-	if !testConfig.DevicePluginInit.Enabled || testConfig.DevicePluginInit.Runtime.Image == "" {
+	if !testConfig.DevicePluginInit.Enabled || testConfig.Runtime.Image == "" {
 		return
 	}
 	By("checking the cluster policy kept the runtime init container config")
@@ -449,12 +457,12 @@ func EnableInitContainer(clusterPolicy *spyrev1alpha1.SpyreClusterPolicy,
 		},
 		ExecutePolicy: &executePolicy,
 	}
-	if testConfig.DevicePluginInit.Runtime.Image != "" {
+	if testConfig.Runtime.Image != "" {
 		initContainer.Runtime = &spyrev1alpha1.DeploymentConfig{
-			Repository:      testConfig.DevicePluginInit.Runtime.Repository,
-			Image:           testConfig.DevicePluginInit.Runtime.Image,
-			Version:         testConfig.DevicePluginInit.Runtime.Version,
-			ImagePullPolicy: testConfig.DevicePluginInit.Runtime.ImagePullPolicy,
+			Repository:      testConfig.DevicePluginInit.Repository,
+			Image:           testConfig.DevicePluginInit.Image,
+			Version:         testConfig.DevicePluginInit.Version,
+			ImagePullPolicy: testConfig.DevicePluginInit.ImagePullPolicy,
 		}
 	}
 	clusterPolicy.Spec.DevicePlugin.InitContainer = initContainer
