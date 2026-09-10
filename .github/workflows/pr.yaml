@@ -13,26 +13,7 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-permissions:
-  actions: read
-  artifact-metadata: read
-  attestations: read
-  checks: read
-  code-quality: read
-  contents: read
-  deployments: read
-  discussions: read
-  drives: read
-  id-token: write
-  issues: read
-  models: read
-  packages: write
-  pages: read
-  pull-requests: write
-  repository-projects: read
-  security-events: read
-  statuses: read
-  vulnerability-alerts: read
+permissions: read-all
 
 env:
   GOTOOLCHAIN: auto
