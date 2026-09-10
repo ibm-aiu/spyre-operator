@@ -35,7 +35,7 @@ metadata:
             },
             "metricsExporter": {
               "enabled": false,
-              "image": "spyre-exporter",
+              "image": "spyre-metrics-exporter",
               "repository": "docker.io/spyre-operator",
               "version": "1.4.0-dev"
             },
