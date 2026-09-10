@@ -84,6 +84,8 @@ spec:
           mountPath: /tmp/spyre-config
         - name: spyre-metrics
           mountPath: /tmp/spyre-metrics
+        - name: spyre-metadata
+          mountPath: /tmp/spyre-metadata
         - name: spyre-senlib
           mountPath: /opt/ibm/spyre/senlib/lib
           subPath: senlib/lib
@@ -102,6 +104,10 @@ spec:
       - name: spyre-metrics
         hostPath:
           path: /usr/local/etc/device-plugins/spyre-metrics
+          type: DirectoryOrCreate
+      - name: spyre-metadata
+        hostPath:
+          path: /usr/local/etc/device-plugins/metadata
           type: DirectoryOrCreate
       - name: spyre-senlib
         emptyDir: {}
