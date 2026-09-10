@@ -10,7 +10,7 @@ channels:
   Fast:
     Bundles: []
 exporter:
-  image: spyre-exporter
+  image: spyre-metrics-exporter
   version: 1.4.0-dev
   architectures:
   - amd64

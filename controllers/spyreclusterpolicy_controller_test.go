@@ -50,7 +50,7 @@ var _ = Describe("SpyreclusterpolicyController", func() {
 			Expect(err).To(BeNil())
 			Expect(cp.Name).To(Equal("spyreclusterpolicy"))
 			Expect(cp.Spec.DevicePlugin.Image).To(Equal("spyre-device-plugin"))
-			Expect(cp.Spec.MetricsExporter.Image).To(Equal("spyre-exporter"))
+			Expect(cp.Spec.MetricsExporter.Image).To(Equal("spyre-metrics-exporter"))
 		})
 
 		It("can unmarshal an example file with skip components", func() {
