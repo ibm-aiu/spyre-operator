@@ -34,21 +34,21 @@ spec:
       - name: imagepullsecret
         secret:
           secretName: registry-dockerconfig-secret
-      - name: grpc-socket-dir
+      - name: health-check-api-socket
         hostPath:
-          path: /var/lib/cardmgmt-wrapper/sockets
+          path: /usr/local/etc/spyre-cardmgmt
           type: DirectoryOrCreate
       initContainers:
       - name: open-socket-dir
         image: "FILLED BY THE OPERATOR"
-        command: ["/bin/sh", "-c", "chmod 0777 /var/run/cardmgmt-wrapper"]
+        command: ["/bin/sh", "-c", "chmod 0777 /var/run/cardmgmt-health-check-api"]
         securityContext:
           runAsUser: 0
           seLinuxOptions:
             type: spc_t
         volumeMounts:
-        - name: grpc-socket-dir
-          mountPath: /var/run/cardmgmt-wrapper
+        - name: health-check-api-socket
+          mountPath: /var/run/cardmgmt-health-check-api
       containers:
       - name: app
         image: "FILLED BY THE OPERATOR"
@@ -90,7 +90,7 @@ spec:
         imagePullPolicy: Always
         env:
         - name: API_GRPC_SOCKET_PATH
-          value: "/var/run/cardmgmt-wrapper/grpc.sock"
+          value: "/var/run/cardmgmt-health-check-api/health-check-api.sock"
         - name: WORKER_RPYC_PORT
           value: "50001"
         - name: RPYC_TIMEOUT
@@ -121,8 +121,8 @@ spec:
           seLinuxOptions:
             type: spc_t
         volumeMounts:
-        - name: grpc-socket-dir
-          mountPath: /var/run/cardmgmt-wrapper
+        - name: health-check-api-socket
+          mountPath: /var/run/cardmgmt-health-check-api
         livenessProbe:
           exec:
             command:

@@ -92,9 +92,9 @@ const (
 	// constants regarding the card management health-check API sidecar
 	CardManagementHealthApiContainerName     = "health-api"
 	CardManagementHealthApiInitContainerName = "open-socket-dir"
-	CardManagementHealthApiSocketVolumeName  = "grpc-socket-dir"
-	CardManagementHealthApiSocketHostPath    = "/var/lib/cardmgmt-wrapper/sockets"
-	CardManagementHealthApiSocketMountPath   = "/var/run/cardmgmt-wrapper"
+	CardManagementHealthApiSocketVolumeName  = "health-check-api-socket"
+	CardManagementHealthApiSocketHostPath    = "/usr/local/etc/spyre-cardmgmt"
+	CardManagementHealthApiSocketMountPath   = "/var/run/cardmgmt-health-check-api"
 
 	// config paths
 	DefaultSenlibConfigFilename = "senlib_config.json"
