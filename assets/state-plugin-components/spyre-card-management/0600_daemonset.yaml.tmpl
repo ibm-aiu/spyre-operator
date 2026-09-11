@@ -38,6 +38,10 @@ spec:
         hostPath:
           path: /usr/local/etc/spyre-cardmgmt
           type: DirectoryOrCreate
+      - name: spyre-cert
+        secret:
+          secretName: spyre-cert
+          optional: true
       initContainers:
       - name: open-socket-dir
         image: "FILLED BY THE OPERATOR"
@@ -123,6 +127,9 @@ spec:
         volumeMounts:
         - name: health-check-api-socket
           mountPath: /var/run/cardmgmt-health-check-api
+        - name: spyre-cert
+          mountPath: /etc/cardmgmt-health-check-api/certs
+          readOnly: true
         livenessProbe:
           exec:
             command:
