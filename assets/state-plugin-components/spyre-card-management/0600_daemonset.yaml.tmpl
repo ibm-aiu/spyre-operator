@@ -34,6 +34,25 @@ spec:
       - name: imagepullsecret
         secret:
           secretName: registry-dockerconfig-secret
+      - name: health-check-api-socket
+        hostPath:
+          path: /usr/local/etc/spyre-cardmgmt
+          type: DirectoryOrCreate
+      - name: spyre-cert
+        secret:
+          secretName: spyre-cert
+          optional: true
+      initContainers:
+      - name: open-socket-dir
+        image: "FILLED BY THE OPERATOR"
+        command: ["/bin/sh", "-c", "chmod 0777 /var/run/cardmgmt-health-check-api"]
+        securityContext:
+          runAsUser: 0
+          seLinuxOptions:
+            type: spc_t
+        volumeMounts:
+        - name: health-check-api-socket
+          mountPath: /var/run/cardmgmt-health-check-api
       containers:
       - name: app
         image: "FILLED BY THE OPERATOR"
@@ -70,3 +89,64 @@ spec:
         - name: imagepullsecret
           mountPath: /var/imagepullsecret
           readOnly: true
+      - name: health-api
+        image: "FILLED BY THE OPERATOR"
+        imagePullPolicy: Always
+        env:
+        - name: API_GRPC_SOCKET_PATH
+          value: "/var/run/cardmgmt-health-check-api/health-check-api.sock"
+        - name: WORKER_RPYC_PORT
+          value: "50001"
+        - name: RPYC_TIMEOUT
+          value: "30"
+        - name: RPYC_RETRY_COUNT
+          value: "3"
+        - name: RPYC_RETRY_DELAY
+          value: "1"
+        - name: LOG_LEVEL
+          value: "INFO"
+        resources:
+          limits:
+            cpu: 250m
+            memory: 256Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+          seLinuxOptions:
+            type: spc_t
+        volumeMounts:
+        - name: health-check-api-socket
+          mountPath: /var/run/cardmgmt-health-check-api
+        - name: spyre-cert
+          mountPath: /etc/cardmgmt-health-check-api/certs
+          readOnly: true
+        livenessProbe:
+          exec:
+            command:
+            - python
+            - -c
+            - "import os, socket; s=socket.socket(socket.AF_UNIX); s.connect(os.environ['API_GRPC_SOCKET_PATH']); s.close()"
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - python
+            - -c
+            - "import os, socket; s=socket.socket(socket.AF_UNIX); s.connect(os.environ['API_GRPC_SOCKET_PATH']); s.close()"
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
