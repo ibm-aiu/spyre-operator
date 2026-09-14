@@ -102,10 +102,10 @@ func ClusterPolicy(testConfig TestConfig, modes []spyrev1alpha1.SpyreClusterPoli
 	}
 	if testConfig.Runtime.Image != "" {
 		clusterPolicy.Spec.MetricsExporter.Runtime = &spyrev1alpha1.DeploymentConfig{
-			Repository:      testConfig.Exporter.Repository,
-			Image:           testConfig.Exporter.Image,
-			Version:         testConfig.Exporter.Version,
-			ImagePullPolicy: testConfig.Exporter.ImagePullPolicy,
+			Repository:      testConfig.Runtime.Repository,
+			Image:           testConfig.Runtime.Image,
+			Version:         testConfig.Runtime.Version,
+			ImagePullPolicy: testConfig.Runtime.ImagePullPolicy,
 		}
 	}
 	if draDriverEnabled {
@@ -459,10 +459,10 @@ func EnableInitContainer(clusterPolicy *spyrev1alpha1.SpyreClusterPolicy,
 	}
 	if testConfig.Runtime.Image != "" {
 		initContainer.Runtime = &spyrev1alpha1.DeploymentConfig{
-			Repository:      testConfig.DevicePluginInit.Repository,
-			Image:           testConfig.DevicePluginInit.Image,
-			Version:         testConfig.DevicePluginInit.Version,
-			ImagePullPolicy: testConfig.DevicePluginInit.ImagePullPolicy,
+			Repository:      testConfig.Runtime.Repository,
+			Image:           testConfig.Runtime.Image,
+			Version:         testConfig.Runtime.Version,
+			ImagePullPolicy: testConfig.Runtime.ImagePullPolicy,
 		}
 	}
 	clusterPolicy.Spec.DevicePlugin.InitContainer = initContainer
