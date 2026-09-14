@@ -46,7 +46,7 @@ spec:
           mkdir -p /mnt/spyre/senlib/etc /mnt/spyre/senlib/lib
           cp -a /opt/ibm/spyre/senlib/etc/. /mnt/spyre/senlib/etc/
           cp -a /opt/ibm/spyre/senlib/lib/.       /mnt/spyre/senlib/lib/
-          cp -a /opt/ibm/spyre/aiu-monitor/lib/.  /mnt/spyre/senlib/lib/
+          cp -a /opt/ibm/spyre/aiu-monitor/lib/.  /mnt/spyre/senlib/lib/ || echo "aiu-monitor not available"
           cp -a /usr/lib64/libhwloc.so*           /mnt/spyre/senlib/lib/
           cp -a /usr/lib64/libboost_*.so*         /mnt/spyre/senlib/lib/
           cp -a /usr/lib64/libicu*.so*            /mnt/spyre/senlib/lib/
