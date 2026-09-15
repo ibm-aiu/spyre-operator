@@ -333,11 +333,21 @@ func transformRuntimeInitContainer(obj *appsv1.DaemonSet,
 // TransformPodValidator transforms pod validator deployment
 func TransformPodValidator(obj *appsv1.Deployment, clusterPolicy *spyrev1alpha1.SpyreClusterPolicy) error {
 	applyExperimentalModes(&(obj.Spec.Template.Spec.Containers[0]), clusterPolicy.Spec.ExperimentalMode)
+	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "VF_MODE_ENABLED", boolEnvValue(clusterPolicy.Spec.CardManagement.Enabled))
+	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "DRA_DRIVER_ENABLED", boolEnvValue(clusterPolicy.Spec.DevicePlugin.DRADriver))
 	if err := TransformDeployment(obj, &clusterPolicy.Spec.PodValidator.DeploymentConfig,
 		clusterPolicy.Spec.PodValidator.Replicas); err != nil {
 		return fmt.Errorf("failed to transform deployment: %w", err)
 	}
 	return nil
+}
+
+// boolEnvValue renders a bool as the "1"/"0" convention used by the pod validator's env vars.
+func boolEnvValue(enabled bool) string {
+	if enabled {
+		return spyreconst.ModeEnabledValue
+	}
+	return "0"
 }
 
 // TransformCardManagement transforms card management deployment

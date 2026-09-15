@@ -26,6 +26,10 @@ spec:
         env:
         - name: LOGLEVEL
           value: "debug"
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
         ports:
         - name: webhook
           containerPort: 8443
