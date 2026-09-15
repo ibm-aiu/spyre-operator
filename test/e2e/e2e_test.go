@@ -731,7 +731,7 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 
 		DescribeTable("Get metrics", func(podName string, numOfSpyre int64) {
 			exporterPort := GetExporterPort(ctx, k8sClientset)
-			p := BuildMockUserPod(exporterPort, testConfig, podName, testNamespace, numOfSpyre, targetNodeName)
+			p := BuildMockUserPod(exporterPort, testConfig, podName, OperatorNamespace, numOfSpyre, targetNodeName)
 			By("creating pod")
 			_, err := k8sClientset.CoreV1().Pods(p.Namespace).Create(ctx, p, metav1.CreateOptions{})
 			Expect(err).To(BeNil())
@@ -752,8 +752,8 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 			firstPodName := "first-pod"
 			secondPodName := "second-pod"
 			exporterPort := GetExporterPort(ctx, k8sClientset)
-			firstPod := BuildMockUserPod(exporterPort, testConfig, firstPodName, testNamespace, singleNumOfSpyre, targetNodeName)
-			secondPod := BuildMockUserPod(exporterPort, testConfig, secondPodName, testNamespace, singleNumOfSpyre, targetNodeName)
+			firstPod := BuildMockUserPod(exporterPort, testConfig, firstPodName, OperatorNamespace, singleNumOfSpyre, targetNodeName)
+			secondPod := BuildMockUserPod(exporterPort, testConfig, secondPodName, OperatorNamespace, singleNumOfSpyre, targetNodeName)
 			By("creating and validating first pod's metrics")
 			_, err := k8sClientset.CoreV1().Pods(firstPod.Namespace).Create(ctx, firstPod, metav1.CreateOptions{})
 			Expect(err).To(BeNil())
