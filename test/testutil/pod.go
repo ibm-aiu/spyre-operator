@@ -279,7 +279,7 @@ func BuildMockUserPod(exporterPort int, testConfig TestConfig, name, namespace s
 		Privileged: &True,
 	}
 	pod.Spec.Containers[0].Image = testConfig.ExporterMockUser.GetImage()
-	pod.Spec.Containers[0].ImagePullPolicy = corev1.PullAlways
+	pod.Spec.Containers[0].ImagePullPolicy = corev1.PullPolicy(testConfig.ExporterMockUser.ImagePullPolicy)
 	pod.Spec.DNSPolicy = corev1.DNSClusterFirst
 	return pod
 }
