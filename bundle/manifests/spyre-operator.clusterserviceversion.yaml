@@ -69,7 +69,7 @@ metadata:
     capabilities: Basic Install
     categories: AI/Machine Learning
     containerImage: docker.io/spyre-operator/spyre-operator:1.4.0
-    createdAt: "2026-09-04T02:46:37Z"
+    createdAt: "2026-09-09T02:10:13Z"
     description: Operator for IBM Spyre devices
     features.operators.openshift.io/disconnected: "false"
     features.operators.openshift.io/fips-compliant: "false"
@@ -116,6 +116,38 @@ spec:
         path: cardManagement.env
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text
+      - description: 'Optional: List of arguments'
+        displayName: Arguments
+        path: cardManagement.healthApi.args
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text
+      - description: |-
+          Enabled indicates if the health-check API sidecar container is added to the
+          Spyre Card Management DaemonSet Pod.
+        displayName: Enable Card Management Health API sidecar
+        path: cardManagement.healthApi.enabled
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+      - description: 'Optional: List of environment variables'
+        displayName: Environment Variables
+        path: cardManagement.healthApi.env
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text
+      - description: Image pull policy
+        displayName: Image Pull Policy
+        path: cardManagement.healthApi.imagePullPolicy
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:imagePullPolicy
+      - description: Image pull secrets
+        displayName: Image pull secrets
+        path: cardManagement.healthApi.imagePullSecrets
+        x-descriptors:
+        - urn:alm:descriptor:io.kubernetes:Secret
+      - description: 'Optional: Define resources requests and limits for each pod'
+        displayName: Resource Requirements
+        path: cardManagement.healthApi.resources
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:resourceRequirements
       - description: Image pull policy
         displayName: Image Pull Policy
         path: cardManagement.imagePullPolicy

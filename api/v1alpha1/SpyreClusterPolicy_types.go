@@ -204,6 +204,25 @@ type CardManagementSpec struct {
 	// CardManagementConfig defines values to set for cardmanagement config (spyrecardmgmg.ini).
 	// +kubebuilder:default={}
 	Config *CardManagementConfig `json:"config,omitempty"`
+
+	// HealthApi defines an optional sidecar container that exposes a gRPC health-check API
+	// alongside the card management worker container, reachable via a UNIX domain socket
+	// shared through a hostPath volume (mirrors HealthChecker's SPYRE_HEALTH_SOCK pattern).
+	// +kubebuilder:validation:Optional
+	HealthApi *HealthApiSpec `json:"healthApi,omitempty"`
+}
+
+// HealthApiSpec defines the properties for the aiu-cardmgmt-health-api sidecar container,
+// which exposes a gRPC health-check API in front of the card-management worker's RPyC interface.
+type HealthApiSpec struct {
+	// Enabled indicates if the health-check API sidecar container is added to the
+	// Spyre Card Management DaemonSet Pod.
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Enable Card Management Health API sidecar",xDescriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	// +kubebuilder:default=false
+	Enabled bool `json:"enabled,omitempty"`
+
+	// DeploymentConfig defines embedded common fields
+	DeploymentConfig `json:",inline"`
 }
 
 // CardManagementConfig defines configurable values for card management component.
