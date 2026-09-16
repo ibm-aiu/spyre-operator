@@ -89,6 +89,13 @@ const (
 	CardManagementConfigName = "spyre-cardmgmt-config"
 	CardManagementConfigFile = "aiucardmgmt.ini"
 
+	// constants regarding the card management health-check API sidecar
+	CardManagementHealthApiContainerName     = "health-api"
+	CardManagementHealthApiInitContainerName = "open-socket-dir"
+	CardManagementHealthApiSocketVolumeName  = "health-check-api-socket"
+	CardManagementHealthApiSocketHostPath    = "/usr/local/etc/spyre-cardmgmt"
+	CardManagementHealthApiSocketMountPath   = "/var/run/cardmgmt-health-check-api"
+
 	// config paths
 	DefaultSenlibConfigFilename = "senlib_config.json"
 
