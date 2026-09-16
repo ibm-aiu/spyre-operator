@@ -626,26 +626,35 @@ var _ = Describe("integration test", Label("integration"), Ordered, ContinueOnFa
 			if !clusterPolicy.Spec.HealthChecker.Enabled {
 				Skip("Skip test due to health checker is disabled")
 			}
+			// EnabledReporters defaults to "lspci,cardmgmt" so the cardmgmt reporter
+			// is active in any standard deployment — no cluster policy changes needed.
 
-			By("enabling cardmgmt reporter on the health checker")
-			clusterPolicy.Spec.HealthChecker.EnabledReporters = "lspci,cardmgmt"
-			testutils.UpdateClusterPolicy(ctx, spyreV2Client, k8sClientset, clusterPolicy, len(nodeNames), spyrev1alpha1.Ready)
+			// In pseudo device mode deploy the mock aiu-cardmgmt-health-api sidecar.
+			// It binds to the same hostPath the health-checker already mounts
+			// (/var/run/cardmgmt-health-check-api) so the cardmgmt reporter can
+			// reach it without any reconfiguration of the health-checker DaemonSet.
+			if itConfig.PseudoDeviceMode {
+				testutils.DeployMockCardmgmtSidecar(ctx, k8sClientset,
+					testutils.OperatorNamespace, itConfig.CardManagement.GetImage())
+			}
 		})
 
 		AfterAll(func() {
-			By("restoring health checker reporter config")
-			clusterPolicy := &spyrev1alpha1.SpyreClusterPolicy{}
-			err := spyreV2Client.Get(ctx, client.ObjectKey{Namespace: metav1.NamespaceAll, Name: testutils.ClusterPolicyName}, clusterPolicy, &client.GetOptions{})
-			Expect(err).To(BeNil())
-			clusterPolicy.Spec.HealthChecker.EnabledReporters = ""
-			testutils.UpdateClusterPolicy(ctx, spyreV2Client, k8sClientset, clusterPolicy, len(nodeNames), spyrev1alpha1.Ready)
+			if itConfig.PseudoDeviceMode {
+				testutils.TeardownMockCardmgmtSidecar(ctx, k8sClientset, testutils.OperatorNamespace)
+			}
 		})
 
 		BeforeEach(func() {
 			renewSpyreAppsNamespace(ctx)
 		})
 
+		// Skipped in pseudo device mode because PseudoReporter always marks
+		// 0000:41:00.0 as IN_ERROR, so UnhealthyDevices is never empty.
 		It("All devices must be reported as healthy", func() {
+			if itConfig.PseudoDeviceMode {
+				Skip("pseudo device mode always has an unhealthy card (0000:41:00.0) — skipping all-healthy check")
+			}
 			Eventually(func(g Gomega) {
 				spyreNodeStateList := &spyrev1alpha1.SpyreNodeStateList{}
 				err := spyreV2Client.List(ctx, spyreNodeStateList)
@@ -670,13 +679,6 @@ var _ = Describe("integration test", Label("integration"), Ordered, ContinueOnFa
 		//
 		// This test uses the lspci reporter (always active) so it runs against any
 		// cluster without requiring a mock sidecar.
-		//
-		// TODO: once the aiu-cardmgmt-health-api sidecar gains a mock/test mode, add
-		// a companion test here that:
-		//   1. enables --enabled-reporters=cardmgmt on the health-checker DaemonSet,
-		//   2. instructs the mock sidecar to return "unhealthy" for a specific PCI slot,
-		//   3. asserts that slot appears in SpyreNodeState.Status.UnhealthyDevices, and
-		//   4. confirms that slot cannot be allocated by a workload pod.
 		It("health checker data flows into SpyreNodeState interface health fields", func() {
 			Eventually(func(g Gomega) {
 				spyreNodeStateList := &spyrev1alpha1.SpyreNodeStateList{}
@@ -727,10 +729,6 @@ var _ = Describe("integration test", Label("integration"), Ordered, ContinueOnFa
 		// Verifies that the health-checker Prometheus metrics endpoint exports
 		// per-device state data carrying real PCI addresses, confirming the metrics
 		// pipeline from health-checker to any scraping component is functional.
-		//
-		// TODO: once the aiu-cardmgmt-health-api sidecar gains a mock/test mode,
-		// extend this to verify that a cardmgmt-reporter-sourced unhealthy state
-		// appears as spyre_device_state{state="in_error",...} in the metrics output.
 		It("health checker metrics endpoint exports per-device state with PCI addresses", func() {
 			body := testutils.FetchHealthCheckerMetrics(ctx, k8sClientset)
 
@@ -744,6 +742,89 @@ var _ = Describe("integration test", Label("integration"), Ordered, ContinueOnFa
 			Expect(body).To(MatchRegexp(`spyre_device_state\{[^}]*pci_address="[0-9a-fA-F:.]+"`),
 				"expected at least one spyre_device_state entry with a pci_address label — "+
 					"health checker device data is not reaching the metrics endpoint")
+		})
+		// Verifies the full cardmgmt reporter pipeline in pseudo device mode:
+		//   mock sidecar (PSEUDO_DEVICE_MODE=1) → CardmgmtReporter → Merge() →
+		//   operator reconcile → SpyreNodeState.Status.UnhealthyDevices
+		//
+		// PSEUDO_DEVICE_MODE always reports "unhealthy" for PCI slots starting with
+		// "0000:41".  The PseudoReporter in the health-checker synthesises exactly
+		// that address, so it appears in SpyreInterfaces and the cardmgmt reporter
+		// marks it unhealthy.  The device plugin must then refuse to allocate it.
+		It("cardmgmt reporter: unhealthy slot appears in SpyreNodeState and blocks pod scheduling", func() {
+			if !itConfig.PseudoDeviceMode {
+				Skip("requires pseudo device mode — mock cardmgmt sidecar only deployed in that mode")
+			}
+
+			By("waiting for " + testutils.PseudoUnhealthyPCISlot + " to appear in SpyreNodeState.Status.UnhealthyDevices")
+			var targetNode string
+			Eventually(func(g Gomega) {
+				spyreNodeStateList := &spyrev1alpha1.SpyreNodeStateList{}
+				g.Expect(spyreV2Client.List(ctx, spyreNodeStateList)).To(BeNil())
+				for _, sns := range spyreNodeStateList.Items {
+					for _, ud := range sns.Status.UnhealthyDevices {
+						if ud.ID == testutils.PseudoUnhealthyPCISlot {
+							targetNode = sns.Spec.NodeName
+							return
+						}
+					}
+				}
+				g.Expect(targetNode).NotTo(BeEmpty(),
+					"expected %s in SpyreNodeState.Status.UnhealthyDevices on at least one node",
+					testutils.PseudoUnhealthyPCISlot)
+			}).WithTimeout(90 * time.Second).WithPolling(5 * time.Second).Should(Succeed())
+
+			By("confirming SpyreInterface.Health is set to unhealthy")
+			sns, err := testutils.GetSpyreNodeState(ctx, spyreV2Client, targetNode)
+			Expect(err).To(BeNil())
+			foundUnhealthy := false
+			for _, iface := range sns.Spec.SpyreInterfaces {
+				if iface.PciAddress == testutils.PseudoUnhealthyPCISlot {
+					Expect(iface.Health).To(Equal(spyrev1alpha1.SpyreUnhealthy),
+						"interface %s should be marked unhealthy in SpyreInterfaces", testutils.PseudoUnhealthyPCISlot)
+					foundUnhealthy = true
+				}
+			}
+			Expect(foundUnhealthy).To(BeTrue(),
+				"interface %s not found in SpyreInterfaces for node %s", testutils.PseudoUnhealthyPCISlot, targetNode)
+
+			By("verifying a pod requesting the unhealthy device stays Pending")
+			// SafePciAddress replaces ':' with '_' but preserves '.', so
+			// 0000:41:00.0 → ibm.com/spyre_pf_0000_41_00.0
+			resourceName := "ibm.com/spyre_pf_0000_41_00.0"
+			probePod := testutils.BuildPod("cardmgmt-unhealthy-probe", "spyre-apps", resourceName, 1, targetNode, true)
+			_, err = k8sClientset.CoreV1().Pods("spyre-apps").Create(ctx, probePod, metav1.CreateOptions{})
+			Expect(err).To(BeNil())
+			defer testutils.DeletePod(ctx, k8sClientset, probePod)
+			Eventually(func(g Gomega) {
+				p, err := k8sClientset.CoreV1().Pods("spyre-apps").Get(ctx, probePod.Name, metav1.GetOptions{})
+				g.Expect(err).To(BeNil())
+				g.Expect(p.Status.Phase).To(Equal(corev1.PodPending),
+					"pod requesting unhealthy device %s should remain Pending", testutils.PseudoUnhealthyPCISlot)
+			}).WithTimeout(2 * time.Minute).WithPolling(5 * time.Second).Should(Succeed())
+		})
+
+		// Verifies that the cardmgmt reporter's unhealthy verdict reaches the
+		// Prometheus metrics endpoint as a spyre_device_state{state="in_error"}
+		// entry, confirming the full reporting pipeline in pseudo device mode.
+		It("health checker metrics show in_error state for cardmgmt-reported unhealthy slot", func() {
+			if !itConfig.PseudoDeviceMode {
+				Skip("requires pseudo device mode — mock cardmgmt sidecar only deployed in that mode")
+			}
+
+			By("waiting for spyre_device_state{pci_address=\"0000:41:00.0\",state=\"in_error\"} in /metrics")
+			// Allow multiple polling attempts: the health-checker runs on a periodic
+			// timer (default 1h, overridden to a short interval in test config) so
+			// the first scrape after the mock sidecar becomes ready may not yet have
+			// fired.  FetchHealthCheckerMetrics spawns a one-shot curl pod each call.
+			Eventually(func(g Gomega) {
+				body := testutils.FetchHealthCheckerMetrics(ctx, k8sClientset)
+				g.Expect(body).To(MatchRegexp(
+					`spyre_device_state\{[^}]*pci_address="0000:41:00\.0"[^}]*state="in_error"[^}]*\}\s+1`,
+				), "expected spyre_device_state in_error entry for %s — "+
+					"cardmgmt reporter result has not yet reached the metrics endpoint",
+					testutils.PseudoUnhealthyPCISlot)
+			}).WithTimeout(3 * time.Minute).WithPolling(15 * time.Second).Should(Succeed())
 		})
 	})
 

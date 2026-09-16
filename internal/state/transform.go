@@ -179,13 +179,15 @@ func TransformHealthChecker(obj *appsv1.DaemonSet, config *spyrev1alpha1.SpyreCl
 	// update env from experimental modes
 	applyExperimentalModes(&(obj.Spec.Template.Spec.Containers[0]), config.ExperimentalMode)
 
-	// Inject --enabled-reporters when set in the cluster policy.
-	// The flag is idempotent: if already present in the manifest args it is not
-	// duplicated — we replace the existing entry so reconciliation is safe.
-	if config.HealthChecker.EnabledReporters != "" {
-		setOrReplaceArg(&obj.Spec.Template.Spec.Containers[0],
-			"--enabled-reporters", config.HealthChecker.EnabledReporters)
+	// Inject --enabled-reporters from the cluster policy.
+	// EnabledReporters defaults to "lspci,cardmgmt" via the API server default,
+	// so the cardmgmt reporter is active in every fresh deployment. The fallback
+	// to "lspci" only applies to pre-existing objects that predate the field.
+	reporters := config.HealthChecker.EnabledReporters
+	if reporters == "" {
+		reporters = "lspci"
 	}
+	setOrReplaceArg(&obj.Spec.Template.Spec.Containers[0], "--enabled-reporters", reporters)
 
 	// apply common deploy config
 	if err := applyDeployConfig(&obj.Spec.Template, &config.HealthChecker.DeploymentConfig); err != nil {
