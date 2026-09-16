@@ -6,10 +6,10 @@
 apiVersion: resource.k8s.io/v1
 kind: DeviceClass
 metadata:
-  name: spyre-pf
+  name: spyre-privileged-vf
 spec:
   selectors:
   - cel:
       expression: >
         device.driver == 'spyre.ibm.com' && device.attributes["spyre.ibm.com"].pciFunctionIndex
-        == 0 && device.attributes["spyre.ibm.com"].vfEnabled == true
+        == 1
