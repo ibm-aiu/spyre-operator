@@ -626,7 +626,21 @@ var _ = Describe("integration test", Label("integration"), Ordered, ContinueOnFa
 			if !clusterPolicy.Spec.HealthChecker.Enabled {
 				Skip("Skip test due to health checker is disabled")
 			}
+
+			By("enabling cardmgmt reporter on the health checker")
+			clusterPolicy.Spec.HealthChecker.EnabledReporters = "lspci,cardmgmt"
+			testutils.UpdateClusterPolicy(ctx, spyreV2Client, k8sClientset, clusterPolicy, len(nodeNames), spyrev1alpha1.Ready)
 		})
+
+		AfterAll(func() {
+			By("restoring health checker reporter config")
+			clusterPolicy := &spyrev1alpha1.SpyreClusterPolicy{}
+			err := spyreV2Client.Get(ctx, client.ObjectKey{Namespace: metav1.NamespaceAll, Name: testutils.ClusterPolicyName}, clusterPolicy, &client.GetOptions{})
+			Expect(err).To(BeNil())
+			clusterPolicy.Spec.HealthChecker.EnabledReporters = ""
+			testutils.UpdateClusterPolicy(ctx, spyreV2Client, k8sClientset, clusterPolicy, len(nodeNames), spyrev1alpha1.Ready)
+		})
+
 		BeforeEach(func() {
 			renewSpyreAppsNamespace(ctx)
 		})
@@ -648,6 +662,88 @@ var _ = Describe("integration test", Label("integration"), Ordered, ContinueOnFa
 					}
 				}
 			}).WithTimeout(30 * time.Second).WithPolling(5 * time.Second).Should(Succeed())
+		})
+
+		// Verifies that health-checker data reaches SpyreNodeState: the DeviceHealthy
+		// condition must be set and every interface reported by the device plugin must
+		// carry a non-empty health value written by the health checker.
+		//
+		// This test uses the lspci reporter (always active) so it runs against any
+		// cluster without requiring a mock sidecar.
+		//
+		// TODO: once the aiu-cardmgmt-health-api sidecar gains a mock/test mode, add
+		// a companion test here that:
+		//   1. enables --enabled-reporters=cardmgmt on the health-checker DaemonSet,
+		//   2. instructs the mock sidecar to return "unhealthy" for a specific PCI slot,
+		//   3. asserts that slot appears in SpyreNodeState.Status.UnhealthyDevices, and
+		//   4. confirms that slot cannot be allocated by a workload pod.
+		It("health checker data flows into SpyreNodeState interface health fields", func() {
+			Eventually(func(g Gomega) {
+				spyreNodeStateList := &spyrev1alpha1.SpyreNodeStateList{}
+				err := spyreV2Client.List(ctx, spyreNodeStateList)
+				g.Expect(err).To(BeNil())
+				g.Expect(len(spyreNodeStateList.Items)).To(BeNumerically(">", 0))
+
+				// At least one node must have devices and show health data from the
+				// health checker — this is the key cross-component data-flow assertion.
+				foundHealthData := false
+				for _, spyrens := range spyreNodeStateList.Items {
+					if len(spyrens.Spec.SpyreInterfaces) == 0 && len(spyrens.Spec.SpyreSSAInterfaces) == 0 {
+						continue
+					}
+
+					// The DeviceHealthy condition must be present.
+					conditionTypes := make([]string, 0, len(spyrens.Status.Conditions))
+					for _, c := range spyrens.Status.Conditions {
+						conditionTypes = append(conditionTypes, c.Type)
+					}
+					g.Expect(conditionTypes).To(ContainElement("DeviceHealthy"),
+						"SpyreNodeState %q: DeviceHealthy condition missing (got %v) — "+
+							"health checker data did not reach SpyreNodeState",
+						spyrens.Name, conditionTypes)
+
+					// Every PF interface must have a health value set by the health checker.
+					for _, iface := range spyrens.Spec.SpyreInterfaces {
+						g.Expect(string(iface.Health)).NotTo(BeEmpty(),
+							"SpyreNodeState %q: interface %s has no health value — "+
+								"health checker data did not flow through to SpyreInterfaces",
+							spyrens.Name, iface.PciAddress)
+					}
+					// Same check for SSA (s390x isolated VF) interfaces.
+					for _, iface := range spyrens.Spec.SpyreSSAInterfaces {
+						g.Expect(string(iface.Health)).NotTo(BeEmpty(),
+							"SpyreNodeState %q: SSA interface %s has no health value — "+
+								"health checker data did not flow through to SpyreSSAInterfaces",
+							spyrens.Name, iface.PciAddress)
+					}
+
+					foundHealthData = true
+				}
+				g.Expect(foundHealthData).To(BeTrue(),
+					"no SpyreNodeState with devices found — cannot verify health checker data flow")
+			}).WithTimeout(60 * time.Second).WithPolling(5 * time.Second).Should(Succeed())
+		})
+
+		// Verifies that the health-checker Prometheus metrics endpoint exports
+		// per-device state data carrying real PCI addresses, confirming the metrics
+		// pipeline from health-checker to any scraping component is functional.
+		//
+		// TODO: once the aiu-cardmgmt-health-api sidecar gains a mock/test mode,
+		// extend this to verify that a cardmgmt-reporter-sourced unhealthy state
+		// appears as spyre_device_state{state="in_error",...} in the metrics output.
+		It("health checker metrics endpoint exports per-device state with PCI addresses", func() {
+			body := testutils.FetchHealthCheckerMetrics(ctx, k8sClientset)
+
+			By("checking spyre_device_state metric is present")
+			Expect(body).To(ContainSubstring("spyre_device_state"),
+				"expected health-checker /metrics to contain spyre_device_state entries")
+
+			By("checking at least one entry carries a pci_address label")
+			// Each entry is of the form:
+			//   spyre_device_state{pci_address="0000:xx:xx.x",...} <value>
+			Expect(body).To(MatchRegexp(`spyre_device_state\{[^}]*pci_address="[0-9a-fA-F:.]+"`),
+				"expected at least one spyre_device_state entry with a pci_address label — "+
+					"health checker device data is not reaching the metrics endpoint")
 		})
 	})
 

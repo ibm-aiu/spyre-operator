@@ -57,6 +57,9 @@ spec:
         - name: spyre-cert
           mountPath: /etc/spyre-health-checker/certs
           readOnly: true
+        - name: cardmgmt-health-api-socket
+          mountPath: /var/run/cardmgmt-health-check-api
+          readOnly: true
         resources:
           requests:
             cpu: 100m
@@ -114,3 +117,7 @@ spec:
       - name: spyre-cert
         secret:
           secretName: spyre-cert
+      - name: cardmgmt-health-api-socket
+        hostPath:
+          path: /var/run/cardmgmt-health-check-api
+          type: DirectoryOrCreate

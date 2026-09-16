@@ -1412,6 +1412,12 @@ spec:
                     description: Enabled indicates if deployment of Spyre Health Checker
                       through operator is enabled
                     type: boolean
+                  enabledReporters:
+                    description: |-
+                      EnabledReporters is a comma-separated list of reporter names to pass to the
+                      health-checker via --enabled-reporters. Supported values: "lspci", "cardmgmt".
+                      Defaults to "lspci" when empty (the health-checker binary's own default).
+                    type: string
                   env:
                     description: 'Optional: List of environment variables'
                     items:

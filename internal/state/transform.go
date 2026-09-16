@@ -179,11 +179,40 @@ func TransformHealthChecker(obj *appsv1.DaemonSet, config *spyrev1alpha1.SpyreCl
 	// update env from experimental modes
 	applyExperimentalModes(&(obj.Spec.Template.Spec.Containers[0]), config.ExperimentalMode)
 
+	// Inject --enabled-reporters when set in the cluster policy.
+	// The flag is idempotent: if already present in the manifest args it is not
+	// duplicated — we replace the existing entry so reconciliation is safe.
+	if config.HealthChecker.EnabledReporters != "" {
+		setOrReplaceArg(&obj.Spec.Template.Spec.Containers[0],
+			"--enabled-reporters", config.HealthChecker.EnabledReporters)
+	}
+
 	// apply common deploy config
 	if err := applyDeployConfig(&obj.Spec.Template, &config.HealthChecker.DeploymentConfig); err != nil {
 		return fmt.Errorf("failed to apply config: %w", err)
 	}
 	return nil
+}
+
+// setOrReplaceArg sets a flag of the form "--name=value" on the container.
+// If an existing "--name=..." or two-element "--name" "value" pair is found it
+// is replaced in-place so reconciliation is idempotent; otherwise the
+// "--name" "value" pair is appended.
+func setOrReplaceArg(container *corev1.Container, name, value string) {
+	prefix := name + "="
+	for i, arg := range container.Args {
+		// "--name=value" form
+		if strings.HasPrefix(arg, prefix) {
+			container.Args[i] = prefix + value
+			return
+		}
+		// "--name" "value" two-element form
+		if arg == name && i+1 < len(container.Args) {
+			container.Args[i+1] = value
+			return
+		}
+	}
+	container.Args = append(container.Args, name, value)
 }
 
 // addHwHostPathVolume adds host path volumes to the pod spec based on the node architecture.
