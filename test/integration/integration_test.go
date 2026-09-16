@@ -657,8 +657,8 @@ var _ = Describe("integration test", Label("integration"), Ordered, ContinueOnFa
 			if !itConfig.SmallToy.Enabled {
 				Skip("Skip test since small toy workload is disabled")
 			}
-			if ppc64le {
-				Skip("tests skipped since cluster is ppc64le")
+			if !amd64arch {
+				Skip("tests skipped since cluster is not amd64arch")
 			}
 			if !itConfig.HasDevice {
 				Skip("Skip test since no real Spyre device: the aiu backend cannot run on a pseudo device")
