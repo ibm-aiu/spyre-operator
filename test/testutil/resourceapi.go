@@ -33,6 +33,10 @@ const (
 	numaAttribute = "spyre.ibm.com/numaInfo"
 	PfProductId   = "06a7"
 	VfProductId   = "06a8"
+
+	pfDeviceClassName           = "spyre-pf"
+	vfDeviceClassName           = "spyre-standard-vf"
+	vfPrivilegedDeviceClassName = "spyre-privileged-vf"
 )
 
 const ResourceClaimTemplate = `
@@ -47,7 +51,7 @@ spec:
       requests:
       - name: spyre
         exactly:
-          deviceClassName: spyre.ibm.com
+          deviceClassName: {{ .DeviceClassName }}
           {{- if gt .Count 0 }}
           count: {{ .Count }}
           {{- end}}
@@ -82,12 +86,13 @@ spec:
 // pciAddress and productId cannot be applied at the same time.
 // If both specified, pciAddress will be used.
 type ResourceClaimTemplateData struct {
-	Name           string
-	Namespace      string
-	Count          int
-	PCIAddress     string
-	ProductId      string
-	MatchAttribute string
+	Name            string
+	Namespace       string
+	Count           int
+	PCIAddress      string
+	ProductId       string
+	MatchAttribute  string
+	DeviceClassName string
 }
 
 // BasicResourceClaimTemplateData init data
@@ -114,6 +119,21 @@ func (c *ResourceClaimTemplateData) SetPCIAddressSelector(pciAddress string) *Re
 func (c *ResourceClaimTemplateData) SetProductId(productId string) *ResourceClaimTemplateData {
 	c.ProductId = productId
 	return c
+}
+
+// DeviceClassNameForDevice returns the DeviceClass name (spyre-pf,
+// spyre-privileged-vf, or spyre-standard-vf) matching the given productId
+// and pciFunctionIndex. pciFunctionIndex is only consulted for VF devices,
+// since privileged VFs (pciFunctionIndex == 1) require spyre-privileged-vf
+// rather than spyre-standard-vf.
+func DeviceClassNameForDevice(productId string, pciFunctionIndex int64) string {
+	if productId != VfProductId {
+		return pfDeviceClassName
+	}
+	if pciFunctionIndex == 1 {
+		return vfPrivilegedDeviceClassName
+	}
+	return vfDeviceClassName
 }
 
 // SetMatchAttribute sets an attribute to match in constraints

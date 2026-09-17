@@ -835,6 +835,7 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 		testPodName := "test-pod-with-claim"
 		var productId string
 		var pciAddress string
+		var pciFunctionIndex int64
 		numaMap := map[string]string{}
 		var originalSpec spyrev1alpha1.SpyreClusterPolicySpec
 
@@ -868,6 +869,7 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 					Expect(len(rsi.Spec.Devices)).To(BeNumerically(">", 1))
 					productId = *rsi.Spec.Devices[0].Attributes["productId"].StringValue
 					pciAddress = *rsi.Spec.Devices[0].Attributes["pciAddress"].StringValue
+					pciFunctionIndex = *rsi.Spec.Devices[0].Attributes["pciFunctionIndex"].IntValue
 					for _, d := range rsi.Spec.Devices {
 						addr := *d.Attributes["pciAddress"].StringValue
 						numaMap[addr] = *rsi.Spec.Devices[0].Attributes["numaInfo"].StringValue
@@ -922,6 +924,9 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 				ProductId: func() string {
 					return productId
 				}(),
+				DeviceClassName: func() string {
+					return DeviceClassNameForDevice(productId, pciFunctionIndex)
+				}(),
 			}),
 			Entry("specific device", ResourceClaimTemplateData{
 				Name:      testClaimName,
@@ -930,6 +935,9 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 				PCIAddress: func() string {
 					return pciAddress
 				}(),
+				DeviceClassName: func() string {
+					return DeviceClassNameForDevice(productId, pciFunctionIndex)
+				}(),
 			}),
 			Entry("numa-aware devices", ResourceClaimTemplateData{
 				Name:      testClaimName,
@@ -937,6 +945,9 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 				Count:     2,
 				ProductId: func() string {
 					return productId
+				}(),
+				DeviceClassName: func() string {
+					return DeviceClassNameForDevice(productId, pciFunctionIndex)
 				}(),
 				MatchAttribute: "spyre.ibm.com/numaInfo",
 			}),
