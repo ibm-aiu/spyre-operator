@@ -6,10 +6,9 @@
 apiVersion: resource.k8s.io/v1
 kind: DeviceClass
 metadata:
-  name: spyre-pf
+  name: spyre.ibm.com
+  namespace: "FILLED BY THE OPERATOR"
 spec:
   selectors:
   - cel:
-      expression: >
-        device.driver == 'spyre.ibm.com' && device.attributes["spyre.ibm.com"].pciFunctionIndex
-        == 0 && device.attributes["spyre.ibm.com"].vfEnabled == true
+      expression: "device.driver == 'spyre.ibm.com'"
