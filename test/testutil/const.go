@@ -49,4 +49,25 @@ const (
 	containerTestImage                = "registry.access.redhat.com/ubi9-minimal:9.4"
 	Ubi9MicroTestImage                = "registry.access.redhat.com/ubi9/ubi-micro:latest"
 	schedForcePullPodLabel            = "ibm-spyre-force-image-puller"
+
+	// MockCardmgmtSidecarName is the name used for the mock aiu-cardmgmt-health-api
+	// DaemonSet, ServiceAccount, and RBAC objects deployed during pseudo-device tests.
+	MockCardmgmtSidecarName = "aiu-cardmgmt-health-check-api-mock"
+
+	// MockCardmgmtSidecarLabel is the pod label selector for the mock DaemonSet.
+	MockCardmgmtSidecarLabel = "app=aiu-cardmgmt-health-check-api-mock"
+
+	// PseudoUnhealthyPCISlot is the PCI address that PSEUDO_DEVICE_MODE always
+	// reports as "unhealthy".  It must match PSEUDO_UNHEALTHY_PCI_SLOT_PREFIX
+	// ("0000:41") in aiu-cardmgmt-health-api/src/grpc_service.py.
+	PseudoUnhealthyPCISlot = "0000:41:00.0"
+
+	// mockCardmgmtHostPath is the hostPath the mock sidecar writes its UNIX
+	// socket into.  It must match the cardmgmt-health-api-socket volume in
+	// assets/state-init/spyre-health-checker/0400_daemonset.yaml so that the
+	// health-checker pods on the same node can reach the socket.
+	mockCardmgmtHostPath = "/var/run/cardmgmt-health-check-api"
+
+	// mockCardmgmtSocketFile is the socket filename inside mockCardmgmtHostPath.
+	mockCardmgmtSocketFile = "health-check-api.sock"
 )

@@ -294,6 +294,13 @@ type HealthCheckerSpec struct {
 	// +kubebuilder:default=false
 	Enabled bool `json:"enabled,omitempty"`
 
+	// EnabledReporters is a comma-separated list of reporter names to pass to the
+	// health-checker via --enabled-reporters. Supported values: "lspci", "cardmgmt".
+	// Defaults to "lspci,cardmgmt". Set to "lspci" to disable the cardmgmt reporter.
+	// +kubebuilder:default="lspci,cardmgmt"
+	// +optional
+	EnabledReporters string `json:"enabledReporters,omitempty"`
+
 	// DeploymentConfig defines embedded common fields
 	DeploymentConfig `json:",inline"`
 }
