@@ -547,10 +547,13 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 		)
 
 		DescribeTable("check file preparation", func(resourceNameFunc func() string, expectedTopologyFile bool) {
+			resourceName := resourceNameFunc()
+			if !testConfig.DevicePluginInit.Enabled && strings.Contains(resourceName, "tier") {
+				Skip("Require Topology while init container is not provided")
+			}
 			if !testConfig.DevicePluginInit.Enabled {
 				expectedTopologyFile = false
 			}
-			resourceName := resourceNameFunc()
 			commonPaths := []string{
 				"/etc/aiu/senlib_config.json",
 				"/etc/aiu/resource_pool",
@@ -718,6 +721,9 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 		}
 
 		BeforeAll(func() {
+			if !testConfig.Exporter.Enabled {
+				Skip("Metric exporter test skipped: exporter.enabled is false in test config")
+			}
 			By("enabling metric exporter in the cluster policy")
 			clusterPolicy := &spyrev1alpha1.SpyreClusterPolicy{}
 			err := spyreV2Client.Get(ctx,
@@ -732,6 +738,7 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 		DescribeTable("Get metrics", func(podName string, numOfSpyre int64) {
 			exporterPort := GetExporterPort(ctx, k8sClientset)
 			p := BuildMockUserPod(exporterPort, testConfig, podName, OperatorNamespace, numOfSpyre, targetNodeName)
+			_ = k8sClientset.CoreV1().Pods(p.Namespace).Delete(ctx, podName, metav1.DeleteOptions{})
 			By("creating pod")
 			_, err := k8sClientset.CoreV1().Pods(p.Namespace).Create(ctx, p, metav1.CreateOptions{})
 			Expect(err).To(BeNil())
@@ -754,6 +761,8 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 			exporterPort := GetExporterPort(ctx, k8sClientset)
 			firstPod := BuildMockUserPod(exporterPort, testConfig, firstPodName, OperatorNamespace, singleNumOfSpyre, targetNodeName)
 			secondPod := BuildMockUserPod(exporterPort, testConfig, secondPodName, OperatorNamespace, singleNumOfSpyre, targetNodeName)
+			_ = k8sClientset.CoreV1().Pods(firstPod.Namespace).Delete(ctx, firstPodName, metav1.DeleteOptions{})
+			_ = k8sClientset.CoreV1().Pods(secondPod.Namespace).Delete(ctx, secondPodName, metav1.DeleteOptions{})
 			By("creating and validating first pod's metrics")
 			_, err := k8sClientset.CoreV1().Pods(firstPod.Namespace).Create(ctx, firstPod, metav1.CreateOptions{})
 			Expect(err).To(BeNil())
@@ -1206,6 +1215,15 @@ func getNumDevices() int {
 }
 
 func getDeviceList(ctx context.Context) (deviceList []string) {
+	if !testConfig.DevicePluginInit.Enabled || nodeArchitecture == "s390x" {
+		spyrens, err := GetSpyreNodeState(ctx, spyreV2Client, targetNodeName)
+		Expect(err).To(BeNil())
+		for _, iface := range spyrens.Spec.SpyreInterfaces {
+			deviceList = append(deviceList, iface.PciAddress)
+		}
+		Expect(len(deviceList)).To(BeNumerically(">=", 2))
+		return deviceList
+	}
 	pcitopoMap, err := getPciTopoFromSpyreNodeState(ctx)
 	Expect(err).To(BeNil())
 	devices, ok := pcitopoMap["devices"]

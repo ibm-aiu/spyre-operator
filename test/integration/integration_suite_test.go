@@ -93,6 +93,13 @@ var _ = BeforeSuite(func() {
 	nodeNames = testutil.GetWorkerNodeNames(ctx, k8sClientset)
 	Expect(len(nodeNames)).Should(BeNumerically(">=", 1))
 
+	isS390x, err := testutil.IsS390xArch(ctx, k8sClientset)
+	Expect(err).To(BeNil())
+	if isS390x {
+		By("disabling devicePluginInit on s390x (topology and initContainer not needed for Z)")
+		itConfig.DevicePluginInit.Enabled = false
+	}
+
 	By("uninstalling the operator if already installed")
 	testutil.UninstallOperator(ctx, k8sClientset, dynClient, spyreV2Client, itConfig.HasDevice, nodeNames)
 
