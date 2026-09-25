@@ -110,6 +110,14 @@ var _ = BeforeSuite(func() {
 	setMsg := fmt.Sprintf("setting target node = %s (%s)", targetNodeName, nodeArchitecture)
 	By(setMsg)
 
+	// The device plugin init container is not used on s390x.
+	// Override the config so that .spec.devicePlugin.initContainer is omitted from the
+	// cluster policy and every test consistently treats it as absent.
+	if nodeArchitecture == "s390x" && testConfig.DevicePluginInit.Enabled {
+		By("omitting device plugin init container from cluster policy on s390x")
+		testConfig.DevicePluginInit.Enabled = false
+	}
+
 	By("uninstalling the operator if already installed")
 	testutil.UninstallOperator(ctx, k8sClientset, dynClient, spyreV2Client, testConfig.HasDevice, nodeNames)
 
