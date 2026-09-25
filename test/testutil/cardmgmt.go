@@ -91,6 +91,20 @@ func IsPpc64LeArch(ctx context.Context, k8sClientset *kubernetes.Clientset) (boo
 	return false, nil
 }
 
+func IsS390xArch(ctx context.Context, k8sClientset *kubernetes.Clientset) (bool, error) {
+	nodes, err := k8sClientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return false, fmt.Errorf("fail to list Nodes: %w", err)
+	}
+	for _, node := range nodes.Items {
+		arch := node.Status.NodeInfo.Architecture
+		if arch == "s390x" {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func EnabledCardmgmtForWorkers(ctx context.Context, clusterPolicy *spyrev2.SpyreClusterPolicy, spyreV2Client client.Client, k8sClientset *kubernetes.Clientset, nodeFilter string) {
 	nodeList, err := k8sClientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	Expect(err).To(BeNil())
