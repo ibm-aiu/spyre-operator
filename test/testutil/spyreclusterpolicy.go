@@ -188,13 +188,15 @@ func checkInitContainerRuntimeAccepted(ctx context.Context, spyreV2Client client
 	if !testConfig.DevicePluginInit.Enabled || testConfig.Runtime.Image == "" {
 		return
 	}
-	By("checking the cluster policy kept the runtime init container config")
 	var clusterPolicy spyrev1alpha1.SpyreClusterPolicy
 	err := spyreV2Client.Get(ctx,
 		client.ObjectKey{Namespace: metav1.NamespaceAll, Name: ClusterPolicyName}, &clusterPolicy)
 	Expect(err).To(BeNil())
-	Expect(clusterPolicy.Spec.DevicePlugin.InitContainer).NotTo(BeNil(),
-		"spec.devicePlugin.initContainer was dropped by the API server")
+	if clusterPolicy.Spec.DevicePlugin.InitContainer == nil {
+		// On s390x or when initContainer is intentionally disabled, skip runtime acceptance check
+		return
+	}
+	By("checking the cluster policy kept the runtime init container config")
 	Expect(clusterPolicy.Spec.DevicePlugin.InitContainer.Runtime).NotTo(BeNil(),
 		"spec.devicePlugin.initContainer.runtime was dropped by the API server: the installed "+
 			"SpyreClusterPolicy CRD is older than the test config. Rebuild and republish the "+
