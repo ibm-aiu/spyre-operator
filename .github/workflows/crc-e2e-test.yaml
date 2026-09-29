@@ -6,6 +6,8 @@
 name: CRC End to End Test
 
 on:
+  schedule:
+  - cron: '0 23 * * *' # 08:00 JST (UTC+9) daily
   workflow_dispatch:
     inputs:
       runner:
@@ -47,9 +49,9 @@ jobs:
   crc-e2e-test:
     uses: ibm-aiu/spyre-operator-actions/.github/workflows/crc-e2e-test.yaml@main
     with:
-      runner: ${{ inputs.runner }}
-      branch-name: ${{ inputs.branch-name }}
-      registry: ${{ inputs.registry }}
+      runner: ${{ inputs.runner || 'ubuntu-24.04' }}
+      branch-name: ${{ inputs.branch-name || 'main' }}
+      registry: ${{ inputs.registry || 'ghcr.io/ibm-aiu' }}
       pr-url: ${{ inputs.pr-url }}
       operator-version: ${{ inputs.operator-version }}
       operator-channel: ${{ inputs.operator-channel }}

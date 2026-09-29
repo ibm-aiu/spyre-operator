@@ -59,6 +59,33 @@ jobs:
           exit 1
         fi
 
+  check-e2e-label:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Check if source code affecting e2e changed
+      id: check-src
+      run: |
+        changed=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+        echo "Changed files:"
+        echo "$changed"
+        if echo "$changed" | grep -qE '^(api/|cmd/|internal/|hack/|bundle/|config/|test/|Makefile|go\.mod|go\.sum|\.github/workflows/(pr|crc-e2e-test)\.yaml)'; then
+          echo "src_changed=true" >> $GITHUB_OUTPUT
+        else
+          echo "src_changed=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Warn if ok-to-test label is missing
+      if: steps.check-src.outputs.src_changed == 'true' && !contains(github.event.pull_request.labels.*.name,
+        'ok-to-test')
+      run: |
+        echo "::error::Source code changes detected that may affect e2e tests, but the 'ok-to-test' label is missing. Please add the 'ok-to-test' label to trigger e2e tests, or confirm this change does not require e2e validation."
+        exit 1
+
   unit-test:
     needs: pre-commit
     uses: ibm-aiu/spyre-operator-actions/.github/workflows/unit-test.yaml@main
