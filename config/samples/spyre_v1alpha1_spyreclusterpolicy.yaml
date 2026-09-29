@@ -5,9 +5,6 @@
 #   This sample SpyreClusterPolicy contains some images built only for x86 architecture.
 #   To enable card management and metrics exporter, please make sure to update the image for your architecture.
 #
-#   .spec.devicePlugin.initContainer is currently available for x86 architecture.
-#   Please remove the initContainer section for unsupported architecture.
-#
 apiVersion: spyre.ibm.com/v1alpha1
 kind: SpyreClusterPolicy
 metadata:
@@ -24,7 +21,10 @@ metadata:
 
       Available modes: pseudoDevice, perDeviceAllocation, topologyAwareAllocation,
                        externalDeviceReservation, disableVirtualFunction
-      See CRD schema for detailed descriptions of each mode.
+      See the CRD schema for detailed descriptions of each mode.
+
+      For further customization options, refer to the documentation:
+      https://github.com/ibm-aiu/spyre-operator-docs/blob/main/admin-guide/cluster-policy-customization-guide.md
 spec:
   devicePlugin:
     repository: "docker.io/spyre-operator"
@@ -32,11 +32,6 @@ spec:
     version: 1.4.0-dev
     configPath: /etc/aiu
     configName: senlib_config.json
-    initContainer:
-      repository: "docker.io/spyre-operator"
-      image: "spyre-device-plugin-init"
-      version: 1.4.0-dev
-      executePolicy: IfNotPresent
   scheduler:
     repository: "docker.io/spyre-operator"
     image: "spyre-scheduler"

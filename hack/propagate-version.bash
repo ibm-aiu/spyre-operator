@@ -59,7 +59,6 @@ function propagate_version() {
 	${YQ} eval -i ".spec.devicePlugin.version=\"$(image_tag devicePlugin)\"" ${REPO_ROOT}/config/samples/spyre_v1alpha1_spyreclusterpolicy.yaml
 	${YQ} eval -i ".spec.devicePlugin.version=\"$(image_tag devicePlugin)\"" ${REPO_ROOT}/config/samples/spyre_v1alpha1_spyreclusterpolicy_minimum.yaml
 	${YQ} eval -i ".spec.devicePlugin.version=\"$(image_tag devicePlugin)\"" ${REPO_ROOT}/config/samples/spyre_v1alpha1_spyreclusterpolicy_skip_components.yaml
-	${YQ} eval -i ".spec.devicePlugin.initContainer.version=\"$(image_tag devicePluginInit)\"" ${REPO_ROOT}/config/samples/spyre_v1alpha1_spyreclusterpolicy.yaml
 	${YQ} eval -i ".spec.scheduler.version=\"$(image_tag scheduler)\"" ${REPO_ROOT}/config/samples/spyre_v1alpha1_spyreclusterpolicy.yaml
 	${YQ} eval -i ".spec.podValidator.version=\"$(image_tag podValidator)\"" ${REPO_ROOT}/config/samples/spyre_v1alpha1_spyreclusterpolicy.yaml
 	${YQ} eval -i ".spec.healthChecker.version=\"$(image_tag healthChecker)\"" ${REPO_ROOT}/config/samples/spyre_v1alpha1_spyreclusterpolicy.yaml

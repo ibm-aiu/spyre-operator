@@ -131,7 +131,6 @@ assert_eq "operator.version" \
 # Read component versions from the BOM (as updated by the script) for downstream assertions
 EXPORTER_VERSION="$("${YQ}" -r '.exporter.version' "${TMPDIR}/release-artifacts.yaml")"
 DEVICE_PLUGIN_VERSION="$("${YQ}" -r '.devicePlugin.version' "${TMPDIR}/release-artifacts.yaml")"
-DEVICE_PLUGIN_INIT_VERSION="$("${YQ}" -r '.devicePluginInit.version' "${TMPDIR}/release-artifacts.yaml")"
 SCHEDULER_VERSION="$("${YQ}" -r '.scheduler.version' "${TMPDIR}/release-artifacts.yaml")"
 POD_VALIDATOR_VERSION="$("${YQ}" -r '.podValidator.version' "${TMPDIR}/release-artifacts.yaml")"
 HEALTH_CHECKER_VERSION="$("${YQ}" -r '.healthChecker.version' "${TMPDIR}/release-artifacts.yaml")"
@@ -144,9 +143,6 @@ assert_eq "spec.metricsExporter.version" \
 assert_eq "spec.devicePlugin.version" \
 	"${DEVICE_PLUGIN_VERSION}" \
 	"$("${YQ}" -r '.spec.devicePlugin.version' "${TMPDIR}/config/samples/spyre_v1alpha1_spyreclusterpolicy.yaml")"
-assert_eq "spec.devicePlugin.initContainer.version" \
-	"${DEVICE_PLUGIN_INIT_VERSION}" \
-	"$("${YQ}" -r '.spec.devicePlugin.initContainer.version' "${TMPDIR}/config/samples/spyre_v1alpha1_spyreclusterpolicy.yaml")"
 assert_eq "spec.scheduler.version" \
 	"${SCHEDULER_VERSION}" \
 	"$("${YQ}" -r '.spec.scheduler.version' "${TMPDIR}/config/samples/spyre_v1alpha1_spyreclusterpolicy.yaml")"
@@ -189,9 +185,6 @@ assert_eq "mockUser.version" \
 assert_eq "devicePlugin.version" \
 	"${DEVICE_PLUGIN_VERSION}" \
 	"$("${YQ}" -r '.devicePlugin.version' "${TMPDIR}/test/config.yaml")"
-assert_eq "devicePluginInit.version" \
-	"${DEVICE_PLUGIN_INIT_VERSION}" \
-	"$("${YQ}" -r '.devicePluginInit.version' "${TMPDIR}/test/config.yaml")"
 assert_eq "scheduler.version" \
 	"${SCHEDULER_VERSION}" \
 	"$("${YQ}" -r '.scheduler.version' "${TMPDIR}/test/config.yaml")"
