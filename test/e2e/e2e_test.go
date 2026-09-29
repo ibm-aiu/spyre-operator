@@ -881,7 +881,7 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 					pciFunctionIndex = *rsi.Spec.Devices[0].Attributes["pciFunctionIndex"].IntValue
 					for _, d := range rsi.Spec.Devices {
 						addr := *d.Attributes["pciAddress"].StringValue
-						numaMap[addr] = *rsi.Spec.Devices[0].Attributes["numaInfo"].StringValue
+						numaMap[addr] = *d.Attributes["numaInfo"].StringValue
 					}
 					found = true
 					break
@@ -896,6 +896,11 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 				Namespace: testNamespace,
 			})
 			DeleteResourceClaimTemplate(ctx, k8sClientset, testClaimName, testNamespace)
+			By("waiting for all resource claims to be released")
+			Eventually(func(g Gomega) {
+				claims := ListResourceClaims(ctx, k8sClientset, testNamespace)
+				g.Expect(claims).To(BeEmpty())
+			}).WithTimeout(2 * time.Minute).WithPolling(5 * time.Second).Should(Succeed())
 		})
 
 		DescribeTable("single-pod allocation", func(templateData ResourceClaimTemplateData) {
