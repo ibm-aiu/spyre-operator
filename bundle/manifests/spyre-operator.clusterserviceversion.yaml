@@ -9,7 +9,7 @@ metadata:
           "kind": "SpyreClusterPolicy",
           "metadata": {
             "annotations": {
-              "note": "Optional: experimentalMode can be configured to enable specific experimental features.\nBy default, no experimental modes are enabled.\n\nTo enable experimental modes, add them under spec:\n  spec:\n    experimentalMode:\n    - perDeviceAllocation\n\nAvailable modes: pseudoDevice, perDeviceAllocation, topologyAwareAllocation,\n                 externalDeviceReservation, disableVirtualFunction\nSee CRD schema for detailed descriptions of each mode.\n"
+              "note": "Optional: experimentalMode can be configured to enable specific experimental features.\nBy default, no experimental modes are enabled.\n\nTo enable experimental modes, add them under spec:\n  spec:\n    experimentalMode:\n    - perDeviceAllocation\n\nAvailable modes: pseudoDevice, perDeviceAllocation, topologyAwareAllocation,\n                 externalDeviceReservation, disableVirtualFunction\nSee the CRD schema for detailed descriptions of each mode.\n\nFor further customization options, refer to the documentation:\nhttps://github.com/ibm-aiu/spyre-operator-docs/blob/main/admin-guide/cluster-policy-customization-guide.md\n"
             },
             "name": "spyreclusterpolicy"
           },
@@ -18,12 +18,6 @@ metadata:
               "configName": "senlib_config.json",
               "configPath": "/etc/aiu",
               "image": "spyre-device-plugin",
-              "initContainer": {
-                "executePolicy": "IfNotPresent",
-                "image": "spyre-device-plugin-init",
-                "repository": "docker.io/spyre-operator",
-                "version": "1.4.0-dev"
-              },
               "repository": "docker.io/spyre-operator",
               "version": "1.4.0-dev"
             },
@@ -69,7 +63,7 @@ metadata:
     capabilities: Basic Install
     categories: AI/Machine Learning
     containerImage: docker.io/spyre-operator/spyre-operator:1.4.0
-    createdAt: "2026-09-16T06:18:52Z"
+    createdAt: "2026-09-29T09:19:06Z"
     description: Operator for IBM Spyre devices
     features.operators.openshift.io/disconnected: "false"
     features.operators.openshift.io/fips-compliant: "false"
