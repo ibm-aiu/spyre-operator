@@ -388,6 +388,15 @@ func checkPodPhases(ctx context.Context, k8sClientset *kubernetes.Clientset, pod
 				count[pod.Status.Phase] += 1
 				message := getPodMessage(*pod)
 				By(fmt.Sprintf("Getting pod count: %s - %s %s", pod.Name, pod.Status.Phase, message))
+				if pod.Status.Phase == corev1.PodPending {
+					for _, rc := range pod.Spec.ResourceClaims {
+						claim, cerr := k8sClientset.ResourceV1().ResourceClaims(namespace).Get(ctx, rc.Name, metav1.GetOptions{})
+						if cerr == nil {
+							By(fmt.Sprintf("ResourceClaim %s: allocated=%v reservedFor=%d",
+								claim.Name, claim.Status.Allocation != nil, len(claim.Status.ReservedFor)))
+						}
+					}
+				}
 				if len(pod.OwnerReferences) > 0 {
 					g.Expect(pod.Status.Phase).NotTo(Equal(corev1.PodFailed))
 				} else if pod.Status.Phase == corev1.PodFailed {
@@ -438,13 +447,20 @@ func printMessageIfPodNotRunning(pod corev1.Pod) {
 }
 
 func getPodMessage(pod corev1.Pod) string {
-	message := ""
 	if len(pod.Status.ContainerStatuses) > 0 {
 		if pod.Status.ContainerStatuses[0].State.Waiting != nil {
-			message = pod.Status.ContainerStatuses[0].State.Waiting.Message
+			if msg := pod.Status.ContainerStatuses[0].State.Waiting.Message; msg != "" {
+				return msg
+			}
 		}
 	}
-	return message
+	// Fall back to pod scheduling conditions
+	for _, cond := range pod.Status.Conditions {
+		if cond.Type == corev1.PodScheduled && cond.Status == corev1.ConditionFalse {
+			return fmt.Sprintf("unschedulable: %s", cond.Message)
+		}
+	}
+	return ""
 }
 
 func DeletePod(ctx context.Context, k8sClientset *kubernetes.Clientset, pod *corev1.Pod) {
