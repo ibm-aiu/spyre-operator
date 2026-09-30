@@ -876,12 +876,20 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 			for _, rsi := range rs {
 				if *rsi.Spec.NodeName == targetNodeName {
 					Expect(len(rsi.Spec.Devices)).To(BeNumerically(">", 1))
-					productId = *rsi.Spec.Devices[0].Attributes["productId"].StringValue
-					pciAddress = *rsi.Spec.Devices[0].Attributes["pciAddress"].StringValue
-					pciFunctionIndex = *rsi.Spec.Devices[0].Attributes["pciFunctionIndex"].IntValue
+					// prefer PF as a reference device since pseudo VFs may have pciFunctionIndex 0
+					refDevice := rsi.Spec.Devices[0]
+					for _, d := range rsi.Spec.Devices {
+						if *d.Attributes["productId"].StringValue == PfProductId {
+							refDevice = d
+							break
+						}
+					}
+					productId = *refDevice.Attributes["productId"].StringValue
+					pciAddress = *refDevice.Attributes["pciAddress"].StringValue
+					pciFunctionIndex = *refDevice.Attributes["pciFunctionIndex"].IntValue
 					for _, d := range rsi.Spec.Devices {
 						addr := *d.Attributes["pciAddress"].StringValue
-						numaMap[addr] = *rsi.Spec.Devices[0].Attributes["numaInfo"].StringValue
+						numaMap[addr] = *d.Attributes["numaInfo"].StringValue
 					}
 					found = true
 					break
@@ -898,7 +906,10 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 			DeleteResourceClaimTemplate(ctx, k8sClientset, testClaimName, testNamespace)
 		})
 
-		DescribeTable("single-pod allocation", func(templateData ResourceClaimTemplateData) {
+		// Entry parameters are evaluated at tree construction, before BeforeAll sets productId etc.
+		// Pass a builder function so that the template data is resolved when the spec runs.
+		DescribeTable("single-pod allocation", func(buildTemplateData func() ResourceClaimTemplateData) {
+			templateData := buildTemplateData()
 			By("deploying resourceclaimtemplate")
 			BuildResourceClaimTemplate(ctx, dynClient, discoClient, &templateData)
 			BuildPodWithClaim(ctx, dynClient, discoClient, &PodTemplateData{
@@ -926,39 +937,33 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 				}
 			}
 		},
-			Entry("one device", ResourceClaimTemplateData{
-				Name:      testClaimName,
-				Namespace: testNamespace,
-				Count:     1,
-				ProductId: func() string {
-					return productId
-				}(),
-				DeviceClassName: func() string {
-					return DeviceClassNameForDevice(productId, pciFunctionIndex)
-				}(),
+			Entry("one device", func() ResourceClaimTemplateData {
+				return ResourceClaimTemplateData{
+					Name:            testClaimName,
+					Namespace:       testNamespace,
+					Count:           1,
+					ProductId:       productId,
+					DeviceClassName: DeviceClassNameForDevice(productId, pciFunctionIndex),
+				}
 			}),
-			Entry("specific device", ResourceClaimTemplateData{
-				Name:      testClaimName,
-				Namespace: testNamespace,
-				Count:     1,
-				PCIAddress: func() string {
-					return pciAddress
-				}(),
-				DeviceClassName: func() string {
-					return DeviceClassNameForDevice(productId, pciFunctionIndex)
-				}(),
+			Entry("specific device", func() ResourceClaimTemplateData {
+				return ResourceClaimTemplateData{
+					Name:            testClaimName,
+					Namespace:       testNamespace,
+					Count:           1,
+					PCIAddress:      pciAddress,
+					DeviceClassName: DeviceClassNameForDevice(productId, pciFunctionIndex),
+				}
 			}),
-			Entry("numa-aware devices", ResourceClaimTemplateData{
-				Name:      testClaimName,
-				Namespace: testNamespace,
-				Count:     2,
-				ProductId: func() string {
-					return productId
-				}(),
-				DeviceClassName: func() string {
-					return DeviceClassNameForDevice(productId, pciFunctionIndex)
-				}(),
-				MatchAttribute: "spyre.ibm.com/numaInfo",
+			Entry("numa-aware devices", func() ResourceClaimTemplateData {
+				return ResourceClaimTemplateData{
+					Name:            testClaimName,
+					Namespace:       testNamespace,
+					Count:           2,
+					ProductId:       productId,
+					DeviceClassName: DeviceClassNameForDevice(productId, pciFunctionIndex),
+					MatchAttribute:  "spyre.ibm.com/numaInfo",
+				}
 			}),
 		)
 	})
