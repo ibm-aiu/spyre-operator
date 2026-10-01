@@ -1,0 +1,294 @@
+# +-------------------------------------------------------------------+
+# | Copyright (c) 2025, 2026 IBM Corp.                                |
+# | SPDX-License-Identifier: Apache-2.0                               |
+# +-------------------------------------------------------------------+
+
+# Run Red Hat preflight container checks against an image and, optionally,
+# submit the results to Red Hat Partner Connect to obtain the image
+# certification.
+#
+# The "check" job always runs preflight without submitting. The "submit" job
+# only runs when `submit` is true and every platform passed in "check". It runs
+# in the `rh-certification` environment, which holds PYXIS_API_TOKEN and can be
+# configured with required reviewers as an approval gate.
+#
+# Secrets / variables:
+#   PYXIS_API_TOKEN       (environment secret) Partner Connect API key,
+#                         exported to preflight as PFLT_PYXIS_API_TOKEN.
+#   REGISTRY_USERNAME     (optional) pull credential for a private image,
+#   REGISTRY_PASSWORD     passed to preflight as --docker-config in "check"
+#                         only. With --submit, preflight uploads the docker
+#                         config to the Pyxis certification project, so the
+#                         "submit" job never uses these credentials and fails
+#                         when they are set.
+#   RHCERT_COMPONENT_ID   (variable) default certification component ID, used
+#                         when the `component-id` input is empty.
+
+name: Red Hat Image Certification
+
+on:
+  workflow_dispatch:
+    inputs:
+      image:
+        description: 'Image repository without tag (e.g., quay.io/ibm-aiu/spyre-operator)'
+        required: true
+        type: string
+        default: 'quay.io/ibm-aiu/spyre-operator'
+      tag:
+        description: 'Image tag to certify. Defaults to the VERSION file.'
+        required: false
+        type: string
+      component-id:
+        description: 'Certification component ID. Defaults to vars.RHCERT_COMPONENT_ID.'
+        required: false
+        type: string
+      platform:
+        description: 'Single architecture to check (e.g., amd64). Empty checks every
+          platform in the manifest list.'
+        required: false
+        type: string
+      submit:
+        description: 'Submit the results to Red Hat after all checks pass'
+        required: false
+        type: boolean
+        default: false
+      preflight-version:
+        description: 'openshift-preflight release to use'
+        required: false
+        type: string
+        default: '1.21.1'
+  workflow_call:
+    inputs:
+      image:
+        required: true
+        type: string
+      tag:
+        required: false
+        type: string
+      component-id:
+        required: false
+        type: string
+      platform:
+        required: false
+        type: string
+      submit:
+        required: false
+        type: boolean
+        default: false
+      preflight-version:
+        required: false
+        type: string
+        default: '1.21.1'
+    secrets:
+      PYXIS_API_TOKEN:
+        required: false
+      REGISTRY_USERNAME:
+        required: false
+      REGISTRY_PASSWORD:
+        required: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.image }}-${{ inputs.tag }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  PREFLIGHT_VERSION: ${{ inputs.preflight-version || '1.21.1' }}
+  PFLT_ARTIFACTS: ${{ github.workspace }}/preflight-artifacts
+  PFLT_LOGFILE: ${{ github.workspace }}/preflight-artifacts/preflight.log
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      image-ref: ${{ steps.ref.outputs.image-ref }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+
+    - name: Resolve image reference
+      id: ref
+      env:
+        IMAGE: ${{ inputs.image }}
+        TAG: ${{ inputs.tag }}
+      run: |
+        if [ -z "$TAG" ]; then
+          TAG=$(cat VERSION)
+        fi
+        if [ -z "$TAG" ]; then
+          echo "::error::Image tag is empty and VERSION file is empty"
+          exit 1
+        fi
+        echo "image-ref=${IMAGE}:${TAG}" >> "$GITHUB_OUTPUT"
+        echo "Image: ${IMAGE}:${TAG}"
+
+    - name: Install preflight
+      run: |
+        curl -fsSL -o preflight \
+          "https://github.com/redhat-openshift-ecosystem/openshift-preflight/releases/download/${PREFLIGHT_VERSION}/preflight-linux-amd64"
+        chmod +x preflight
+        sudo mv preflight /usr/local/bin/preflight
+        preflight --version
+
+    - name: Create registry auth file
+      id: auth
+      env:
+        IMAGE: ${{ inputs.image }}
+        REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+        REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+      run: |
+        if [ -z "$REGISTRY_USERNAME" ] || [ -z "$REGISTRY_PASSWORD" ]; then
+          echo "No registry credentials; assuming a public image."
+          exit 0
+        fi
+        AUTHFILE="${RUNNER_TEMP}/auth.json"
+        AUTH=$(printf '%s:%s' "$REGISTRY_USERNAME" "$REGISTRY_PASSWORD" | base64 -w0)
+        jq -n --arg r "${IMAGE%%/*}" --arg a "$AUTH" '{auths: {($r): {auth: $a}}}' > "$AUTHFILE"
+        chmod 600 "$AUTHFILE"
+        echo "docker-config=${AUTHFILE}" >> "$GITHUB_OUTPUT"
+
+    - name: Run preflight check container
+      env:
+        IMAGE_REF: ${{ steps.ref.outputs.image-ref }}
+        PLATFORM: ${{ inputs.platform }}
+        REGISTRY_AUTHFILE: ${{ steps.auth.outputs.docker-config }}
+      run: |
+        mkdir -p "$PFLT_ARTIFACTS"
+        ARGS=()
+        if [ -n "$REGISTRY_AUTHFILE" ]; then
+          ARGS+=(--docker-config "$REGISTRY_AUTHFILE")
+        fi
+        if [ -n "$PLATFORM" ]; then
+          ARGS+=(--platform "$PLATFORM")
+        fi
+        preflight check container "$IMAGE_REF" "${ARGS[@]}"
+
+    - name: Evaluate results
+      run: |
+        shopt -s nullglob
+        RESULTS=("$PFLT_ARTIFACTS"/*/results.json)
+        if [ ${#RESULTS[@]} -eq 0 ]; then
+          echo "::error::No preflight results.json found under $PFLT_ARTIFACTS"
+          exit 1
+        fi
+        {
+          echo "## Preflight results"
+          echo ""
+          echo "| Platform | Passed | Failed checks | Errors |"
+          echo "|---|---|---|---|"
+        } >> "$GITHUB_STEP_SUMMARY"
+        RC=0
+        for f in "${RESULTS[@]}"; do
+          ARCH=$(basename "$(dirname "$f")")
+          PASSED=$(jq -r '.passed' "$f")
+          FAILED=$(jq -r '[.results.failed[]?.name] | join(", ")' "$f")
+          ERRORS=$(jq -r '[.results.errors[]?.name] | join(", ")' "$f")
+          echo "| ${ARCH} | ${PASSED} | ${FAILED} | ${ERRORS} |" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$PASSED" != "true" ]; then
+            jq -r --arg arch "$ARCH" '(.results.failed[]?, .results.errors[]?)
+              | "::error title=preflight \($arch)::\(.name): \(.suggestion // .help // .description)"' "$f"
+            RC=1
+          fi
+        done
+        exit $RC
+
+    - name: Upload preflight artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: preflight-check
+        path: preflight-artifacts/
+        if-no-files-found: warn
+
+  submit:
+    needs: check
+    if: inputs.submit
+    runs-on: ubuntu-latest
+    environment: rh-certification
+    steps:
+    - name: Validate submission settings
+      env:
+        COMPONENT_ID: ${{ inputs.component-id || vars.RHCERT_COMPONENT_ID }}
+        PYXIS_API_TOKEN: ${{ secrets.PYXIS_API_TOKEN }}
+        REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+        REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+      run: |
+        # preflight uploads the --docker-config file to Pyxis on submit. Refuse
+        # to submit when private registry credentials are configured so they
+        # are never sent to Red Hat.
+        if [ -n "$REGISTRY_USERNAME" ] || [ -n "$REGISTRY_PASSWORD" ]; then
+          echo "::error::REGISTRY_USERNAME/REGISTRY_PASSWORD are set; refusing to submit. Submission is only supported for public images."
+          exit 1
+        fi
+        if [ -z "$COMPONENT_ID" ]; then
+          echo "::error::Set the component-id input or the RHCERT_COMPONENT_ID variable"
+          exit 1
+        fi
+        if [ -z "$PYXIS_API_TOKEN" ]; then
+          echo "::error::PYXIS_API_TOKEN secret is not set in the rh-certification environment"
+          exit 1
+        fi
+
+    - name: Install preflight
+      run: |
+        curl -fsSL -o preflight \
+          "https://github.com/redhat-openshift-ecosystem/openshift-preflight/releases/download/${PREFLIGHT_VERSION}/preflight-linux-amd64"
+        chmod +x preflight
+        sudo mv preflight /usr/local/bin/preflight
+        preflight --version
+
+    - name: Run preflight check container and submit
+      env:
+        IMAGE_REF: ${{ needs.check.outputs.image-ref }}
+        PLATFORM: ${{ inputs.platform }}
+        PFLT_CERTIFICATION_COMPONENT_ID: ${{ inputs.component-id || vars.RHCERT_COMPONENT_ID
+          }}
+        PFLT_PYXIS_API_TOKEN: ${{ secrets.PYXIS_API_TOKEN }}
+      run: |
+        mkdir -p "$PFLT_ARTIFACTS"
+        # Never pass a docker config on submit (see "Validate submission settings").
+        unset PFLT_DOCKERCONFIG
+        ARGS=(--submit)
+        if [ -n "$PLATFORM" ]; then
+          ARGS+=(--platform "$PLATFORM")
+        fi
+        preflight check container "$IMAGE_REF" "${ARGS[@]}"
+
+    - name: Evaluate results
+      run: |
+        shopt -s nullglob
+        RESULTS=("$PFLT_ARTIFACTS"/*/results.json)
+        if [ ${#RESULTS[@]} -eq 0 ]; then
+          echo "::error::No preflight results.json found under $PFLT_ARTIFACTS"
+          exit 1
+        fi
+        {
+          echo "## Preflight results"
+          echo ""
+          echo "| Platform | Passed | Failed checks | Errors |"
+          echo "|---|---|---|---|"
+        } >> "$GITHUB_STEP_SUMMARY"
+        RC=0
+        for f in "${RESULTS[@]}"; do
+          ARCH=$(basename "$(dirname "$f")")
+          PASSED=$(jq -r '.passed' "$f")
+          FAILED=$(jq -r '[.results.failed[]?.name] | join(", ")' "$f")
+          ERRORS=$(jq -r '[.results.errors[]?.name] | join(", ")' "$f")
+          echo "| ${ARCH} | ${PASSED} | ${FAILED} | ${ERRORS} |" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$PASSED" != "true" ]; then
+            jq -r --arg arch "$ARCH" '(.results.failed[]?, .results.errors[]?)
+              | "::error title=preflight \($arch)::\(.name): \(.suggestion // .help // .description)"' "$f"
+            RC=1
+          fi
+        done
+        exit $RC
+
+    - name: Upload preflight artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: preflight-submit
+        path: preflight-artifacts/
+        if-no-files-found: warn
