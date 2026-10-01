@@ -8,7 +8,7 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 REPO_ROOT_DIR=${SCRIPT_DIR%/*}
 TEMPLATE=${SCRIPT_DIR}/base_template.yaml
-ARTIFACT_CONFIG=${REPO_ROOT_DIR}/release-artifacts.yaml
+CATALOG_CONFIG=${REPO_ROOT_DIR}/catalog/config.yaml
 CURRENT_VERSION=$(cat ${REPO_ROOT_DIR}/VERSION)
 
 set -eu -o pipefail
@@ -125,13 +125,13 @@ action=$1
 case $action in
 "template")
 	# The current released stable bundle
-	STABLE_TAGS=$(yq '.channels.Stable.Bundles[]' "${ARTIFACT_CONFIG}")
+	STABLE_TAGS=$(yq '.channels.Stable.Bundles[]' "${CATALOG_CONFIG}")
 
 	# The current released rc.x bundles to be included in the FBC
-	CANDIDATE_TAGS=$(yq '.channels.Candidates.Bundles[]' "${ARTIFACT_CONFIG}")
+	CANDIDATE_TAGS=$(yq '.channels.Candidates.Bundles[]' "${CATALOG_CONFIG}")
 
 	# The current released bundles to be included in the FBC
-	FAST_TAGS=$(yq '.channels.Fast.Bundles[]' "${ARTIFACT_CONFIG}")
+	FAST_TAGS=$(yq '.channels.Fast.Bundles[]' "${CATALOG_CONFIG}")
 
 	BUILD_TYPE=${2:-}
 	[ -z "${BUILD_TYPE}" ] && echo "Please provide a build type" && exit 1
