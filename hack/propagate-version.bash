@@ -7,7 +7,7 @@
 set -eu -o pipefail
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 readonly REPO_ROOT=${SCRIPT_DIR%/*}
-readonly BOM=${REPO_ROOT}/release-artifacts.yaml
+readonly BOM=${REPO_ROOT}/catalog/config.yaml
 readonly YQ=${REPO_ROOT}/bin/yq
 readonly YAMLFMT=${REPO_ROOT}/bin/yamlfmt
 readonly VERSION=${1}
@@ -84,7 +84,7 @@ function propagate_version() {
 
 	# format all modified yaml files
 	${YAMLFMT} -conf=${REPO_ROOT}/.yamlfmt -dstar "${REPO_ROOT}/config/**/*.yaml" "${REPO_ROOT}/bundle/**/*.yaml" \
-		${REPO_ROOT}/test/config.yaml ${REPO_ROOT}/release-artifacts.yaml
+		${REPO_ROOT}/test/config.yaml ${REPO_ROOT}/catalog/config.yaml
 
 }
 
