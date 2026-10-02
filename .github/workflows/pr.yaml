@@ -81,9 +81,9 @@ jobs:
 
     - name: Warn if ok-to-test label is missing
       if: steps.check-src.outputs.src_changed == 'true' && !contains(github.event.pull_request.labels.*.name,
-        'ok-to-test')
+        'ok-to-test') && !contains(github.event.pull_request.labels.*.name, 'skip-e2e-test')
       run: |
-        echo "::error::Source code changes detected that may affect e2e tests, but the 'ok-to-test' label is missing. Please add the 'ok-to-test' label to trigger e2e tests, or confirm this change does not require e2e validation."
+        echo "::error::Source code changes detected that may affect e2e tests, but neither the 'ok-to-test' nor 'skip-e2e-test' label is present. Please add the 'ok-to-test' label to trigger e2e tests, or 'skip-e2e-test' to skip them."
         exit 1
 
   unit-test:
@@ -92,7 +92,8 @@ jobs:
 
   e2e-test:
     needs: unit-test
-    if: contains(github.event.pull_request.labels.*.name, 'ok-to-test')
+    if: contains(github.event.pull_request.labels.*.name, 'ok-to-test') && !contains(github.event.pull_request.labels.*.name,
+      'skip-e2e-test')
     uses: ibm-aiu/spyre-operator-actions/.github/workflows/crc-e2e-test.yaml@main
     with:
       runner: ubuntu-24.04
