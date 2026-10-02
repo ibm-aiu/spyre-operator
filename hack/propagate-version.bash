@@ -73,6 +73,9 @@ function propagate_version() {
 	${YQ} eval -i ".podValidator.version=\"$(image_tag podValidator)\"" ${REPO_ROOT}/test/config.yaml
 	${YQ} eval -i ".healthChecker.version=\"$(image_tag healthChecker)\"" ${REPO_ROOT}/test/config.yaml
 	${YQ} eval -i ".draDriver.version=\"$(image_tag draDriver)\"" ${REPO_ROOT}/test/config.yaml
+	${YQ} eval -i ".exporter.version=\"$(image_tag exporter)\"" ${REPO_ROOT}/test/config.yaml
+	${YQ} eval -i ".mockUser.version=\"${VERSION}\"" ${REPO_ROOT}/test/config.yaml
+	${YQ} eval -i ".devicePluginInit.version=\"$(image_tag devicePluginInit)\"" ${REPO_ROOT}/test/config.yaml
 	${YQ} eval -i ".defaultChannel=\"${DEFAULT_CHANNEL}\"" ${REPO_ROOT}/test/config.yaml
 
 	# patch bundle annotation
