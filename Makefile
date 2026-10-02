@@ -34,7 +34,8 @@ OPERATOR_MAKE_ENV_FILE = $(REPO_ROOT)/local.mk
 KUBECTL             ?= $(shell command -v oc 2> /dev/null || echo kubectl)
 OC                  ?= $(shell command -v oc)
 OPERATOR_NAMESPACE  ?= spyre-operator
-DEFAULT_CHANNEL		?=fast-v1.4
+MINOR_VERSION		:= $(shell cat $(REPO_ROOT)/VERSION | cut -d. -f1-2)
+DEFAULT_CHANNEL		?= fast-v$(MINOR_VERSION)
 CHANNELS            ?= $(DEFAULT_CHANNEL)
 
 # Operating system
@@ -443,7 +444,7 @@ clean: ## Clean-up intermediate artifacts
 
 .PHONY: propagate-version
 propagate-version: yq yamlfmt ## Propagate version to all required files
-	hack/propagate-version.bash $(VERSION) $(REGISTRY) $(DEFAULT_CHANNEL)
+	hack/propagate-version.bash $(VERSION) $(REGISTRY) $(DEFAULT_CHANNEL) $(RELEASE_VERSION)
 
 ##@ Image operations
 
