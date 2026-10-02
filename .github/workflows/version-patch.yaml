@@ -144,8 +144,11 @@ jobs:
       run: |
         MINOR_VERSION=$(echo "${NEW_VERSION}" | cut -d. -f1-2)
         DEFAULT_CHANNEL="fast-v${MINOR_VERSION}"
-        make bundle DEFAULT_CHANNEL="${DEFAULT_CHANNEL}"
+        # Update config/samples and kustomization.yaml before make bundle
+        # so that alm-examples in the CSV reflect the new component versions
         make propagate-version VERSION=$(cat VERSION)-dev DEFAULT_CHANNEL="${DEFAULT_CHANNEL}" RELEASE_VERSION=$(cat VERSION)
+        # Regenerate the CSV and bundle using the updated samples and kustomization.
+        make bundle DEFAULT_CHANNEL="${DEFAULT_CHANNEL}"
 
     - name: Commit and push changes
       uses: planetscale/ghcommit-action@25309d8005ac7c3bcd61d3fe19b69e0fe47dbdde # v0.2.20
