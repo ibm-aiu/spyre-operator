@@ -13,6 +13,7 @@ readonly YAMLFMT=${REPO_ROOT}/bin/yamlfmt
 readonly VERSION=${1}
 readonly REGISTRY=${2}
 readonly DEFAULT_CHANNEL=${3}
+readonly RELEASE_VERSION=${4:-${VERSION}}
 
 if [ "x" == "x${VERSION}" ]; then
 	echo "Error: Version needs to be supplied as the first argument."
@@ -44,9 +45,9 @@ function image_tag() {
 }
 
 function propagate_version() {
-	${YQ} eval -i ".images[0].newTag=\"${VERSION}\"" ${REPO_ROOT}/config/manager/kustomization.yaml
+	${YQ} eval -i ".images[0].newTag=\"${RELEASE_VERSION}\"" ${REPO_ROOT}/config/manager/kustomization.yaml
 	${YQ} eval -i ".labels[0].pairs.operator-version=\"${VERSION}\"" ${REPO_ROOT}/config/manager/kustomization.yaml
-	${YQ} eval -i ".spec.image=\"${REGISTRY}/spyre-operator-catalog:${VERSION}\"" ${REPO_ROOT}/config/olm/catalog-source.yaml
+	${YQ} eval -i ".spec.image=\"${REGISTRY}/spyre-operator-catalog:${RELEASE_VERSION}\"" ${REPO_ROOT}/config/olm/catalog-source.yaml
 	${YQ} eval -i ".spec.channel=\"${DEFAULT_CHANNEL}\"" ${REPO_ROOT}/config/olm/subscription.yaml
 
 	#patch version in the BOM
@@ -72,6 +73,9 @@ function propagate_version() {
 	${YQ} eval -i ".podValidator.version=\"$(image_tag podValidator)\"" ${REPO_ROOT}/test/config.yaml
 	${YQ} eval -i ".healthChecker.version=\"$(image_tag healthChecker)\"" ${REPO_ROOT}/test/config.yaml
 	${YQ} eval -i ".draDriver.version=\"$(image_tag draDriver)\"" ${REPO_ROOT}/test/config.yaml
+	${YQ} eval -i ".exporter.version=\"$(image_tag exporter)\"" ${REPO_ROOT}/test/config.yaml
+	${YQ} eval -i ".mockUser.version=\"${VERSION}\"" ${REPO_ROOT}/test/config.yaml
+	${YQ} eval -i ".devicePluginInit.version=\"$(image_tag devicePluginInit)\"" ${REPO_ROOT}/test/config.yaml
 	${YQ} eval -i ".defaultChannel=\"${DEFAULT_CHANNEL}\"" ${REPO_ROOT}/test/config.yaml
 
 	# patch bundle annotation

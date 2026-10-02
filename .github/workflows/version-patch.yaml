@@ -15,6 +15,17 @@ on:
         options:
         - minor
         - major
+        default: "minor"
+      operator_sdk_version:
+        description: "Operator SDK version to install"
+        required: false
+        type: string
+        default: "v1.38.0"
+      allow_skew_version:
+        description: "Allow version skew between components and operator"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -28,3 +39,120 @@ jobs:
     uses: ibm-aiu/spyre-operator-actions/.github/workflows/version-patch.yaml@main
     with:
       version_bump: ${{ inputs.version_bump }}
+
+  update-spyre-operator:
+    needs: version-patch
+    runs-on: ubuntu-latest
+    env:
+      NEW_VERSION: ${{ needs.version-patch.outputs.new_version }}
+      BRANCH_NAME: ${{ needs.version-patch.outputs.branch_name }}
+      ALLOW_SKEW: ${{ inputs.allow_skew_version }}
+      OPERATOR_SDK_VERSION: ${{ inputs.operator_sdk_version }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+    - name: Checkout PR branch
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ needs.version-patch.outputs.branch_name }}
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: 'go.mod'
+        check-latest: true
+
+    - name: Retrieve and validate component versions
+      id: component_versions
+      run: |
+        COMPONENTS=("spyre-device-plugin" "spyre-scheduler-plugins" "spyre-webhook-validator" "spyre-health-checker" "dra-driver-spyre" "spyre-metrics-exporter" "spyre-device-plugin-init")
+        VALIDATION_FAILED=false
+
+        echo "Retrieving component versions..."
+        echo "Allow version skew: ${ALLOW_SKEW}"
+
+        if [ "${ALLOW_SKEW}" = "false" ]; then
+          echo "Version validation enabled - all components must match version: ${NEW_VERSION}"
+        fi
+
+        for COMPONENT in "${COMPONENTS[@]}"; do
+          echo "Checking ${COMPONENT}..."
+
+          DEFAULT_BRANCH=$(curl -sSf -H "Authorization: token ${GITHUB_TOKEN}" \
+            "https://api.github.com/repos/ibm-aiu/${COMPONENT}" | \
+            jq -r '.default_branch' 2>/dev/null)
+
+          if [ -z "${DEFAULT_BRANCH}" ] || [ "${DEFAULT_BRANCH}" = "null" ]; then
+            echo "::error::Could not determine default branch for ${COMPONENT}"
+            VALIDATION_FAILED=true
+            continue
+          fi
+
+          echo "  Using default branch: ${DEFAULT_BRANCH}"
+
+          VERSION_URL="https://raw.githubusercontent.com/ibm-aiu/${COMPONENT}/refs/heads/${DEFAULT_BRANCH}/VERSION"
+
+          if VERSION=$(curl -sSf "${VERSION_URL}" 2>/dev/null); then
+            VERSION_WITH_DEV="${VERSION}-dev"
+            echo "${COMPONENT}_version=${VERSION_WITH_DEV}" >> $GITHUB_OUTPUT
+            echo "  ${COMPONENT}: ${VERSION_WITH_DEV} (from ${DEFAULT_BRANCH})"
+
+            if [ "${ALLOW_SKEW}" = "false" ] && [ "${VERSION}" != "${NEW_VERSION}" ]; then
+              echo "::error::Version mismatch for ${COMPONENT}: expected ${NEW_VERSION}, got ${VERSION}"
+              VALIDATION_FAILED=true
+            fi
+          else
+            echo "::error::VERSION file not found for ${COMPONENT} on branch ${DEFAULT_BRANCH}"
+            VALIDATION_FAILED=true
+          fi
+        done
+
+        if [ "${VALIDATION_FAILED}" = "true" ]; then
+          echo "::error::Version validation failed. Component versions must match NEW_VERSION (${NEW_VERSION}) when allow_skew_version is false."
+          exit 1
+        fi
+
+        if [ "${ALLOW_SKEW}" = "false" ]; then
+          echo "✓ All component versions validated successfully"
+        fi
+
+    - name: Update release-artifacts.yaml and configs
+      run: |
+        if [ -f "release-artifacts.yaml" ]; then
+          echo "Updating release-artifacts.yaml with component versions..."
+          yq eval '.devicePlugin.version = "${{ steps.component_versions.outputs.spyre-device-plugin_version }}"' -i release-artifacts.yaml
+          yq eval '.scheduler.version = "${{ steps.component_versions.outputs.spyre-scheduler-plugins_version }}"' -i release-artifacts.yaml
+          yq eval '.podValidator.version = "${{ steps.component_versions.outputs.spyre-webhook-validator_version }}"' -i release-artifacts.yaml
+          yq eval '.healthChecker.version = "${{ steps.component_versions.outputs.spyre-health-checker_version }}"' -i release-artifacts.yaml
+          yq eval '.draDriver.version = "${{ steps.component_versions.outputs.dra-driver-spyre_version }}"' -i release-artifacts.yaml
+          yq eval '.exporter.version = "${{ env.NEW_VERSION }}-dev"' -i release-artifacts.yaml
+          yq eval '.devicePluginInit.version = "${{ steps.component_versions.outputs.spyre-device-plugin_version }}"' -i release-artifacts.yaml
+        fi
+
+    - name: Install operator-sdk
+      run: |
+        export ARCH=$(case $(uname -m) in x86_64) echo -n amd64 ;; aarch64) echo -n arm64 ;; *) echo -n $(uname -m) ;; esac)
+        export OS=$(uname | awk '{print tolower($0)}')
+        export OPERATOR_SDK_DL_URL=https://github.com/operator-framework/operator-sdk/releases/download/${OPERATOR_SDK_VERSION}
+        curl -LO ${OPERATOR_SDK_DL_URL}/operator-sdk_${OS}_${ARCH}
+        chmod +x operator-sdk_${OS}_${ARCH}
+        sudo mv operator-sdk_${OS}_${ARCH} /usr/local/bin/operator-sdk
+        operator-sdk version
+
+    - name: Run make bundle and propagate version
+      run: |
+        MINOR_VERSION=$(echo "${NEW_VERSION}" | cut -d. -f1-2)
+        DEFAULT_CHANNEL="fast-v${MINOR_VERSION}"
+        make bundle DEFAULT_CHANNEL="${DEFAULT_CHANNEL}"
+        make propagate-version VERSION=$(cat VERSION)-dev DEFAULT_CHANNEL="${DEFAULT_CHANNEL}" RELEASE_VERSION=$(cat VERSION)
+
+    - name: Commit and push changes
+      uses: planetscale/ghcommit-action@25309d8005ac7c3bcd61d3fe19b69e0fe47dbdde # v0.2.20
+      with:
+        commit_message: "chore: update artifacts and bundle to ${{ env.NEW_VERSION
+          }}"
+        repo: ${{ github.repository }}
+        branch: ${{ needs.version-patch.outputs.branch_name }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
