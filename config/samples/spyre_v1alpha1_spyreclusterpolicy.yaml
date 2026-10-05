@@ -29,25 +29,25 @@ spec:
   devicePlugin:
     repository: "docker.io/spyre-operator"
     image: "spyre-device-plugin"
-    version: 1.4.0-dev
+    version: 1.5.0-dev
     configPath: /etc/aiu
     configName: senlib_config.json
   scheduler:
     repository: "docker.io/spyre-operator"
     image: "spyre-scheduler"
-    version: 1.4.0-dev
+    version: 1.5.0-dev
   podValidator:
     enabled: true
     repository: "docker.io/spyre-operator"
     image: "spyre-webhook-validator"
-    version: 1.4.0-dev
+    version: 1.5.0-dev
   metricsExporter:
     enabled: false
     repository: "docker.io/spyre-operator"
     image: "spyre-metrics-exporter"
-    version: 1.4.0-dev
+    version: 1.5.0-dev
   healthChecker:
     enabled: false
     repository: "docker.io/spyre-operator"
     image: "spyre-health-checker"
-    version: 1.4.0-dev
+    version: 1.5.0-dev
