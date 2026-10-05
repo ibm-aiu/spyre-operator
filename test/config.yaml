@@ -5,54 +5,54 @@ hasDevice: false
 pseudoDeviceMode: true
 workloadImage: docker.io/spyre-operator/x86_64/dd2/e2e_stable:2025_09_06
 nodeName: "" # Provide actual hostname with Spyre cards or integration test will fail
-defaultChannel: "fast-v1.4"
+defaultChannel: "fast-v1.5"
 catalog:
   image: spyre-operator-catalog
-  version: 1.4.0-dev
+  version: 1.5.0-dev
   imagePullPolicy: Always
 bundle:
   image: spyre-operator-bundle
-  version: 1.4.0-dev
+  version: 1.5.0-dev
   imagePullPolicy: Always
 operator:
   image: spyre-operator
-  version: 1.4.0-dev
+  version: 1.5.0-dev
   imagePullPolicy: Always
 devicePlugin:
   image: spyre-device-plugin
-  version: 1.4.0-dev
+  version: 1.5.0-dev
   imagePullPolicy: Always
 scheduler:
   image: spyre-scheduler
-  version: 1.4.0-dev
+  version: 1.5.0-dev
   imagePullPolicy: Always
 podValidator:
   enabled: false
   image: spyre-webhook-validator
-  version: 1.4.0-dev
+  version: 1.5.0-dev
   imagePullPolicy: Always
 healthChecker:
   enabled: false
   image: spyre-health-checker
-  version: 1.4.0-dev
+  version: 1.5.0-dev
   imagePullPolicy: Always
 draDriver:
   image: dra-driver-spyre
-  version: 1.4.0-dev
+  version: 1.5.0-dev
   imagePullPolicy: Always
 exporter:
   enabled: false
   image: spyre-metrics-exporter
-  version: 1.4.0-dev
+  version: 1.5.0-dev
   imagePullPolicy: Always
 mockUser:
   image: spyre-mock-user
-  version: 1.4.0-dev
+  version: 1.5.0-dev
   imagePullPolicy: Always
 devicePluginInit:
   enabled: true
   image: spyre-device-plugin-init
-  version: 1.4.0-dev
+  version: 1.5.0-dev
   imagePullPolicy: Always
   executePolicy: IfNotPresent
 runtime:
