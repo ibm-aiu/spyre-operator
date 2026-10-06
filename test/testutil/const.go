@@ -46,7 +46,7 @@ const (
 	subscriptionResource              = "subscriptions.v1alpha1.operators.coreos.com"
 	customresourcedefinitionResource  = "customresourcedefinitions.v1.apiextensions.k8s.io"
 	SpyreResourcePrefix               = "ibm.com/spyre_pf"
-	containerTestImage                = "registry.access.redhat.com/ubi9-minimal:9.4"
+	containerTestImage                = "registry.access.redhat.com/ubi9-minimal:9.8"
 	Ubi9MicroTestImage                = "registry.access.redhat.com/ubi9/ubi-micro:latest"
 	schedForcePullPodLabel            = "ibm-spyre-force-image-puller"
 

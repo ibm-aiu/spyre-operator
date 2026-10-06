@@ -27,7 +27,7 @@ spec:
   schedulerName: spyre-scheduler
   containers:
   - name: app
-    image: registry.access.redhat.com/ubi9-minimal:9.5
+    image: registry.access.redhat.com/ubi9-minimal:9.8
     imagePullPolicy: IfNotPresent
     command: ["tail", "-f", "/dev/null"]
     resources:
