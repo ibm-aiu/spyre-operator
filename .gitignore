@@ -40,3 +40,7 @@ test/manifest/serving-certs
 test/crd/external
 coverage-report.html
 .bob
+
+# fbc generated files
+catalog/base_template.yaml
+catalog/spyre-operator

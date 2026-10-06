@@ -1,7 +1,7 @@
 
 # Create File Based Catalog (FBC) image
 
-Before running these make target, verify the bundles are specified in [artifact config](../release-artifacts.yaml).
+Before running these make target, verify the bundles are specified in [catalog/config](../config.yaml).
 
 For currently released bundled images:
 

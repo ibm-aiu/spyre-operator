@@ -65,7 +65,7 @@ ln -s "${REPO_ROOT}/bin/yamlfmt" "${TMPDIR}/bin/yamlfmt"
 ln -s "${REPO_ROOT}/.yamlfmt" "${TMPDIR}/.yamlfmt"
 
 # Copy all files that the script modifies
-cp "${REPO_ROOT}/release-artifacts.yaml" "${TMPDIR}/release-artifacts.yaml"
+cp "${REPO_ROOT}/catalog/config.yaml" "${TMPDIR}/catalog/config.yaml"
 cp "${REPO_ROOT}/config/manager/kustomization.yaml" "${TMPDIR}/config/manager/kustomization.yaml"
 cp "${REPO_ROOT}/config/olm/catalog-source.yaml" "${TMPDIR}/config/olm/catalog-source.yaml"
 cp "${REPO_ROOT}/config/olm/subscription.yaml" "${TMPDIR}/config/olm/subscription.yaml"
@@ -117,23 +117,16 @@ assert_eq "spec.channel" \
 	"$("${YQ}" -r '.spec.channel' "${TMPDIR}/config/olm/subscription.yaml")"
 
 echo ""
-echo "=== Asserting release-artifacts.yaml (BOM) ==="
+echo "=== Asserting catalog/config.yaml ==="
 assert_eq "catalog.version" \
 	"${TEST_VERSION}" \
-	"$("${YQ}" -r '.catalog.version' "${TMPDIR}/release-artifacts.yaml")"
+	"$("${YQ}" -r '.catalog.version' "${TMPDIR}/catalog/config.yaml")"
 assert_eq "bundle.version" \
 	"${TEST_VERSION}" \
-	"$("${YQ}" -r '.bundle.version' "${TMPDIR}/release-artifacts.yaml")"
+	"$("${YQ}" -r '.bundle.version' "${TMPDIR}/catalog/config.yaml")"
 assert_eq "operator.version" \
 	"${TEST_VERSION}" \
-	"$("${YQ}" -r '.operator.version' "${TMPDIR}/release-artifacts.yaml")"
-
-# Read component versions from the BOM (as updated by the script) for downstream assertions
-EXPORTER_VERSION="$("${YQ}" -r '.exporter.version' "${TMPDIR}/release-artifacts.yaml")"
-DEVICE_PLUGIN_VERSION="$("${YQ}" -r '.devicePlugin.version' "${TMPDIR}/release-artifacts.yaml")"
-SCHEDULER_VERSION="$("${YQ}" -r '.scheduler.version' "${TMPDIR}/release-artifacts.yaml")"
-POD_VALIDATOR_VERSION="$("${YQ}" -r '.podValidator.version' "${TMPDIR}/release-artifacts.yaml")"
-HEALTH_CHECKER_VERSION="$("${YQ}" -r '.healthChecker.version' "${TMPDIR}/release-artifacts.yaml")"
+	"$("${YQ}" -r '.operator.version' "${TMPDIR}/catalog/config.yaml")"
 
 echo ""
 echo "=== Asserting config/samples/spyre_v1alpha1_spyreclusterpolicy.yaml ==="
