@@ -233,44 +233,11 @@ func (r *Reservation) NormalizeFromLegacy() {
 		return
 	}
 
-	remaining := make([]int, 0, len(r.DeviceSets))
-	for i := range r.DeviceSets {
-		remaining = append(remaining, i)
-	}
-
-	kept := make([]ReservationEntry, 0, len(r.Entries))
-	for _, e := range r.Entries {
-		want := deviceSetKey(e.DeviceList)
-		matched := -1
-		for j, idx := range remaining {
-			if deviceSetKey(r.DeviceSets[idx]) == want {
-				matched = j
-				break
-			}
-		}
-		if matched < 0 {
-			// The older writer retired this reservation.
-			continue
-		}
-		remaining = slices.Delete(remaining, matched, matched+1)
-		kept = append(kept, e)
-	}
+	kept, remaining := entriesStillListed(r.Entries, r.DeviceSets)
 
 	// Whatever is left in DeviceSets was added by the older writer. Pair it with
 	// any Pod that no surviving entry claims.
-	unclaimed := make([]Pod, 0, len(r.PodsUnderScheduling))
-	for _, p := range r.PodsUnderScheduling {
-		owned := false
-		for _, e := range kept {
-			if e.Pod.SameAs(p) {
-				owned = true
-				break
-			}
-		}
-		if !owned {
-			unclaimed = append(unclaimed, p)
-		}
-	}
+	unclaimed := unclaimedPods(r.PodsUnderScheduling, kept)
 	for _, idx := range remaining {
 		e := ReservationEntry{DeviceList: slices.Clone(r.DeviceSets[idx])}
 		if len(unclaimed) > 0 {
@@ -282,6 +249,40 @@ func (r *Reservation) NormalizeFromLegacy() {
 
 	r.Entries = kept
 	r.SyncLegacy()
+}
+
+// entriesStillListed returns the entries whose devices still appear in
+// deviceSets, along with the indices of the device sets no entry matched. An
+// entry missing from deviceSets was retired by an older writer and is dropped.
+func entriesStillListed(entries []ReservationEntry, deviceSets [][]string) ([]ReservationEntry, []int) {
+	remaining := make([]int, 0, len(deviceSets))
+	for i := range deviceSets {
+		remaining = append(remaining, i)
+	}
+	kept := make([]ReservationEntry, 0, len(entries))
+	for _, e := range entries {
+		want := deviceSetKey(e.DeviceList)
+		matched := slices.IndexFunc(remaining, func(idx int) bool {
+			return deviceSetKey(deviceSets[idx]) == want
+		})
+		if matched < 0 {
+			continue
+		}
+		remaining = slices.Delete(remaining, matched, matched+1)
+		kept = append(kept, e)
+	}
+	return kept, remaining
+}
+
+// unclaimedPods returns the pods that no entry in kept belongs to, in order.
+func unclaimedPods(pods []Pod, kept []ReservationEntry) []Pod {
+	unclaimed := make([]Pod, 0, len(pods))
+	for _, p := range pods {
+		if !slices.ContainsFunc(kept, func(e ReservationEntry) bool { return e.Pod.SameAs(p) }) {
+			unclaimed = append(unclaimed, p)
+		}
+	}
+	return unclaimed
 }
 
 func (r Reservation) legacyIsInSync() bool {
