@@ -24,7 +24,7 @@ spec:
       runAsNonRoot: true
       allowPrivilegeEscalation: false
     imagePullPolicy: IfNotPresent
-    image: "registry.access.redhat.com/ubi9-minimal:9.6"
+    image: "registry.access.redhat.com/ubi9-minimal:9.8"
     args:
     - sh
     - "-c"
@@ -61,7 +61,7 @@ spec:
       runAsNonRoot: true
       allowPrivilegeEscalation: false
     imagePullPolicy: IfNotPresent
-    image: "registry.access.redhat.com/ubi9-minimal:9.6"
+    image: "registry.access.redhat.com/ubi9-minimal:9.8"
     args:
     - "sleep infinity"
   - resources:
@@ -78,7 +78,7 @@ spec:
       allowPrivilegeEscalation: false
     imagePullPolicy: IfNotPresent
     terminationMessagePolicy: File
-    image: "registry.access.redhat.com/ubi9-minimal:9.6"
+    image: "registry.access.redhat.com/ubi9-minimal:9.8"
     args:
     - sh
     - "-c"
@@ -101,7 +101,7 @@ spec:
       allowPrivilegeEscalation: false
     imagePullPolicy: IfNotPresent
     terminationMessagePolicy: FallbackToLogsOnError
-    image: "registry.access.redhat.com/ubi9-minimal:9.6"
+    image: "registry.access.redhat.com/ubi9-minimal:9.8"
     args:
     - sh
     - "-c"
@@ -130,7 +130,7 @@ spec:
       readOnlyRootFilesystem: true
       allowPrivilegeEscalation: false
     imagePullPolicy: IfNotPresent
-    image: "registry.access.redhat.com/ubi9-minimal:9.6"
+    image: "registry.access.redhat.com/ubi9-minimal:9.8"
     args:
     - sh
     - "-c"
