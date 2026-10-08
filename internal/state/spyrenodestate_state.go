@@ -158,10 +158,17 @@ func (s *SpyreNodeStateState) CheckActiveDevicePluginWorkloads(ctx context.Conte
 	var activePods []string
 	for _, nodeState := range nodeStateList.Items {
 		for _, allocation := range nodeState.Status.AllocationList {
-			if s.isActivePod(ctx, logger, allocation) {
-				podName := allocation.Pod.Name
-				podNamespace := allocation.Pod.Namespace
-				activePods = append(activePods, fmt.Sprintf("%s/%s", podNamespace, podName))
+			isActive, err := s.allocationIsActive(ctx, logger, allocation)
+			if err != nil {
+				// Fail closed: if we cannot tell whether the Pod is still using the
+				// devices, assume it is, so that DRA is not enabled underneath it.
+				logger.Info("failed to check allocation, treating it as active",
+					"namespace", allocation.Pod.Namespace, "name", allocation.Pod.Name, "error", err)
+				isActive = true
+			}
+			if isActive {
+				activePods = append(activePods,
+					fmt.Sprintf("%s/%s", allocation.Pod.Namespace, allocation.Pod.Name))
 			}
 		}
 	}
@@ -175,29 +182,41 @@ func (s *SpyreNodeStateState) CheckActiveDevicePluginWorkloads(ctx context.Conte
 	return nil
 }
 
-// isActivePod returns true if the allocation has devices and a pod reference that exists
-func (s *SpyreNodeStateState) isActivePod(ctx context.Context, logger logr.Logger,
-	allocation spyrev1alpha1.Allocation) bool {
+// allocationIsActive returns true if the allocation has devices and a pod reference that exists
+func (s *SpyreNodeStateState) allocationIsActive(ctx context.Context, logger logr.Logger,
+	allocation spyrev1alpha1.Allocation) (bool, error) {
 	// Check if allocation has devices and a pod reference
 	if len(allocation.DeviceList) > 0 && allocation.Pod != nil {
 		podName := allocation.Pod.Name
 		podNamespace := allocation.Pod.Namespace
 		if podName == "" || podNamespace == "" {
-			return false
+			return false, nil
 		}
 
 		// Verify the pod still exists
 		pod := &corev1.Pod{}
 		key := client.ObjectKey{Namespace: podNamespace, Name: podName}
 		err := s.k8sClient.Get(ctx, key, pod)
-		if err == nil {
-			return true
-		} else if !apierrors.IsNotFound(err) {
-			// Error other than not found - log but continue checking
-			logger.V(1).Info("error checking pod existence", "pod", fmt.Sprintf("%s/%s", podNamespace, podName), "error", err)
+		switch {
+		case err == nil:
+			// This is the only path that returns true: the Pod exists and its
+			// UID matches the allocation, or the allocation has no UID recorded
+			// (written by an older version; accepted for backward compatibility).
+			if pod.UID == allocation.Pod.UID || allocation.Pod.UID == "" {
+				return true, nil
+			} else {
+				logger.V(1).Info("ignore stale allocation",
+					"pod", fmt.Sprintf("%s/%s", podNamespace, podName),
+					"allocatedUID", allocation.Pod.UID, "currentUID", pod.UID)
+			}
+		case apierrors.IsNotFound(err):
+			logger.V(1).Info("allocated Pod no longer exists",
+				"pod", fmt.Sprintf("%s/%s", podNamespace, podName))
+		default:
+			return false, fmt.Errorf("failed to get pod %s/%s: %w", podNamespace, podName, err)
 		}
 	}
-	return false
+	return false, nil
 }
 
 // DeleteAllSpyreNodeStates deletes all SpyreNodeState resources in the cluster.
