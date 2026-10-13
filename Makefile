@@ -135,6 +135,7 @@ JQ				?= $(LOCALBIN)/jq
 KIND			?= $(LOCALBIN)/kind
 KIND			?= $(LOCALBIN)/kind
 KUSTOMIZE 		?= $(LOCALBIN)/kustomize
+OPERATOR_SDK	?= $(LOCALBIN)/operator-sdk
 YQ				?= $(LOCALBIN)/yq
 YAMLFMT			?= $(LOCALBIN)/yamlfmt
 
@@ -147,6 +148,7 @@ GOLANGCI_LINT_VERSION		?= 2.11.4
 JQ_VERSION 					?= jq-1.7.1
 KIND_VERSION				?= 0.20.0
 KUSTOMIZE_VERSION 			?= v5.4.1
+OPERATOR_SDK_VERSION		?= v1.42.3
 YQ_VERSION 					?= v4.29.2
 KUSTOMIZE_INSTALL_SCRIPT 	?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 YAMLFMT_VERSION				?= v0.17.0
@@ -259,6 +261,15 @@ else
 	@echo make: Nothing to be done for 'kustomize'.
 endif
 
+.PHONY: operator-sdk
+operator-sdk: $(LOCALBIN) ## Download operator-sdk locally if necessary
+	@if [ ! -x "$(OPERATOR_SDK)" ] || ! "$(OPERATOR_SDK)" version 2>/dev/null | grep -q 'operator-sdk version: "$(OPERATOR_SDK_VERSION)"'; then \
+		echo "Installing operator-sdk $(OPERATOR_SDK_VERSION) to $(OPERATOR_SDK)"; \
+		OS=$$(go env GOOS) && ARCH=$$(go env GOARCH) && \
+		curl --retry 30 -sSfLo $(OPERATOR_SDK) https://github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/operator-sdk_$${OS}_$${ARCH} && \
+		chmod +x $(OPERATOR_SDK); \
+	fi
+
 .PHONY: opm
 OPM = ./bin/opm
 opm: ## Download opm if necessary
@@ -283,7 +294,7 @@ crdoc:
 ##@ Operator Artifacts
 
 .PHONY: manifests
-manifests: controller-gen yamlfmt ## Generate manifests
+manifests: vendor controller-gen yamlfmt ## Generate manifests
 	$(CONTROLLER_GEN) rbac:roleName=manager-role,headerFile="hack/boilerplate.yaml.txt",year="2025" \
 					  crd:headerFile="hack/boilerplate.yaml.txt",year="2025" \
 					  webhook:headerFile="hack/boilerplate.yaml.txt",year="2025" \
@@ -296,11 +307,11 @@ generate: controller-gen ## Generate code
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="{./api/...,./controllers/...,./pkg/...,./internal/...}"
 
 .PHONY: bundle
-bundle: kustomize yq yamlfmt manifests ## Generate bundle manifests and metadata using base branch version
-	operator-sdk generate kustomize manifests -q
+bundle: kustomize yq yamlfmt operator-sdk manifests ## Generate bundle manifests and metadata using base branch version
+	$(OPERATOR_SDK) generate kustomize manifests -q
 	$(YAMLFMT) -conf=$(REPO_ROOT)/.yamlfmt $(REPO_ROOT)/config/manifests/bases/spyre-operator.clusterserviceversion.yaml
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMAGE_NAME):$(VERSION)
-	$(KUSTOMIZE) build config/manifests | operator-sdk generate bundle $(BUNDLE_GEN_FLAGS) --version $(VERSION)
+	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle $(BUNDLE_GEN_FLAGS) --version $(VERSION)
 	$(YQ) eval -i ".annotations[\"com.redhat.openshift.versions\"]=\"$(OCP_VERSIONS)\"" ${REPO_ROOT}/bundle/metadata/annotations.yaml
 	$(YQ) eval -i ".spec.image=\"$(IMAGE_TAG_BASE)-catalog:$(VERSION)\"" ${REPO_ROOT}/config/olm/catalog-source.yaml
 	find bundle -type d -exec chmod 755 {} \;
@@ -308,11 +319,11 @@ bundle: kustomize yq yamlfmt manifests ## Generate bundle manifests and metadata
 	$(YAMLFMT) -conf=$(REPO_ROOT)/.yamlfmt -dstar "$(REPO_ROOT)/config/**/*.yaml" "$(REPO_ROOT)/bundle/**/*.yaml" $(REPO_ROOT)/config/olm/catalog-source.yaml
 
 .PHONY: bundle-validate
-bundle-validate: ## Validate the bundle files
+bundle-validate: operator-sdk ## Validate the bundle files
 ifeq ($(DOCKER),docker)
-	operator-sdk bundle validate ./bundle --optional-values=container-tools=docker --select-optional name=multiarch
+	$(OPERATOR_SDK) bundle validate ./bundle --optional-values=container-tools=docker --select-optional name=multiarch
 else
-	operator-sdk bundle validate ./bundle --optional-values=container-tools=podman --select-optional name=multiarch
+	$(OPERATOR_SDK) bundle validate ./bundle --optional-values=container-tools=podman --select-optional name=multiarch
 endif
 
 .PHONY: bundle-build
@@ -415,8 +426,12 @@ fmt: ## Run the formatter
 vet: vendor ## Run the vet command
 	go vet -mod vendor ./...
 
+.PHONY: tidy
+tidy: ## Run go mod tidy
+	go mod tidy
+
 .PHONY: vendor
-vendor: ## Run vendor
+vendor: tidy ## Run vendor
 	go mod vendor
 
 .PHONY: build

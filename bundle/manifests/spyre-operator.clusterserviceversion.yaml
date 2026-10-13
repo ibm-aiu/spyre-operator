@@ -63,7 +63,7 @@ metadata:
     capabilities: Basic Install
     categories: AI/Machine Learning
     containerImage: docker.io/spyre-operator/spyre-operator:1.5.0
-    createdAt: "2026-10-05T05:42:11Z"
+    createdAt: "2026-10-13T05:39:02Z"
     description: Operator for IBM Spyre devices
     features.operators.openshift.io/disconnected: "false"
     features.operators.openshift.io/fips-compliant: "false"
@@ -74,7 +74,7 @@ metadata:
     features.operators.openshift.io/token-auth-gcp: "false"
     operatorframework.io/suggested-namespace: spyre-operator
     operators.openshift.io/valid-subscription: use with IBM Spyre
-    operators.operatorframework.io/builder: operator-sdk-v1.38.0
+    operators.operatorframework.io/builder: operator-sdk-v1.42.3
     operators.operatorframework.io/internal-objects: '["spyrenodestates.spyre.ibm.com"]'
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
     support: IBM
