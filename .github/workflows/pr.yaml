@@ -22,7 +22,7 @@ jobs:
   pre-commit:
     uses: ibm-aiu/spyre-operator-actions/.github/workflows/pre-commit.yaml@main
 
-  check-api-docs:
+  check-api-docs-bundle-build:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
@@ -58,6 +58,15 @@ jobs:
           echo "::error::API documentation is out of date. Please run 'make api-docs' and commit the changes."
           exit 1
         fi
+
+    - name: Run bundle-related targets and check differences
+      run: |
+        make bundle bundle-validate bundle-build
+        git diff --numstat | awk '{add+=$1; rem+=$2} END {exit !(add==1 && rem==1)}'
+
+    - name: Run make docker-buld
+      run: |
+        make docker-build
 
   check-e2e-label:
     runs-on: ubuntu-latest
