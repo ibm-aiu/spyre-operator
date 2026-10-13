@@ -20,7 +20,6 @@ permissions:
   packages: write # Crucial for pushing to ghcr.io
 
 env:
-  SDK_VERSION: 1.38.0
   DOCKER: docker
 
 jobs:
@@ -91,17 +90,6 @@ jobs:
 
         echo "arch=${ARCH}" >> $GITHUB_OUTPUT
         echo "Detected architecture: ${ARCH} from $(uname -m)"
-    - name: set ARCH and OS
-      run: |
-        echo "ARCH=${{ steps.detect_arch.outputs.arch }}" >> $GITHUB_ENV
-        echo "OS=$(uname | awk '{print tolower($0)}')" >> $GITHUB_ENV
-        echo "OPERATOR_SDK_DL_URL=https://github.com/operator-framework/operator-sdk/releases/download/v${{ env.SDK_VERSION }}" >> $GITHUB_ENV
-    - name: download operator-sdk
-      run: |
-        curl -LO ${{ env.OPERATOR_SDK_DL_URL }}/operator-sdk_${{ env.OS }}_${{ env.ARCH }}
-    - name: move operator-sdk to binary path
-      run: |
-        chmod +x operator-sdk_${{ env.OS }}_${{ env.ARCH }} && sudo mv operator-sdk_${{ env.OS }}_${{ env.ARCH }} /usr/local/bin/operator-sdk
     - name: Build bundle and setup fbc
       env:
         VERSION: ${{ steps.get_version.outputs.version }}-dev
