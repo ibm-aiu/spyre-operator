@@ -269,14 +269,17 @@ func BuildPod(name, namespace string, resourceName string, quantity int64, nodeN
 }
 
 func BuildMockUserPod(exporterPort int, testConfig TestConfig, name, namespace string, numOfSpyre int64, nodeName string) *corev1.Pod {
-	var True = true
+	var False = false
 	copyData := "./user-copy.sh"
 	sleepAndRunGetMetric := fmt.Sprintf("sleep 20; curl http://%s.%s:%d; sleep 1000", metricsExporterName, OperatorNamespace, exporterPort)
 	arg0 := fmt.Sprintf("%s;%s", copyData, sleepAndRunGetMetric)
 	pod := buildPod(name, namespace, "ibm.com/spyre_pf", numOfSpyre, nodeName, arg0, true)
 	pod.Spec.RestartPolicy = corev1.RestartPolicyOnFailure
 	pod.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{
-		Privileged: &True,
+		AllowPrivilegeEscalation: &False,
+		Capabilities: &corev1.Capabilities{
+			Drop: []corev1.Capability{"ALL"},
+		},
 	}
 	pod.Spec.Containers[0].Image = testConfig.ExporterMockUser.GetImage()
 	pod.Spec.Containers[0].ImagePullPolicy = corev1.PullPolicy(testConfig.ExporterMockUser.ImagePullPolicy)
