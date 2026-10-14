@@ -24,6 +24,8 @@ spec:
       labels:
         app: dra-driver-spyre
     spec:
+      securityContext:
+        supplementalGroups: [2000]
       priorityClassName: system-node-critical
       serviceAccountName: dra-driver-spyre
       initContainers:
