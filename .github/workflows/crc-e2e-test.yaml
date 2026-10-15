@@ -47,7 +47,7 @@ permissions: read-all
 
 jobs:
   crc-e2e-test:
-    uses: ibm-aiu/spyre-operator-actions/.github/workflows/crc-e2e-test.yaml@main
+    uses: ibm-aiu/spyre-operator-actions/.github/workflows/crc-e2e-test.yaml@sunya-ch-version
     with:
       runner: ${{ inputs.runner || 'ubuntu-24.04' }}
       branch-name: ${{ inputs.branch-name || 'main' }}
