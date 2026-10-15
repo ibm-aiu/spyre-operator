@@ -534,25 +534,31 @@ func transformCardManagementHealthApi(obj *appsv1.DaemonSet, healthApi *spyrev1a
 }
 
 // injectCardManagementResourceClaim wires the card-management Pod to the DRA
-// ResourceClaimTemplate, binding the container to the spyre PF and privileged VF
-// device requests. Only the container's resource claims are set; existing
-// cpu/memory limits and requests from the manifest are preserved.
+// ResourceClaimTemplates, binding the container to the spyre PF and privileged
+// VF device requests. PF and VF are requested through separate claims because
+// dra-driver-spyre rejects a claim that mixes devices with different product
+// IDs. Only the container's resource claims are set; existing cpu/memory limits
+// and requests from the manifest are preserved.
 //
 // The manifest leaves SchedulerName unset, so the Pod uses the default
 // scheduler here: device selection is handled by the DRA scheduler plugin via
-// the ResourceClaimTemplate, so the spyre-scheduler extender is not needed.
+// the ResourceClaimTemplates, so the spyre-scheduler extender is not needed.
 func injectCardManagementResourceClaim(obj *appsv1.DaemonSet) {
-	templateName := spyreconst.CardManagementResourceClaimTemplateName
-	claimName := spyreconst.CardManagementPodResourceClaimName
+	pfTemplateName := spyreconst.CardManagementPfResourceClaimTemplateName
+	vfTemplateName := spyreconst.CardManagementPrivilegedVfResourceClaimTemplateName
 	obj.Spec.Template.Spec.ResourceClaims = []corev1.PodResourceClaim{
 		{
-			Name:                      claimName,
-			ResourceClaimTemplateName: &templateName,
+			Name:                      spyreconst.CardManagementPfPodResourceClaimName,
+			ResourceClaimTemplateName: &pfTemplateName,
+		},
+		{
+			Name:                      spyreconst.CardManagementPrivilegedVfPodResourceClaimName,
+			ResourceClaimTemplateName: &vfTemplateName,
 		},
 	}
 	obj.Spec.Template.Spec.Containers[0].Resources.Claims = []corev1.ResourceClaim{
-		{Name: claimName, Request: spyreconst.DRADeviceRequestPf},
-		{Name: claimName, Request: spyreconst.DRADeviceRequestPrivilegedVf},
+		{Name: spyreconst.CardManagementPfPodResourceClaimName, Request: spyreconst.DRADeviceRequestPf},
+		{Name: spyreconst.CardManagementPrivilegedVfPodResourceClaimName, Request: spyreconst.DRADeviceRequestPrivilegedVf},
 	}
 }
 

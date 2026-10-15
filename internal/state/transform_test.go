@@ -944,17 +944,22 @@ var _ = Describe("Transform", func() {
 				// manifest's unset SchedulerName is left as-is
 				Expect(ds.Spec.Template.Spec.SchedulerName).To(BeEmpty())
 
+				// PF and VF must be requested through separate claims since
+				// dra-driver-spyre rejects claims mixing product IDs
 				claims := ds.Spec.Template.Spec.ResourceClaims
-				Expect(claims).To(HaveLen(1))
-				Expect(claims[0].Name).To(Equal(spyreconst.CardManagementPodResourceClaimName))
+				Expect(claims).To(HaveLen(2))
+				Expect(claims[0].Name).To(Equal(spyreconst.CardManagementPfPodResourceClaimName))
 				Expect(claims[0].ResourceClaimTemplateName).NotTo(BeNil())
-				Expect(*claims[0].ResourceClaimTemplateName).To(Equal(spyreconst.CardManagementResourceClaimTemplateName))
+				Expect(*claims[0].ResourceClaimTemplateName).To(Equal(spyreconst.CardManagementPfResourceClaimTemplateName))
+				Expect(claims[1].Name).To(Equal(spyreconst.CardManagementPrivilegedVfPodResourceClaimName))
+				Expect(claims[1].ResourceClaimTemplateName).NotTo(BeNil())
+				Expect(*claims[1].ResourceClaimTemplateName).To(Equal(spyreconst.CardManagementPrivilegedVfResourceClaimTemplateName))
 
 				containerClaims := ds.Spec.Template.Spec.Containers[0].Resources.Claims
 				Expect(containerClaims).To(HaveLen(2))
-				Expect(containerClaims[0].Name).To(Equal(spyreconst.CardManagementPodResourceClaimName))
+				Expect(containerClaims[0].Name).To(Equal(spyreconst.CardManagementPfPodResourceClaimName))
 				Expect(containerClaims[0].Request).To(Equal(spyreconst.DRADeviceRequestPf))
-				Expect(containerClaims[1].Name).To(Equal(spyreconst.CardManagementPodResourceClaimName))
+				Expect(containerClaims[1].Name).To(Equal(spyreconst.CardManagementPrivilegedVfPodResourceClaimName))
 				Expect(containerClaims[1].Request).To(Equal(spyreconst.DRADeviceRequestPrivilegedVf))
 
 				// cpu/memory limits preserved, no device-plugin extended resources

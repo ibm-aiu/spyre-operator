@@ -97,17 +97,23 @@ const (
 	CardManagementHealthApiSocketMountPath   = "/var/run/cardmgmt-health-check-api"
 
 	// DRA (Dynamic Resource Allocation) card management.
-	// CardManagementResourceClaimTemplateName is the name of the
-	// ResourceClaimTemplate object (see
-	// `assets/state-plugin-components/spyre-card-management/0550_resourceclaimtemplate.yaml`)
+	// CardManagementPfResourceClaimTemplateName and
+	// CardManagementPrivilegedVfResourceClaimTemplateName are the names of the
+	// ResourceClaimTemplate objects (see
+	// `assets/state-plugin-components/spyre-card-management/055*_resourceclaimtemplate_*.yaml`)
 	// that the card-management Pod references when DevicePlugin.DRADriver is enabled.
-	CardManagementResourceClaimTemplateName = "spyre-card-management"
-	// CardManagementPodResourceClaimName is the pod-local name used in
-	// pod.spec.resourceClaims and referenced from container.resources.claims.
-	CardManagementPodResourceClaimName = "spyre-cards"
+	// PF and VF are requested through separate claims because dra-driver-spyre
+	// rejects a claim that mixes devices with different product IDs.
+	CardManagementPfResourceClaimTemplateName           = "spyre-card-management-pf"
+	CardManagementPrivilegedVfResourceClaimTemplateName = "spyre-card-management-privileged-vf"
+	// CardManagementPfPodResourceClaimName and
+	// CardManagementPrivilegedVfPodResourceClaimName are the pod-local names used
+	// in pod.spec.resourceClaims and referenced from container.resources.claims.
+	CardManagementPfPodResourceClaimName           = "spyre-pf"
+	CardManagementPrivilegedVfPodResourceClaimName = "spyre-privileged-vf"
 	// DRADeviceRequestPf and DRADeviceRequestPrivilegedVf are the request names
-	// defined in the ResourceClaimTemplate. They must match the request names in
-	// the YAML asset and target the spyre-pf / spyre-privileged-vf DeviceClasses.
+	// defined in the ResourceClaimTemplates. They must match the request names in
+	// the YAML assets and target the spyre-pf / spyre-privileged-vf DeviceClasses.
 	DRADeviceRequestPf           = "spyre-pf"
 	DRADeviceRequestPrivilegedVf = "spyre-privileged-vf"
 
