@@ -1383,6 +1383,7 @@ func (obj *SecondaryScheduler) TransformByPolicy(scheme *runtime.Scheme,
 		return fmt.Errorf("failed o get scheduler image path: %w", err)
 	}
 	obj.loadedObj.Spec.SchedulerImage = image
+	obj.loadedObj.Spec.LogLevel = schedulerLogLevel(cluster.GetLogLevel())
 	return nil
 }
 

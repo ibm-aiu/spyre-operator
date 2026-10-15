@@ -24,6 +24,7 @@ import (
 
 	spyrev1alpha1 "github.com/ibm-aiu/spyre-operator/api/v1alpha1"
 	spyreconst "github.com/ibm-aiu/spyre-operator/const"
+	operatorv1 "github.com/openshift/api/operator/v1"
 	"go.uber.org/zap/zapcore"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -262,6 +263,19 @@ func transformDevicePluginLogLevel(obj *appsv1.DaemonSet, logLevel zapcore.Level
 		obj.Spec.Template.Spec.Containers[0].Args = append(obj.Spec.Template.Spec.Containers[0].Args,
 			fmt.Sprintf("--v=%d", -logLevel)) // invert zap loglevel.
 	}
+}
+
+// schedulerLogLevel maps the operator's log level onto the coarse levels the
+// Secondary Scheduler Operator offers for the scheduler it deploys: debug becomes
+// Debug (-v=4), and every less verbose level Normal (-v=2). At -v=4 the
+// scheduler logs several lines per node for every scheduling attempt, which
+// under load is enough to rotate its log away within minutes, so it is only
+// worth having when asked for.
+func schedulerLogLevel(logLevel zapcore.Level) operatorv1.LogLevel {
+	if logLevel <= zapcore.DebugLevel {
+		return operatorv1.Debug
+	}
+	return operatorv1.Normal
 }
 
 func transformDevicePluginPath(obj *appsv1.DaemonSet, config *spyrev1alpha1.SpyreClusterPolicySpec) {
