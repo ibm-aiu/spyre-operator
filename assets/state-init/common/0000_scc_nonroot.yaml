@@ -32,6 +32,8 @@ supplementalGroups:
   ranges:
   - min: 0
     max: 0
+  - min: 2000
+    max: 2000
 seLinuxContext:
   type: RunAsAny
 volumes:

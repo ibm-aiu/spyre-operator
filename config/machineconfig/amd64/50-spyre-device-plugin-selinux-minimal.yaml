@@ -59,9 +59,14 @@ spec:
           # Set permissions for group write access (device plugin runs as UID 1001, GID 0)
           ExecStart=/usr/bin/chmod 770 /usr/local/etc/device-plugins
           ExecStart=/usr/bin/chmod 770 /usr/local/etc/device-plugins/spyre-config
-          ExecStart=/usr/bin/chmod 770 /usr/local/etc/device-plugins/spyre-metrics
+          ExecStart=/usr/bin/chmod 2770 /usr/local/etc/device-plugins/spyre-metrics
           ExecStart=/usr/bin/chmod 770 /usr/local/etc/device-plugins/spyre-sockets
           ExecStart=/usr/bin/chmod 770 /usr/local/etc/device-plugins/metadata
+
+          # Set owning group of spyre-metrics to 2000
+          ExecStart=/usr/bin/chgrp 2000 /usr/local/etc/device-plugins/spyre-metrics
+          # Set default ACL so runtime-created subdirs inherit rwx for GID 2000.
+          ExecStart=/usr/bin/setfacl -d -m g:2000:rwx /usr/local/etc/device-plugins/spyre-metrics
 
           # Fix SELinux context for container access
           ExecStart=/usr/bin/chcon -R -t container_file_t /usr/local/etc/device-plugins

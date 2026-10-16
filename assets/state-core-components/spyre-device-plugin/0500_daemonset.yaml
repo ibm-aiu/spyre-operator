@@ -20,6 +20,8 @@ spec:
       labels:
         app: spyre-device-plugin
     spec:
+      securityContext:
+        supplementalGroups: [2000]
       initContainers:
       - name: init-senlib
         image: "FILLED BY THE OPERATOR"
