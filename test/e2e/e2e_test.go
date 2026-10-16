@@ -846,6 +846,7 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 		var pciAddress string
 		var pciFunctionIndex int64
 		numaMap := map[string]string{}
+		tier0GroupMap := map[string]string{}
 		var originalSpec spyrev1alpha1.SpyreClusterPolicySpec
 
 		AfterAll(func() {
@@ -890,6 +891,9 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 					for _, d := range rsi.Spec.Devices {
 						addr := *d.Attributes["pciAddress"].StringValue
 						numaMap[addr] = *d.Attributes["numaInfo"].StringValue
+						if v, ok := d.Attributes["tier0Group"]; ok && v.StringValue != nil {
+							tier0GroupMap[addr] = *v.StringValue
+						}
 					}
 					found = true
 					break
@@ -927,15 +931,15 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 			pod, err := k8sClientset.CoreV1().Pods(testNamespace).Get(ctx, testPodName, metav1.GetOptions{})
 			Expect(err).To(BeNil())
 			WaitForPodRunning(ctx, k8sClientset, pod)
-			pciAddress := CheckAndGetAllocationsFromPodLog(ctx, k8sClientset, testPodName, testNamespace)
-			Expect(pciAddress).To(HaveLen(templateData.Count))
+			allocatedAddrs := CheckAndGetAllocationsFromPodLog(ctx, k8sClientset, testPodName, testNamespace)
+			Expect(allocatedAddrs).To(HaveLen(templateData.Count))
 			if templateData.PCIAddress != "" {
-				Expect(pciAddress).To(ContainElement(templateData.PCIAddress))
+				Expect(allocatedAddrs).To(ContainElement(templateData.PCIAddress))
 			}
 			if templateData.MatchAttribute != "" {
-				numa, found := numaMap[pciAddress[0]]
+				numa, found := numaMap[allocatedAddrs[0]]
 				Expect(found).To(BeTrue())
-				for _, addr := range pciAddress[1:] {
+				for _, addr := range allocatedAddrs[1:] {
 					cmpNuma, found := numaMap[addr]
 					Expect(found).To(BeTrue())
 					Expect(cmpNuma).To(Equal(numa))
@@ -971,6 +975,97 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 				}
 			}),
 		)
+
+		Context("tier allocation", Ordered, func() {
+			// tier0GroupSize is the number of devices that share the same tier0Group value,
+			// i.e. the size of one tier0 co-location group.
+			var tier0GroupSize int
+
+			BeforeAll(func() {
+				if !testConfig.DevicePluginInit.Enabled {
+					Skip("Require topology (init container) for tier allocation")
+				}
+				if len(tier0GroupMap) == 0 {
+					Skip("No tier0Group attribute found in resourceslices")
+				}
+				// Count devices in the first tier0 group we encounter.
+				groupCounts := map[string]int{}
+				for _, g := range tier0GroupMap {
+					groupCounts[g]++
+				}
+				for _, count := range groupCounts {
+					tier0GroupSize = count
+					break
+				}
+				By(fmt.Sprintf("found tier0 group size of %d devices", tier0GroupSize))
+			})
+
+			AfterEach(func() {
+				DeletePodWithData(ctx, k8sClientset, &PodTemplateData{
+					Name:      testPodName,
+					Namespace: testNamespace,
+				})
+				DeleteResourceClaimTemplate(ctx, k8sClientset, testClaimName, testNamespace)
+				By("waiting for all resource claims to be released")
+				Eventually(func(g Gomega) {
+					claims := ListResourceClaims(ctx, k8sClientset, testNamespace)
+					g.Expect(claims).To(BeEmpty())
+				}).WithTimeout(2 * time.Minute).WithPolling(5 * time.Second).Should(Succeed())
+			})
+
+			It("cannot allocate more tier0 devices than fit in one group", func() {
+				By(fmt.Sprintf("requesting %d tier0 devices (one more than the group size of %d)", tier0GroupSize+1, tier0GroupSize))
+				templateData := ResourceClaimTemplateData{
+					Name:            testClaimName,
+					Namespace:       testNamespace,
+					Count:           tier0GroupSize + 1,
+					MatchAttribute:  Tier0GroupAttribute,
+					DeviceClassName: DeviceClassNameForDevice(PfProductId, 0),
+				}
+				BuildResourceClaimTemplate(ctx, dynClient, discoClient, &templateData)
+				BuildPodWithClaim(ctx, dynClient, discoClient, &PodTemplateData{
+					Name:      testPodName,
+					Namespace: testNamespace,
+					Image:     Ubi9MicroTestImage,
+				}, testClaimName)
+				By("verifying pod stays Pending — no single tier0 group has enough devices")
+				SimpleCheckPodPhases(ctx, k8sClientset,
+					[]*PodTemplateData{{Name: testPodName, Namespace: testNamespace}},
+					map[v1.PodPhase]int{v1.PodPending: 1})
+			})
+
+			It("can allocate devices within a single tier0 group", func() {
+				By(fmt.Sprintf("requesting %d devices from the same tier0 group", tier0GroupSize))
+				templateData := ResourceClaimTemplateData{
+					Name:            testClaimName,
+					Namespace:       testNamespace,
+					Count:           tier0GroupSize,
+					MatchAttribute:  Tier0GroupAttribute,
+					DeviceClassName: DeviceClassNameForDevice(PfProductId, 0),
+				}
+				BuildResourceClaimTemplate(ctx, dynClient, discoClient, &templateData)
+				BuildPodWithClaim(ctx, dynClient, discoClient, &PodTemplateData{
+					Name:      testPodName,
+					Namespace: testNamespace,
+					Image:     Ubi9MicroTestImage,
+					Arg0:      PrintSenlibConfig,
+				}, testClaimName)
+				By("waiting for pod running")
+				pod, err := k8sClientset.CoreV1().Pods(testNamespace).Get(ctx, testPodName, metav1.GetOptions{})
+				Expect(err).To(BeNil())
+				WaitForPodRunning(ctx, k8sClientset, pod)
+				allocatedAddrs := CheckAndGetAllocationsFromPodLog(ctx, k8sClientset, testPodName, testNamespace)
+				Expect(allocatedAddrs).To(HaveLen(tier0GroupSize))
+				By("verifying all allocated devices share the same tier0 group")
+				refGroup, found := tier0GroupMap[allocatedAddrs[0]]
+				Expect(found).To(BeTrue(), "expected tier0Group attribute for device %s", allocatedAddrs[0])
+				for _, addr := range allocatedAddrs[1:] {
+					grp, found := tier0GroupMap[addr]
+					Expect(found).To(BeTrue(), "expected tier0Group attribute for device %s", addr)
+					Expect(grp).To(Equal(refGroup))
+				}
+			})
+		})
 	})
 
 	// This set of tests should be executed last so that the stop / start
