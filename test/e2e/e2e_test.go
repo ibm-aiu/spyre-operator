@@ -1066,6 +1066,10 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 				}
 			})
 		})
+
+		It("can gradually allocate 50 Spyres", func() {
+			draAllocationTestCase(ctx, testNamespace, productId, pciFunctionIndex)
+		})
 	})
 
 	// This set of tests should be executed last so that the stop / start
@@ -1368,48 +1372,67 @@ func getHealthyDeviceList() []string {
 	return healthyDevices
 }
 
-func commonAllocationTestCase(ctx context.Context, testNamespace string, schedulerEnabled bool) {
-	nPods := 25
+// assertExpectedRunningPods checks that:
+//   - no pods are in Failed phase
+//   - exactly `expectedRunning` pods are Running
+//   - exactly `expectedPending` pods are Pending
+//   - each running pod's senlib_config.json contains exactly 1 PCI address
+//   - SpyreNodeState.AllocationList length matches the number of running pods
+//
+// It writes the current running pod list into *runningPods so the caller can
+// delete those pods after the assertion succeeds.
+func assertExpectedRunningPods(ctx context.Context, g Gomega, testNamespace string, expectedRunning, expectedPending int, runningPods **v1.PodList) {
+	failedPods, err := k8sClientset.CoreV1().Pods(testNamespace).List(ctx,
+		metav1.ListOptions{FieldSelector: "status.phase=Failed"})
+	Expect(err).To(BeNil())
+	Expect(failedPods.Items).To(HaveLen(0))
+
+	pods, err := k8sClientset.CoreV1().Pods(testNamespace).List(ctx,
+		metav1.ListOptions{FieldSelector: "status.phase=Running"})
+	g.Expect(err).To(BeNil())
+	g.Expect(len(pods.Items)).Should(BeNumerically("==", expectedRunning), fmt.Sprintf("%v\n", pods))
+
+	pendingPods, err := k8sClientset.CoreV1().Pods(testNamespace).List(ctx,
+		metav1.ListOptions{FieldSelector: "status.phase=Pending"})
+	g.Expect(err).To(BeNil())
+	g.Expect(len(pendingPods.Items)).Should(BeNumerically("==", expectedPending), fmt.Sprintf("%v\n", pendingPods))
+
+	// assert each Pod can read senlib_config.json
+	for _, p := range pods.Items {
+		senlibConfig := GetSenlibConfig(ctx, k8sClientset, p.Name, p.Namespace)
+		g.Expect(len(senlibConfig.General.PciAddresses)).Should(Equal(1))
+	}
+
+	// assert allocation of SpyreNodeState is expected
+	spyrens, err := GetSpyreNodeState(ctx, spyreV2Client, targetNodeName)
+	g.Expect(err).To(BeNil())
+	g.Expect(len(spyrens.Status.AllocationList)).To(Equal(len(pods.Items)))
+
+	*runningPods = pods
+}
+
+// gradualAllocationLoop is the shared core of the "gradually allocate N Spyres" test cases.
+// It accepts a createPods callback that is responsible for submitting nPods pods to the
+// cluster, and a cleanup callback that is called once all pods have been drained to release
+// any extra resources (e.g. DRA ResourceClaimTemplates).  The loop itself is identical for
+// both the device-plugin and DRA paths.
+func gradualAllocationLoop(ctx context.Context, testNamespace string, nPods int, createPods func(), cleanup func()) {
 	nSpyres := getNumDevices()
 
 	By("creating Pods")
-	pods := BuildPods(nPods, petname.Generate(2, "-"), testNamespace, "ibm.com/spyre_pf", 1, targetNodeName, schedulerEnabled)
-	for _, pod := range pods {
-		Eventually(func(g Gomega) {
-			_, err := k8sClientset.CoreV1().Pods(pod.Namespace).Create(ctx, pod, metav1.CreateOptions{})
-			g.Expect(err).To(BeNil())
-		}).WithTimeout(3 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
-	}
+	createPods()
 
 	By("deleting pods, then asserting pod and allocation statuses")
 	var runningPods *v1.PodList
 	for nRemainingPods := nPods; nRemainingPods > 0; nRemainingPods -= nSpyres {
+		// running = min(nRemainingPods, nSpyres); pending = the rest still waiting
+		expectedRunning := nSpyres
+		if nRemainingPods < nSpyres {
+			expectedRunning = nRemainingPods
+		}
+		expectedPending := nRemainingPods - expectedRunning
 		Eventually(func(g Gomega) {
-			// assert expected number of Pods are running
-			// expected number should be equals to the number of Spyres unless the number of
-			// remaining Pods is less than the number of Spyres.
-			expected := nSpyres
-			if nRemainingPods < nSpyres {
-				expected = nRemainingPods
-			}
-
-			failedPods, err := k8sClientset.CoreV1().Pods(testNamespace).List(ctx,
-				metav1.ListOptions{FieldSelector: "status.phase=Failed"})
-			Expect(err).To(BeNil())
-			Expect(failedPods.Items).To(HaveLen(0))
-			runningPods, err = k8sClientset.CoreV1().Pods(testNamespace).List(ctx,
-				metav1.ListOptions{FieldSelector: "status.phase=Running"})
-			g.Expect(err).To(BeNil())
-			g.Expect(len(runningPods.Items)).Should(BeNumerically("==", expected), fmt.Sprintf("%v\n", runningPods))
-			// assert each Pod can read senlib_config.json
-			for _, p := range runningPods.Items {
-				senlibConfig := GetSenlibConfig(ctx, k8sClientset, p.Name, p.Namespace)
-				g.Expect(len(senlibConfig.General.PciAddresses)).Should(Equal(1))
-			}
-			// asset allocation of SpyreNodeState is expected
-			spyrens, err := GetSpyreNodeState(ctx, spyreV2Client, targetNodeName)
-			g.Expect(err).To(BeNil())
-			g.Expect(len(spyrens.Status.AllocationList)).To(Equal(len(runningPods.Items)))
+			assertExpectedRunningPods(ctx, g, testNamespace, expectedRunning, expectedPending, &runningPods)
 		}).WithTimeout(180 * time.Second).WithPolling(10 * time.Second).Should(Succeed())
 
 		// delete all of the running Pods
@@ -1426,5 +1449,66 @@ func commonAllocationTestCase(ctx context.Context, testNamespace string, schedul
 			Expect(err).To(BeNil())
 			g.Expect(podList.Items).To(HaveLen(0))
 		}).WithTimeout(60 * time.Second).WithPolling(10 * time.Second).Should(Succeed())
+	})
+
+	if cleanup != nil {
+		cleanup()
+	}
+}
+
+// commonAllocationTestCase tests the device-plugin path: 25 pods each requesting one
+// ibm.com/spyre_pf via the Spyre scheduler (or default scheduler when disabled).
+func commonAllocationTestCase(ctx context.Context, testNamespace string, schedulerEnabled bool) {
+	nPods := 25
+	prefix := petname.Generate(2, "-")
+	pods := BuildPods(nPods, prefix, testNamespace, "ibm.com/spyre_pf", 1, targetNodeName, schedulerEnabled)
+
+	gradualAllocationLoop(ctx, testNamespace, nPods, func() {
+		for _, pod := range pods {
+			Eventually(func(g Gomega) {
+				_, err := k8sClientset.CoreV1().Pods(pod.Namespace).Create(ctx, pod, metav1.CreateOptions{})
+				g.Expect(err).To(BeNil())
+			}).WithTimeout(3 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
+		}
+	}, nil)
+}
+
+// draAllocationTestCase tests the DRA driver path: 50 pods each backed by an individual
+// ResourceClaimTemplate requesting one device of the given productId/pciFunctionIndex.
+func draAllocationTestCase(ctx context.Context, testNamespace string, productId string, pciFunctionIndex int64) {
+	nPods := 50
+	prefix := petname.Generate(2, "-")
+	deviceClassName := DeviceClassNameForDevice(productId, pciFunctionIndex)
+
+	gradualAllocationLoop(ctx, testNamespace, nPods, func() {
+		for i := 0; i < nPods; i++ {
+			podName := fmt.Sprintf("%s-%d", prefix, i)
+			claimName := fmt.Sprintf("%s-claim-%d", prefix, i)
+			templateData := ResourceClaimTemplateData{
+				Name:            claimName,
+				Namespace:       testNamespace,
+				Count:           1,
+				ProductId:       productId,
+				DeviceClassName: deviceClassName,
+			}
+			BuildResourceClaimTemplate(ctx, dynClient, discoClient, &templateData)
+			BuildPodWithClaim(ctx, dynClient, discoClient, &PodTemplateData{
+				Name:             podName,
+				Namespace:        testNamespace,
+				Image:            Ubi9MicroTestImage,
+				NodeSelectorNode: targetNodeName,
+				Arg0:             PrintSenlibConfig,
+			}, claimName)
+		}
+	}, func() {
+		By("deleting all claim templates")
+		for i := 0; i < nPods; i++ {
+			DeleteResourceClaimTemplate(ctx, k8sClientset, fmt.Sprintf("%s-claim-%d", prefix, i), testNamespace)
+		}
+		By("waiting for all resource claims to be released")
+		Eventually(func(g Gomega) {
+			claims := ListResourceClaims(ctx, k8sClientset, testNamespace)
+			g.Expect(claims).To(BeEmpty())
+		}).WithTimeout(2 * time.Minute).WithPolling(5 * time.Second).Should(Succeed())
 	})
 }
