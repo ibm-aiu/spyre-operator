@@ -30,9 +30,10 @@ import (
 )
 
 const (
-	numaAttribute = "spyre.ibm.com/numaInfo"
-	PfProductId   = "06a7"
-	VfProductId   = "06a8"
+	numaAttribute       = "spyre.ibm.com/numaInfo"
+	Tier0GroupAttribute = "spyre.ibm.com/tier0Group"
+	PfProductId         = "06a7"
+	VfProductId         = "06a8"
 
 	pfDeviceClassName           = "spyre-pf"
 	vfDeviceClassName           = "spyre-standard-vf"
