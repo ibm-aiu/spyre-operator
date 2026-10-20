@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/go-logr/logr"
@@ -28,6 +29,7 @@ import (
 	discoveryv1 "k8s.io/api/discovery/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	resourcev1 "k8s.io/api/resource/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -78,6 +80,23 @@ type ControlledObject interface {
 	Ready(context.Context, client.Client) bool
 	// TransformByPolicy transform the object using the inputs from clusterPolicy
 	TransformByPolicy(scheme *runtime.Scheme, clusterPolicy *spyrev1alpha1.SpyreClusterPolicy, cluster *ClusterState) error
+}
+
+// DegradedNode describes a node on which a per-node object is permanently unable to become ready
+type DegradedNode struct {
+	Name   string
+	Reason string
+}
+
+// DegradableObject is implemented by controlled objects which can be permanently unable to become ready
+// on some of the nodes they run on (e.g., a Pod stays unschedulable because no device is available on the node).
+// Such an object must not block the other objects from being synced.
+type DegradableObject interface {
+	// Degraded returns the nodes on which the object is permanently, not temporarily, unable to become ready.
+	// Returns an empty list if there is no such node.
+	Degraded(ctx context.Context, k8sClient client.Client) []DegradedNode
+	// NodeNames returns the names of all the nodes on which the object runs
+	NodeNames() []string
 }
 
 // ControlledID identifies controlled object by kind, name, and namespace
@@ -849,8 +868,117 @@ func (obj *PodValidatorDeployment) Ready(ctx context.Context, k8sClient client.C
 	return true
 }
 
+// cardMgmtUnschedulableGracePeriod is how long a card management Pod must be continuously unschedulable
+// before the shortage of devices is regarded as permanent. It absorbs transient scheduling churn.
+var cardMgmtUnschedulableGracePeriod = 2 * time.Minute
+
 type CardManagementDaemonset struct {
 	*DaemonSet
+}
+
+var _ DegradableObject = &CardManagementDaemonset{}
+
+// NodeNames returns the node designated by the nodeSelector of the per-node DaemonSet
+func (obj *CardManagementDaemonset) NodeNames() []string {
+	if nodeName := obj.loadedObj.Spec.Template.Spec.NodeSelector[kubernetesHostnameLabel]; nodeName != "" {
+		return []string{nodeName}
+	}
+	return nil
+}
+
+// Degraded returns the node when the card management Pod of this node is pending permanently
+// because the Spyre devices requested by the Pod are not available on the node,
+// i.e., the Pod has been unschedulable over the grace period and
+// the free devices (allocatable - held by other Pods) are fewer than the requested.
+func (obj *CardManagementDaemonset) Degraded(ctx context.Context, k8sClient client.Client) []DegradedNode {
+	logger := log.FromContext(ctx)
+	nodeNames := obj.NodeNames()
+	ds, err := obj.get(ctx, k8sClient)
+	if err != nil || len(nodeNames) == 0 {
+		return nil
+	}
+	podList := &corev1.PodList{}
+	if err := k8sClient.List(ctx, podList, client.InNamespace(ds.Namespace),
+		client.MatchingLabels(ds.Spec.Template.Labels)); err != nil {
+		logger.Info("failed to list card management pods", "name", ds.Name, "error", err)
+		return nil
+	}
+	for i := range podList.Items {
+		pod := &podList.Items[i]
+		if !metav1.IsControlledBy(pod, ds) || !unschedulableOverGracePeriod(pod) {
+			continue
+		}
+		if reason, short := deviceShortage(ctx, k8sClient, nodeNames[0], pod); short {
+			logger.Info("card management is degraded", "node", nodeNames[0], "reason", reason)
+			return []DegradedNode{{Name: nodeNames[0], Reason: reason}}
+		}
+	}
+	return nil
+}
+
+// unschedulableOverGracePeriod returns true if the Pod is pending as unschedulable over the grace period
+func unschedulableOverGracePeriod(pod *corev1.Pod) bool {
+	if pod.Status.Phase != corev1.PodPending {
+		return false
+	}
+	for _, cond := range pod.Status.Conditions {
+		if cond.Type == corev1.PodScheduled && cond.Status == corev1.ConditionFalse &&
+			cond.Reason == corev1.PodReasonUnschedulable {
+			return time.Since(cond.LastTransitionTime.Time) >= cardMgmtUnschedulableGracePeriod
+		}
+	}
+	return false
+}
+
+// deviceShortage checks if free PF devices on the node are fewer than those requested by the Pod.
+// The devices are short when they are not in the node's allocatable list or are held by other Pods.
+func deviceShortage(ctx context.Context, k8sClient client.Client, nodeName string, pod *corev1.Pod) (string, bool) {
+	logger := log.FromContext(ctx)
+	pfName := corev1.ResourceName(spyreconst.ResourcePrefix + "/" + spyreconst.PfResourceName)
+	requested := podExtendedResource(pod, pfName)
+	if requested.IsZero() {
+		return "", false
+	}
+	node := &corev1.Node{}
+	if err := k8sClient.Get(ctx, types.NamespacedName{Name: nodeName}, node); err != nil {
+		logger.Info("failed to get node", "node", nodeName, "error", err)
+		return "", false
+	}
+	nodePods := &corev1.PodList{}
+	if err := k8sClient.List(ctx, nodePods, client.MatchingFields{"spec.nodeName": nodeName}); err != nil {
+		logger.Info("failed to list pods on node", "node", nodeName, "error", err)
+		return "", false
+	}
+	used := resource.Quantity{}
+	for i := range nodePods.Items {
+		p := &nodePods.Items[i]
+		if p.Status.Phase == corev1.PodSucceeded || p.Status.Phase == corev1.PodFailed {
+			continue
+		}
+		used.Add(podExtendedResource(p, pfName))
+	}
+	allocatable := node.Status.Allocatable[pfName]
+	free := allocatable.DeepCopy()
+	free.Sub(used)
+	if free.Cmp(requested) >= 0 {
+		return "", false
+	}
+	return fmt.Sprintf("card management pod is unschedulable as devices are not available "+
+		"(%s requested: %s, allocatable: %s, held by other pods: %s)",
+		pfName, requested.String(), allocatable.String(), used.String()), true
+}
+
+// podExtendedResource sums up the quantity of the resource requested by the containers of the Pod
+func podExtendedResource(pod *corev1.Pod, name corev1.ResourceName) resource.Quantity {
+	total := resource.Quantity{}
+	for _, c := range pod.Spec.Containers {
+		if q, ok := c.Resources.Requests[name]; ok {
+			total.Add(q)
+		} else if q, ok := c.Resources.Limits[name]; ok {
+			total.Add(q)
+		}
+	}
+	return total
 }
 
 func (obj *CardManagementDaemonset) TransformByPolicy(scheme *runtime.Scheme,

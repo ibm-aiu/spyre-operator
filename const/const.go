@@ -84,6 +84,10 @@ const (
 	MonitorContainerName       = "spyre-monitor"
 	RuntimeInitContainerName   = "init-senlib"
 	DataInitContainerName      = "init-data"
+	// CardManagementDegradedTaintKey is the key of the NoSchedule taint put by the operator on a node
+	// where the card management pod cannot run permanently (e.g., no Spyre device is available).
+	// The taint is removed once the card management pod becomes ready.
+	CardManagementDegradedTaintKey = "ibm.com/spyre-card-management-degraded"
 	// constants regarding card management source
 	CardManagementClaimName  = "cardmgmt"
 	CardManagementConfigName = "spyre-cardmgmt-config"

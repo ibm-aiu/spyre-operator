@@ -364,11 +364,21 @@ var _ = Describe("ControlledComponent", Ordered, func() {
 				By("creating")
 				_, _, err = component.Sync(ctx)
 				Expect(err).To(BeNil())
+				DeferCleanup(func() {
+					for _, obj := range component.GetObjects() {
+						_ = StateClient.Delete(ctx, obj.GetObject())
+					}
+				})
 
 				for _, obj := range component.GetObjects() {
 					runtimeObj := obj.GetObject()
 					if ds, ok := runtimeObj.(*appsv1.DaemonSet); ok {
 						Expect(len(ds.Spec.Template.Spec.Containers)).Should(BeNumerically(">=", 1))
+						// the pod must tolerate the degraded taint (NoSchedule) of its node to recover from it
+						Expect(ds.Spec.Template.Spec.Tolerations).To(ContainElement(SatisfyAll(
+							HaveField("Key", spyreconst.CardManagementDegradedTaintKey),
+							HaveField("Operator", corev1.TolerationOpExists),
+							HaveField("Effect", corev1.TaintEffectNoSchedule))))
 						limits := ds.Spec.Template.Spec.Containers[0].Resources.Limits
 
 						if expectLimits {

@@ -162,10 +162,19 @@ func (c *StateController) syncCoreAndPluginState(ctx context.Context,
 	if err != nil {
 		return spyrev1alpha1.NotReady, fmt.Sprintf("%v", optionalMessages), fmt.Errorf("failed to sync plugin components: %w", err)
 	}
+	degradedNodes := append(c.CoreComponentState.DegradedNodes(), c.PluginComponentState.DegradedNodes()...)
 	if coreSuccess && optionalSuccess {
+		if len(degradedNodes) > 0 {
+			// healthy nodes keep serving while degraded nodes are tainted and reported.
+			return spyrev1alpha1.Degraded, DegradedMessage(degradedNodes), nil
+		}
 		return spyrev1alpha1.Ready, "", nil
 	}
-	return spyrev1alpha1.NotReady, fmt.Sprintf("%v", append(coreMessages, optionalMessages...)), nil
+	messages := slices.Concat(coreMessages, optionalMessages)
+	if len(degradedNodes) > 0 {
+		messages = append(messages, DegradedMessage(degradedNodes))
+	}
+	return spyrev1alpha1.NotReady, fmt.Sprintf("%v", messages), nil
 }
 
 // Clear calls cleaning up cluster and states
