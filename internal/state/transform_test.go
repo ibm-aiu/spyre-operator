@@ -593,8 +593,8 @@ var _ = Describe("Transform", func() {
 	Context("health-checker integration", func() {
 		originalSocket := "health-check.sock"
 
-		DescribeTable("check health socket", func(enabled bool, expectedValue string) {
-			devicePlugin := newDaemonset("device-plugin")
+		DescribeTable("check health socket", func(name string, enabled bool, expectedValue string) {
+			devicePlugin := newDaemonset(name)
 			SetContainerEnv(&devicePlugin.Spec.Template.Spec.Containers[0],
 				spyreconst.SpyreHealthSocketEnvKey, originalSocket)
 			cpSpec := &spyrev1alpha1.SpyreClusterPolicySpec{
@@ -616,8 +616,10 @@ var _ = Describe("Transform", func() {
 			}
 			Expect(found).To(BeTrue())
 		},
-			Entry("enabled health checker", true, originalSocket),
-			Entry("disabled health checker", false, ""),
+			Entry("enabled health checker", "device-plugin", true, originalSocket),
+			Entry("disabled health checker", "device-plugin", false, ""),
+			Entry("enabled health checker for DRA driver", spyreconst.DRADriverResourceName, true, originalSocket),
+			Entry("disabled health checker for DRA driver", spyreconst.DRADriverResourceName, false, ""),
 		)
 	})
 

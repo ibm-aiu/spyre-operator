@@ -128,6 +128,8 @@ spec:
               fieldPath: metadata.namespace
         - name: HEALTHCHECK_PORT
           value: "51515"
+        - name: SPYRE_HEALTH_SOCK
+          value: /usr/local/etc/dra-driver-spyre/spyre-sockets/health-checker.sock
         volumeMounts:
         - name: plugins-registry
           mountPath: "/var/lib/kubelet/plugins_registry"
@@ -142,6 +144,9 @@ spec:
           readOnly: false
         - name: senlib-config-template
           mountPath: "/etc/senlib-config-template"
+        - name: spyre-cert
+          mountPath: /etc/dra-driver/certs
+          readOnly: true
       volumes:
       - name: plugins-registry
         hostPath:
@@ -162,5 +167,9 @@ spec:
       - name: senlib-config-template
         configMap:
           name: senlib-config-template
+      - name: spyre-cert
+        secret:
+          secretName: spyre-cert
+          optional: true
       - name: spyre-senlib
         emptyDir: {}
