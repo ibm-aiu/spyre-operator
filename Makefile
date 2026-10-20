@@ -53,6 +53,10 @@ export TEST_CONFIG
 INTEGRATION_TEST_LABEL ?= "integration && !cardmgmt"
 E2E_TEST_LABEL ?= "e2e"
 
+# python (used for venv and detect-secrets)
+PYTHON ?= python3
+PIP ?= pip
+
 # detect-secrets
 DETECT_SECRETS_GIT ?= "https://github.com/ibm/detect-secrets.git@master\#egg=detect-secrets"
 
