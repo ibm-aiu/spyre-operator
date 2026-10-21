@@ -248,6 +248,7 @@ var _ = Describe("SpyreclusterpolicyController", func() {
 			},
 				Entry("ready", spyrev1alpha1.Ready, false),
 				Entry("not ready", spyrev1alpha1.NotReady, true),
+				Entry("degraded", spyrev1alpha1.Degraded, true),
 				Entry("no Spyre nodes", spyrev1alpha1.NoSpyreNodes, false),
 				Entry("no NFD", spyrev1alpha1.NoNFD, false),
 			)

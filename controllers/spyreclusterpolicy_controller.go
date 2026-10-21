@@ -42,6 +42,7 @@ import (
 const (
 	shortRequeueAfter           = time.Second
 	staticRequeueAfter          = time.Second * 5
+	degradedRequeueAfter        = time.Second * 30
 	SpyreClusterPolicyFinalizer = "finalizers.spyreclusterpolicies.spyre.ibm.com"
 	nfdOSTreeVersionLabelKey    = "feature.node.kubernetes.io/system-os_release.OSTREE_VERSION"
 )
@@ -62,7 +63,7 @@ type SpyreClusterPolicyReconciler struct {
 // +kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles;clusterrolebindings;roles;rolebindings,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=namespaces;serviceaccounts;pods;pods/log;services;services/finalizers;endpoints,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups="",resources=persistentvolumes;persistentvolumeclaims;events;configmaps;secrets;nodes,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=persistentvolumes;persistentvolumeclaims;events;configmaps;secrets;nodes;nodes/status,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=discovery.k8s.io,resources=endpointslices,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps,resources=deployments;daemonsets;replicasets;statefulsets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors;prometheusrule,verbs=get;list;watch;create;update;patch;delete
@@ -295,6 +296,10 @@ func processOverallStatus(ctx context.Context,
 		// if any state is not ready, requeue for reconciliation
 		logger.Info("requeue reconciliation: Spyre is not ready", "message", message)
 		return ctrl.Result{RequeueAfter: staticRequeueAfter}
+	case spyrev1alpha1.Degraded:
+		// healthy nodes are serving. periodically re-check whether the degraded nodes recovered
+		logger.Info("requeue reconciliation: Spyre is degraded", "message", message)
+		return ctrl.Result{RequeueAfter: degradedRequeueAfter}
 	case spyrev1alpha1.NoSpyreNodes, spyrev1alpha1.NoNFD:
 		// node is not ready, do not requeue
 		logger.Info("reconciliation skip: node is not ready", "message", message)

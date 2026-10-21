@@ -42,6 +42,9 @@ type ControlledComponent struct {
 	scheme     *runtime.Scheme
 	disabled   bool
 	skipUpdate bool
+	// degraded holds the nodes on which a DegradableObject is permanently unable to become ready.
+	// It is updated on every Sync.
+	degraded []DegradedNode
 }
 
 func NewControlledComponent(ctx context.Context, k8sClient client.Client, scheme *runtime.Scheme,
@@ -74,6 +77,11 @@ func (c *ControlledComponent) GetName() string {
 	return c.name
 }
 
+// DegradedNodes returns the nodes found degraded at the last Sync
+func (c *ControlledComponent) DegradedNodes() []DegradedNode {
+	return c.degraded
+}
+
 func (c *ControlledComponent) SetDisable(disabled bool) {
 	c.disabled = disabled
 }
@@ -98,50 +106,51 @@ func (c *ControlledComponent) Sync(ctx context.Context) (bool, string, error) {
 	logger := log.FromContext(ctx).WithValues("Component", c.name, "Target Namespace", c.namespace,
 		"disable", c.disabled, "skipUpdate", c.skipUpdate)
 	if c.disabled {
-		var multiErr error
-		if c.name == spyreconst.CardManagementResourceName {
-			if err := c.deleteCardManagementRunners(ctx); err != nil {
-				multiErr = multierror.Append(multiErr, err)
-			}
-		}
-		if err := c.deleteAll(ctx, logger); err != nil {
+		return c.syncDisabled(ctx, logger)
+	}
+	return c.syncEnabled(ctx, logger)
+}
+
+// syncDisabled handles sync when the component is disabled: cleans up any running resources.
+func (c *ControlledComponent) syncDisabled(ctx context.Context, logger logr.Logger) (bool, string, error) {
+	var multiErr error
+	c.degraded = nil
+	if c.name == spyreconst.CardManagementResourceName {
+		if err := c.deleteCardManagementRunners(ctx); err != nil {
 			multiErr = multierror.Append(multiErr, err)
 		}
-		message := ""
-		if multiErr != nil {
-			message = multiErr.Error()
+		if err := c.clearDegradedNodes(ctx); err != nil {
+			multiErr = multierror.Append(multiErr, err)
 		}
-		return true, message, nil
 	}
-	// component is not disabled, continue deploying
+	if err := c.deleteAll(ctx, logger); err != nil {
+		multiErr = multierror.Append(multiErr, err)
+	}
+	message := ""
+	if multiErr != nil {
+		message = multiErr.Error()
+	}
+	return true, message, nil
+}
+
+// syncEnabled deploys the component's objects in order and reports readiness.
+func (c *ControlledComponent) syncEnabled(ctx context.Context, logger logr.Logger) (bool, string, error) {
 	for i, obj := range c.objects {
-		// previous step not ready
-		if i > 0 && !c.objects[i-1].Ready(ctx, c.client) {
+		// previous step not ready.
+		// The step of a DegradableObject (i.e., per-node object) does not block the next steps
+		// so that a pending object of a node does not block the other nodes.
+		if i > 0 && !isDegradable(c.objects[i-1]) && !c.objects[i-1].Ready(ctx, c.client) {
 			return false, fmt.Sprintf("previous step %s is not ready", c.objects[i-1].GetID()), nil
 		}
-		syncedObject, err := obj.Sync(ctx, c.client)
-		if apiErrors.IsNotFound(err) {
-			if err := c.client.Create(ctx, obj.GetObject()); err != nil && !apiErrors.IsAlreadyExists(err) {
-				spyreerr.LogErrCreate(logger, err)
-				msg := fmt.Sprintf("failed to create %s: %v", obj.GetID(), err)
-				return false, msg, errors.New(msg)
-			}
-			continue
-		}
-		if err != nil {
-			msg := fmt.Sprintf("failed to sync %s: %v", obj.GetID(), err)
-			return false, msg, errors.New(msg)
-		}
-		if !c.skipUpdate {
-			if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-				return c.client.Update(ctx, syncedObject)
-			}); err != nil {
-				msg := fmt.Sprintf("failed to update %s: %v", obj.GetID(), err)
-				return false, msg, errors.New(msg)
-			}
+		if ok, msg, err := c.syncObject(ctx, logger, obj); !ok || err != nil {
+			return ok, msg, err
 		}
 	}
-	ready := c.Ready(ctx)
+	// Per-node objects do not block each other, so the last step (e.g., Service) is ready as long as
+	// some nodes are serving. Objects pending within the grace period still make the component not ready,
+	// while permanently pending ones are reported as degraded nodes to the caller.
+	pending := c.reconcileDegraded(ctx, logger)
+	ready := c.Ready(ctx) && pending == 0
 	message := ""
 	if ready {
 		logger.Info(fmt.Sprintf("%s is ready", c.name))
@@ -149,6 +158,107 @@ func (c *ControlledComponent) Sync(ctx context.Context) (bool, string, error) {
 		message = "last step is not ready"
 	}
 	return ready, message, nil
+}
+
+// syncObject creates or updates a single controlled object.
+// Returns (true, "", nil) when the object was successfully synced or created.
+func (c *ControlledComponent) syncObject(ctx context.Context, logger logr.Logger, obj ControlledObject) (bool, string, error) {
+	syncedObject, err := obj.Sync(ctx, c.client)
+	if apiErrors.IsNotFound(err) {
+		if err := c.client.Create(ctx, obj.GetObject()); err != nil && !apiErrors.IsAlreadyExists(err) {
+			spyreerr.LogErrCreate(logger, err)
+			msg := fmt.Sprintf("failed to create %s: %v", obj.GetID(), err)
+			return false, msg, errors.New(msg)
+		}
+		return true, "", nil
+	}
+	if err != nil {
+		msg := fmt.Sprintf("failed to sync %s: %v", obj.GetID(), err)
+		return false, msg, errors.New(msg)
+	}
+	if !c.skipUpdate {
+		if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			return c.client.Update(ctx, syncedObject)
+		}); err != nil {
+			msg := fmt.Sprintf("failed to update %s: %v", obj.GetID(), err)
+			return false, msg, errors.New(msg)
+		}
+	}
+	return true, "", nil
+}
+
+func isDegradable(obj ControlledObject) bool {
+	_, ok := obj.(DegradableObject)
+	return ok
+}
+
+// reconcileDegraded checks every DegradableObject, taints and reports the condition on the nodes
+// where the object is permanently not ready, and restores the other nodes of the object.
+// It updates c.degraded and returns the number of objects which are not ready but not (yet) degraded.
+func (c *ControlledComponent) reconcileDegraded(ctx context.Context, logger logr.Logger) int {
+	degraded := []DegradedNode{}
+	pending := 0
+	for _, obj := range c.objects {
+		degradable, ok := obj.(DegradableObject)
+		if !ok {
+			continue
+		}
+		objDegraded, objPending := c.reconcileDegradableObject(ctx, logger, obj, degradable)
+		degraded = append(degraded, objDegraded...)
+		if objPending {
+			pending++
+		}
+	}
+	c.degraded = degraded
+	return pending
+}
+
+// reconcileDegradableObject marks the nodes where the object is permanently not ready as degraded
+// and restores the other nodes of the object.
+// It returns the degraded nodes and whether the object is not ready but not (yet) degraded.
+func (c *ControlledComponent) reconcileDegradableObject(ctx context.Context, logger logr.Logger,
+	obj ControlledObject, degradable DegradableObject) ([]DegradedNode, bool) {
+	var degraded []DegradedNode
+	notReady := !obj.Ready(ctx, c.client)
+	if notReady {
+		degraded = degradable.Degraded(ctx, c.client)
+	}
+	degradedNames := make(map[string]struct{}, len(degraded))
+	for _, node := range degraded {
+		degradedNames[node.Name] = struct{}{}
+		if err := markNodeDegraded(ctx, c.client, node); err != nil {
+			logger.Info("failed to mark node degraded", "node", node.Name, "error", err)
+		}
+	}
+	for _, name := range degradable.NodeNames() {
+		if _, found := degradedNames[name]; found {
+			continue
+		}
+		if err := clearNodeDegraded(ctx, c.client, name); err != nil {
+			logger.Info("failed to restore node from degraded", "node", name, "error", err)
+		}
+	}
+	return degraded, notReady && len(degraded) == 0
+}
+
+// clearDegradedNodes restores all the nodes of DegradableObjects from degraded
+func (c *ControlledComponent) clearDegradedNodes(ctx context.Context) error {
+	var multiErr error
+	for _, obj := range c.objects {
+		degradable, ok := obj.(DegradableObject)
+		if !ok {
+			continue
+		}
+		for _, name := range degradable.NodeNames() {
+			if err := clearNodeDegraded(ctx, c.client, name); err != nil {
+				multiErr = multierror.Append(multiErr, err)
+			}
+		}
+	}
+	if multiErr != nil {
+		return fmt.Errorf("failed to clear degraded nodes: %w", multiErr)
+	}
+	return nil
 }
 
 func (c *ControlledComponent) deleteAll(ctx context.Context, logger logr.Logger) error {
@@ -247,7 +357,17 @@ func (c *ControlledComponent) Clear(ctx context.Context) error {
 	case spyreconst.ValidatorResourceName:
 		return c.deleteCertSecretFromService(ctx)
 	case spyreconst.CardManagementResourceName:
-		return c.deleteCardManagementRunners(ctx)
+		var multiErr error
+		if err := c.deleteCardManagementRunners(ctx); err != nil {
+			multiErr = multierror.Append(multiErr, err)
+		}
+		if err := c.clearDegradedNodes(ctx); err != nil {
+			multiErr = multierror.Append(multiErr, err)
+		}
+		if multiErr != nil {
+			return fmt.Errorf("failed to clear card management: %w", multiErr)
+		}
+		return nil
 	case spyreconst.DevicePluginResourceName:
 		return c.clearAllSpyreNodeStates(ctx)
 	}

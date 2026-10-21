@@ -169,6 +169,15 @@ func (s *DeploymentState) GetName() string {
 	return s.name
 }
 
+// DegradedNodes returns the degraded nodes found at the last sync in all the components
+func (s *DeploymentState) DegradedNodes() []DegradedNode {
+	nodes := []DegradedNode{}
+	for _, component := range s.components {
+		nodes = append(nodes, component.DegradedNodes()...)
+	}
+	return nodes
+}
+
 // TransformAndSync transforms each components in state and syncs the cluster
 // return success, error messages, and overall error
 func (s *DeploymentState) TransformAndSync(ctx context.Context,

@@ -398,6 +398,7 @@ spec:
           - events
           - namespaces
           - nodes
+          - nodes/status
           - persistentvolumeclaims
           - persistentvolumes
           - pods

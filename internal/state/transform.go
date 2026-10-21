@@ -42,6 +42,8 @@ type HostPathMount struct {
 const (
 	blockingLabel = "spyre.ibm.com/card-management-disabled"
 
+	kubernetesHostnameLabel = "kubernetes.io/hostname"
+
 	archAMD64   = "amd64"
 	archPPC64LE = "ppc64le"
 	archS390X   = "s390x"
@@ -397,7 +399,7 @@ func TransformCardManagement(obj *appsv1.DaemonSet,
 	applyExperimentalModes(&(obj.Spec.Template.Spec.Containers[0]), clusterPolicy.Spec.ExperimentalMode)
 
 	// Apply spyreFilter logic before cluster check
-	nodeName, exists := obj.Spec.Template.Spec.NodeSelector["kubernetes.io/hostname"]
+	nodeName, exists := obj.Spec.Template.Spec.NodeSelector[kubernetesHostnameLabel]
 	if !exists {
 		return fmt.Errorf("failed to transform cardmgmt: no hostname is designated in Daemonset: %s", obj.Name)
 	}

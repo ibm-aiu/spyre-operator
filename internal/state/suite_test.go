@@ -116,6 +116,13 @@ var _ = BeforeSuite(func() {
 })
 
 var _ = AfterSuite(func() {
+	// NewDeploymentState/NewStateController generate per-node card management manifests under assets.
+	// Remove them regardless of which specs ran, since only some specs clean up by themselves.
+	generated, err := filepath.Glob(filepath.Join(AssetsPath, "state-plugin-components", "spyre-card-management", "*_daemonset_*.yaml"))
+	Expect(err).NotTo(HaveOccurred())
+	for _, f := range generated {
+		Expect(os.Remove(f)).To(Succeed())
+	}
 	Eventually(func(g Gomega) {
 		err := testEnv.Stop()
 		g.Expect(err).NotTo(HaveOccurred())

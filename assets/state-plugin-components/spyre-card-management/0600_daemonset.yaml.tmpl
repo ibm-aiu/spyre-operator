@@ -24,6 +24,11 @@ spec:
       schedulerName: spyre-scheduler
       serviceAccountName: spyre-card-management
       priorityClassName: system-node-critical
+      tolerations:
+      # tolerate the taint put by the operator on a degraded node to be able to recover from it
+      - key: ibm.com/spyre-card-management-degraded
+        operator: Exists
+        effect: NoSchedule
       securityContext:
         runAsUser: 0
       volumes:

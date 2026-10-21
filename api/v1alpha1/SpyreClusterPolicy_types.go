@@ -315,6 +315,11 @@ const (
 	Ready State = "ready"
 	// NotReady indicates some/all components of Spyre are not ready
 	NotReady State = "not ready"
+	// Degraded indicates that all components are serving on healthy nodes, but some nodes are
+	// permanently unable to run a per-node component (e.g., the card management pod stays
+	// unschedulable because no Spyre device is available on the node).
+	// The nodes are listed in the status message.
+	Degraded State = "degraded"
 	// NoSpyreNodes indicates no worker nodes with Spyre cards
 	NoSpyreNodes State = "no Spyre nodes"
 	// NoNFD indicates that node feature discovery operator has not been installed successfully
