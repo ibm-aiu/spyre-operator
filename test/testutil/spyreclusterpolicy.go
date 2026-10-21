@@ -131,7 +131,8 @@ func EnableDRADriver(testConfig TestConfig, clusterPolicy *spyrev1alpha1.SpyreCl
 		Version:         testConfig.DraDriver.Version,
 		ImagePullPolicy: testConfig.DraDriver.ImagePullPolicy,
 	}
-	// Disable unsupported components
+	// Disable unsupported components.
+	// The health checker can be enabled again by the caller (see the DRA health checker e2e test).
 	clusterPolicy.Spec.HealthChecker.Enabled = false
 	clusterPolicy.Spec.MetricsExporter.Enabled = false
 	clusterPolicy.Spec.PodValidator.Enabled = false

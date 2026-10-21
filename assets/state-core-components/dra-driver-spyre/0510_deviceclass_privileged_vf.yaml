@@ -13,3 +13,7 @@ spec:
       expression: >
         device.driver == 'spyre.ibm.com' && device.attributes["spyre.ibm.com"].pciFunctionIndex
         == 1
+  # only healthy devices are allocatable
+  - cel:
+      expression: >
+        device.attributes["spyre.ibm.com"].deviceState == 'ONLINE'

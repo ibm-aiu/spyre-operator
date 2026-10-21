@@ -14,3 +14,7 @@ spec:
         device.driver == 'spyre.ibm.com' && device.attributes["spyre.ibm.com"].pciFunctionIndex
         != 1 && !(device.attributes["spyre.ibm.com"].pciFunctionIndex == 0 &&
           device.attributes["spyre.ibm.com"].vfEnabled == true)
+  # only healthy devices are allocatable
+  - cel:
+      expression: >
+        device.attributes["spyre.ibm.com"].deviceState == 'ONLINE'
