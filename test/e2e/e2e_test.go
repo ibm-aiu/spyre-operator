@@ -1072,6 +1072,129 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 		})
 	})
 
+	// The DRA driver consumes the health checker (through the socket shared with the
+	// device-plugins host directory) to publish the deviceState attribute,
+	// and the DeviceClasses only select ONLINE devices.
+	Context("DRA Driver with health checker", Ordered, func() {
+		testClaimName := "test-health-claim-template"
+		testPodName := "test-health-pod-with-claim"
+		var originalSpec spyrev1alpha1.SpyreClusterPolicySpec
+
+		BeforeAll(func() {
+			By("ensuring all pods are deleted")
+			WaitUntilNoPod(ctx, k8sClientset, spyreV2Client, testNamespace, targetNodeName)
+			By("enabling dra-driver and health checker")
+			clusterPolicy := &spyrev1alpha1.SpyreClusterPolicy{}
+			err := spyreV2Client.Get(ctx,
+				client.ObjectKey{Namespace: metav1.NamespaceAll, Name: ClusterPolicyName}, clusterPolicy)
+			Expect(err).To(BeNil())
+			originalSpec = clusterPolicy.Spec
+			EnableDRADriver(testConfig, clusterPolicy)
+			clusterPolicy.Spec.HealthChecker.Enabled = true
+			UpdateClusterPolicy(ctx, spyreV2Client, k8sClientset, clusterPolicy, len(nodeNames), spyrev1alpha1.Ready)
+			By("waiting for the health states to be published in resourceslices")
+			Eventually(func(g Gomega) {
+				states := ListDeviceStates(ctx, k8sClientset, targetNodeName, PfProductId)
+				g.Expect(states).NotTo(BeEmpty())
+				for addr, state := range states {
+					g.Expect(state).To(BeElementOf(DeviceStateOnline, DeviceStateInError), "deviceState of %s", addr)
+				}
+				if testConfig.PseudoDeviceMode {
+					// pseudo health checker always reports at least one bad card
+					g.Expect(states).To(ContainElement(DeviceStateInError))
+				}
+			}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
+		})
+
+		AfterAll(func() {
+			clusterPolicy := &spyrev1alpha1.SpyreClusterPolicy{}
+			err := spyreV2Client.Get(ctx,
+				client.ObjectKey{Namespace: metav1.NamespaceAll, Name: ClusterPolicyName}, clusterPolicy)
+			Expect(err).To(BeNil())
+			clusterPolicy.Spec = originalSpec
+			UpdateClusterPolicy(ctx, spyreV2Client, k8sClientset, clusterPolicy, len(nodeNames), spyrev1alpha1.Ready)
+		})
+
+		AfterEach(func() {
+			DeletePodWithData(ctx, k8sClientset, &PodTemplateData{
+				Name:      testPodName,
+				Namespace: testNamespace,
+			})
+			DeleteResourceClaimTemplate(ctx, k8sClientset, testClaimName, testNamespace)
+			By("waiting for all resource claims to be released")
+			Eventually(func(g Gomega) {
+				claims := ListResourceClaims(ctx, k8sClientset, testNamespace)
+				g.Expect(claims).To(BeEmpty())
+			}).WithTimeout(2 * time.Minute).WithPolling(5 * time.Second).Should(Succeed())
+		})
+
+		It("must not allocate an unhealthy device", func() {
+			unhealthy := ""
+			for addr, state := range ListDeviceStates(ctx, k8sClientset, targetNodeName, PfProductId) {
+				if state == DeviceStateInError {
+					unhealthy = addr
+					break
+				}
+			}
+			if unhealthy == "" {
+				Skip("no unhealthy device reported by the health checker")
+			}
+			By("requesting the unhealthy " + unhealthy)
+			BuildResourceClaimTemplate(ctx, dynClient, discoClient, &ResourceClaimTemplateData{
+				Name:            testClaimName,
+				Namespace:       testNamespace,
+				Count:           1,
+				PCIAddress:      unhealthy,
+				DeviceClassName: DeviceClassNameForDevice(PfProductId, 0),
+			})
+			BuildPodWithClaim(ctx, dynClient, discoClient, &PodTemplateData{
+				Name:             testPodName,
+				Namespace:        testNamespace,
+				Image:            Ubi9MicroTestImage,
+				NodeSelectorNode: targetNodeName,
+			}, testClaimName)
+			By("verifying pod stays Pending since the device is not ONLINE")
+			SimpleCheckPodPhases(ctx, k8sClientset,
+				[]*PodTemplateData{{Name: testPodName, Namespace: testNamespace}},
+				map[v1.PodPhase]int{v1.PodPending: 1})
+		})
+
+		It("can allocate all healthy devices but no unhealthy one", func() {
+			online := []string{}
+			for addr, state := range ListDeviceStates(ctx, k8sClientset, targetNodeName, PfProductId) {
+				if state == DeviceStateOnline {
+					online = append(online, addr)
+				}
+			}
+			Expect(online).NotTo(BeEmpty())
+			By(fmt.Sprintf("requesting all %d healthy PFs", len(online)))
+			BuildResourceClaimTemplate(ctx, dynClient, discoClient, &ResourceClaimTemplateData{
+				Name:            testClaimName,
+				Namespace:       testNamespace,
+				Count:           len(online),
+				ProductId:       PfProductId,
+				DeviceClassName: DeviceClassNameForDevice(PfProductId, 0),
+			})
+			BuildPodWithClaim(ctx, dynClient, discoClient, &PodTemplateData{
+				Name:             testPodName,
+				Namespace:        testNamespace,
+				Image:            Ubi9MicroTestImage,
+				NodeSelectorNode: targetNodeName,
+				Arg0:             PrintSenlibConfig,
+			}, testClaimName)
+			By("waiting for pod running")
+			pod, err := k8sClientset.CoreV1().Pods(testNamespace).Get(ctx, testPodName, metav1.GetOptions{})
+			Expect(err).To(BeNil())
+			WaitForPodRunning(ctx, k8sClientset, pod)
+			allocatedAddrs := CheckAndGetAllocationsFromPodLog(ctx, k8sClientset, testPodName, testNamespace)
+			Expect(allocatedAddrs).To(ConsistOf(online))
+		})
+
+		It("can gradually allocate 50 Spyres on healthy devices only", func() {
+			draAllocationTestCase(ctx, testNamespace, PfProductId, 0)
+		})
+	})
+
 	// This set of tests should be executed last so that the stop / start
 	// of the daemon sets does not affect the execution of other tests
 	Context("Cluster Policy Updates", Ordered, func() {
@@ -1440,9 +1563,7 @@ func assertDRAAllocation(ctx context.Context, testNamespace string) func(Gomega,
 // cluster, an assertAllocation callback for path-specific allocation checks, and a cleanup
 // callback called once all pods have been drained to release extra resources
 // (e.g. DRA ResourceClaimTemplates).
-func gradualAllocationLoop(ctx context.Context, testNamespace string, nPods int, createPods func(), assertAllocation func(Gomega, int), cleanup func()) {
-	nSpyres := getNumDevices()
-
+func gradualAllocationLoop(ctx context.Context, testNamespace string, nPods, nSpyres int, createPods func(), assertAllocation func(Gomega, int), cleanup func()) {
 	By("creating Pods")
 	createPods()
 
@@ -1487,7 +1608,7 @@ func commonAllocationTestCase(ctx context.Context, testNamespace string, schedul
 	prefix := petname.Generate(2, "-")
 	pods := BuildPods(nPods, prefix, testNamespace, "ibm.com/spyre_pf", 1, targetNodeName, schedulerEnabled)
 
-	gradualAllocationLoop(ctx, testNamespace, nPods, func() {
+	gradualAllocationLoop(ctx, testNamespace, nPods, getNumDevices(), func() {
 		for _, pod := range pods {
 			Eventually(func(g Gomega) {
 				_, err := k8sClientset.CoreV1().Pods(pod.Namespace).Create(ctx, pod, metav1.CreateOptions{})
@@ -1503,8 +1624,17 @@ func draAllocationTestCase(ctx context.Context, testNamespace string, productId 
 	nPods := 50
 	prefix := petname.Generate(2, "-")
 	deviceClassName := DeviceClassNameForDevice(productId, pciFunctionIndex)
+	// DeviceClasses select only ONLINE devices, so any other card is not allocatable
+	nOnline := 0
+	for _, state := range ListDeviceStates(ctx, k8sClientset, targetNodeName, productId) {
+		if state == DeviceStateOnline {
+			nOnline++
+		}
+	}
+	Expect(nOnline).To(BeNumerically(">", 0), "no ONLINE device is published in resourceslices")
+	By(fmt.Sprintf("%d devices are allocatable", nOnline))
 
-	gradualAllocationLoop(ctx, testNamespace, nPods, func() {
+	gradualAllocationLoop(ctx, testNamespace, nPods, nOnline, func() {
 		// create one ResourceClaimTemplate + Pod per slot
 		for i := 0; i < nPods; i++ {
 			podName := fmt.Sprintf("%s-%d", prefix, i)

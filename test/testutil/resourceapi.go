@@ -30,6 +30,13 @@ import (
 )
 
 const (
+	// DeviceStateOnline / DeviceStateInError are the values of the deviceState
+	// attribute published by the DRA driver from the health checker report.
+	DeviceStateOnline  = "ONLINE"
+	DeviceStateInError = "IN_ERROR"
+
+	deviceStateAttribute = "deviceState"
+
 	numaAttribute       = "spyre.ibm.com/numaInfo"
 	Tier0GroupAttribute = "spyre.ibm.com/tier0Group"
 	PfProductId         = "06a7"
@@ -171,6 +178,36 @@ func ListResourceSlices(ctx context.Context, k8sClientset *kubernetes.Clientset)
 	slices, err := k8sClientset.ResourceV1().ResourceSlices().List(ctx, metav1.ListOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	return slices.Items
+}
+
+// DeviceState returns the deviceState attribute of the device.
+// It returns "" if the driver does not publish the attribute.
+func DeviceState(d resourcev1.Device) string {
+	if state, ok := d.Attributes[deviceStateAttribute]; ok && state.StringValue != nil {
+		return *state.StringValue
+	}
+	return ""
+}
+
+// ListDeviceStates returns pciAddress -> deviceState of the devices of the given productId
+// published for the node. The state is "" if the driver does not publish the attribute.
+func ListDeviceStates(ctx context.Context, k8sClientset *kubernetes.Clientset, nodeName, productId string) map[string]string {
+	states := map[string]string{}
+	for _, slice := range ListResourceSlices(ctx, k8sClientset) {
+		if slice.Spec.NodeName == nil || *slice.Spec.NodeName != nodeName {
+			continue
+		}
+		for _, d := range slice.Spec.Devices {
+			pid, ok := d.Attributes["productId"]
+			if !ok || pid.StringValue == nil || *pid.StringValue != productId {
+				continue
+			}
+			if addr, ok := d.Attributes["pciAddress"]; ok && addr.StringValue != nil {
+				states[*addr.StringValue] = DeviceState(d)
+			}
+		}
+	}
+	return states
 }
 
 func ListResourceClaims(ctx context.Context, k8sClientset *kubernetes.Clientset, namespace string) []resourcev1.ResourceClaim {
