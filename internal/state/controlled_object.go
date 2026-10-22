@@ -1494,7 +1494,10 @@ func (obj *SecondaryScheduler) Sync(ctx context.Context,
 		return nil, err //nolint:wrapcheck
 	}
 	obj.syncOwners(&getObj.ObjectMeta)
-	getObj.Spec = obj.loadedObj.Spec
+	getObj.Spec.SchedulerConfig = obj.loadedObj.Spec.SchedulerConfig
+	getObj.Spec.SchedulerImage = obj.loadedObj.Spec.SchedulerImage
+	getObj.Spec.ManagementState = obj.loadedObj.Spec.ManagementState
+	getObj.Spec.LogLevel = obj.loadedObj.Spec.LogLevel
 	return getObj, nil
 }
 

@@ -209,7 +209,16 @@ func WaitForSpyreClusterPolicyState(ctx context.Context, spyreV2Client client.Cl
 	defer func() {
 		// on failure report what the Pods are doing instead of adding more timeouts
 		if !reached {
+			var clusterPolicy spyrev1alpha1.SpyreClusterPolicy
+			if err := spyreV2Client.Get(ctx,
+				client.ObjectKey{Namespace: metav1.NamespaceAll, Name: ClusterPolicyName}, &clusterPolicy); err == nil {
+				By(fmt.Sprintf("Cluster policy failed to reach expected state %q: current state=%q, message=%q",
+					expectedState, clusterPolicy.Status.State, clusterPolicy.Status.Message))
+			}
 			DumpPodStatus(ctx, k8sClientset, OperatorNamespace)
+			DumpDaemonSets(ctx, k8sClientset, OperatorNamespace)
+			DumpPodEvents(ctx, k8sClientset, OperatorNamespace)
+			DumpSpyreNodeStates(ctx, spyreV2Client)
 			return
 		}
 		CheckOperatorAssetsRunning(ctx, spyreV2Client, k8sClientset, nodeCount)
@@ -232,7 +241,9 @@ func WaitForSpyreClusterPolicyState(ctx context.Context, spyreV2Client client.Cl
 			terminalPolls = 0
 		}
 		// now make sure that the reconciliation has occurred.
-		g.Expect(clusterPolicy.Status.State).To(Equal(expectedState))
+		g.Expect(clusterPolicy.Status.State).To(Equal(expectedState),
+			"SpyreClusterPolicy state is %q (message: %q), expected %q",
+			clusterPolicy.Status.State, clusterPolicy.Status.Message, expectedState)
 	}).WithTimeout(20 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 	reached = true
 }

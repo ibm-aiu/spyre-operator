@@ -62,7 +62,13 @@ spec:
       - name: app
         image: "FILLED BY THE OPERATOR"
         imagePullPolicy: Always
-        command: ["/opt/ibm/spyre/aiucardmgmt/bin/aiucardmgmt/platform/openshift/run_cardmgmt.sh"]
+        # Why a shell: spec.cardManagement.args in SpyreClusterPolicy can override the start command,
+        # so the operator can run card management images whose start script differs.
+        # Security risk: this container is privileged,
+        # so anyone who can edit SpyreClusterPolicy can run arbitrary code on the node.
+        # Mitigation: restrict write access to SpyreClusterPolicy to admins (or permitted users).
+        command: ["/bin/sh", "-c"]
+        args: ["/opt/ibm/spyre/aiucardmgmt/bin/aiucardmgmt/platform/openshift/run_cardmgmt.sh"]
         securityContext:
           privileged: true
         env:
