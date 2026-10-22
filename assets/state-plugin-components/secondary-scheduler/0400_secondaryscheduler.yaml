@@ -6,7 +6,8 @@ metadata:
   name: cluster
   namespace: openshift-secondary-scheduler-operator
 spec:
-  logLevel: Debug
+  # overwritten by the operator from SpyreClusterPolicy .spec.loglevel
+  logLevel: Normal
   managementState: Managed
   schedulerConfig: secondary-scheduler-config
   schedulerImage: "FILLED BY THE OPERATOR"

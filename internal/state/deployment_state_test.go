@@ -21,7 +21,9 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	operatorv1 "github.com/openshift/api/operator/v1"
 	secondschedv1 "github.com/openshift/secondary-scheduler-operator/pkg/apis/secondaryscheduler/v1"
+	"go.uber.org/zap/zapcore"
 )
 
 var _ = Describe("DeploymentState", Ordered, func() {
@@ -267,6 +269,8 @@ var _ = Describe("DeploymentState", Ordered, func() {
 					schedulerConfig.Image, schedulerConfig.Version)
 				Expect(err).To(BeNil())
 				Expect(scheduler.Spec.SchedulerImage).To(BeEquivalentTo(imagePath))
+				// The operator logs at info here, so the scheduler must not run at -v=4.
+				Expect(scheduler.Spec.LogLevel).To(Equal(operatorv1.Normal))
 				checkOwner(scheduler.ObjectMeta, cpName)
 			} else {
 				Expect(scheduler.Spec.SchedulerImage).To(BeEquivalentTo(spyreconst.OPERATOR_FILLED))
@@ -276,6 +280,32 @@ var _ = Describe("DeploymentState", Ordered, func() {
 			Entry("exporter disabled/scheduler enabled", false, true),
 			Entry("exporter enabled/scheduler disabled", true, false),
 			Entry("exporter enabled/scheduler enabled", true, true),
+		)
+
+		DescribeTable("scheduler log level follows the operator log level", func(level zapcore.Level, want operatorv1.LogLevel) {
+			cp := &spyrev1alpha1.SpyreClusterPolicy{}
+			Expect(K8sClient.Get(ctx, client.ObjectKey{Name: cpName}, cp)).To(Succeed())
+			cp.Spec = spyrev1alpha1.SpyreClusterPolicySpec{
+				Scheduler:        spyrev1alpha1.SchedulerSpec{DeploymentConfig: ValidDeploymentConfig("scheduler")},
+				ExperimentalMode: []spyrev1alpha1.SpyreClusterPolicyExperimentalMode{spyrev1alpha1.ReservationMode},
+			}
+			previous := Cluster.GetLogLevel()
+			DeferCleanup(Cluster.SetLogLevel, previous)
+			Cluster.SetLogLevel(level)
+
+			Expect(deploymentState.Transform(cp, Cluster)).To(Succeed())
+			obj := deploymentState.GetObject(spyreconst.SchedulerResourceName, ControlledID{
+				Name:      "cluster",
+				Namespace: "openshift-secondary-scheduler-operator",
+				Kind:      "SecondaryScheduler",
+			})
+			scheduler, ok := obj.GetObject().(*secondschedv1.SecondaryScheduler)
+			Expect(ok).To(BeTrue())
+			Expect(scheduler.Spec.LogLevel).To(Equal(want))
+		},
+			Entry("debug", zapcore.DebugLevel, operatorv1.Debug),
+			Entry("info", zapcore.InfoLevel, operatorv1.Normal),
+			Entry("error", zapcore.ErrorLevel, operatorv1.Normal),
 		)
 	})
 
