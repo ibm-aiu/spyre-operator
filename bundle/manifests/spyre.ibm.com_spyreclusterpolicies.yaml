@@ -594,11 +594,6 @@ spec:
                     default: /etc/aiu
                     description: ConfigPath defines a target config path at container
                     type: string
-                  draDriver:
-                    default: false
-                    description: DRADriver indicates using DRA driver asset instead
-                      of device plugin
-                    type: boolean
                   env:
                     description: 'Optional: List of environment variables'
                     items:
@@ -774,7 +769,7 @@ spec:
                       ExternalInitContainerSpec defines an init container
                       that generates topology and metadata.
                       This init container requires full physical device access.
-                      It is mounted to device path and share results in device-plugin-config volume
+                      It is mounted to device path and shares results in device-plugin-config volume.
                     properties:
                       args:
                         description: 'Optional: List of arguments'
@@ -1284,6 +1279,20 @@ spec:
                         description: image tag
                         type: string
                     type: object
+                  mode:
+                    allOf:
+                    - enum:
+                      - classic
+                      - dra
+                    - enum:
+                      - classic
+                      - dra
+                    default: classic
+                    description: |-
+                      Mode selects the node-agent implementation to deploy.
+                      Use classic (default) for the Kubernetes Device Plugin,
+                      or dra for the Dynamic Resource Allocation driver.
+                    type: string
                   nodeSelector:
                     additionalProperties:
                       type: string
@@ -1292,7 +1301,7 @@ spec:
                   p2pDMA:
                     default: false
                     description: |-
-                      P2PDMA configuration enablement on device plugin
+                      P2PDMA configuration enablement on device plugin.
                       This field is applicable only for amd64 architecture.
                     type: boolean
                   repository:
@@ -1365,8 +1374,6 @@ spec:
                   version:
                     description: image tag
                     type: string
-                required:
-                - draDriver
                 type: object
               experimentalMode:
                 description: |-
@@ -2709,7 +2716,6 @@ spec:
                   - scheduler
                   - podValidator
                   - healthChecker
-                  - draDriver
                   type: string
                 type: array
             required:

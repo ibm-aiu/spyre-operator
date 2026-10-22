@@ -17,18 +17,28 @@ import (
 
 // Component describes a operator-controlled component name
 // +enum
-// +kubebuilder:validation:Enum=commonInit;devicePlugin;cardManagement;metricsExporter;scheduler;podValidator;healthChecker;draDriver
+// +kubebuilder:validation:Enum=commonInit;devicePlugin;cardManagement;metricsExporter;scheduler;podValidator;healthChecker
 type Component string
 
 const (
 	ComponentCommonInit      Component = "commonInit"
 	ComponentDevicePlugin    Component = "devicePlugin"
-	ComponentDRADriver       Component = "draDriver"
 	ComponentCardManagement  Component = "cardManagement"
 	ComponentMetricsExporter Component = "metricsExporter"
 	ComponentScheduler       Component = "scheduler"
 	ComponentPodValidator    Component = "podValidator"
 	ComponentHealthChecker   Component = "healthChecker"
+)
+
+// DevicePluginMode selects which node-agent implementation to deploy.
+// +kubebuilder:validation:Enum=classic;dra
+type DevicePluginMode string
+
+const (
+	// DevicePluginModeClassic deploys the Kubernetes Device Plugin (default).
+	DevicePluginModeClassic DevicePluginMode = "classic"
+	// DevicePluginModeDRA deploys the Dynamic Resource Allocation (DRA) driver.
+	DevicePluginModeDRA DevicePluginMode = "dra"
 )
 
 // DeploymentConfig defines common embedded fields of pod's deployment
@@ -140,19 +150,22 @@ type DevicePluginSpec struct {
 	// ExternalInitContainerSpec defines an init container
 	// that generates topology and metadata.
 	// This init container requires full physical device access.
-	// It is mounted to device path and share results in device-plugin-config volume
+	// It is mounted to device path and shares results in device-plugin-config volume.
 	// +kubebuilder:validation:Optional
 	InitContainer *ExternalInitContainerSpec `json:"initContainer,omitempty"`
 
+	// P2PDMA configuration enablement on device plugin.
+	// This field is applicable only for amd64 architecture.
 	// +kubebuilder:default=false
 	// +kubebuilder:validation:Optional
-	// P2PDMA configuration enablement on device plugin
-	// This field is applicable only for amd64 architecture.
 	P2PDMA bool `json:"p2pDMA,omitempty"`
 
-	// DRADriver indicates using DRA driver asset instead of device plugin
-	// +kubebuilder:default=false
-	DRADriver bool `json:"draDriver"`
+	// Mode selects the node-agent implementation to deploy.
+	// Use classic (default) for the Kubernetes Device Plugin,
+	// or dra for the Dynamic Resource Allocation driver.
+	// +kubebuilder:default=classic
+	// +kubebuilder:validation:Enum=classic;dra
+	Mode DevicePluginMode `json:"mode,omitempty"`
 }
 
 // ExecutePolicy describes a policy for if/when to generate the topology file

@@ -101,7 +101,7 @@ func (c *StateController) Sync(ctx context.Context,
 		return initialReady, initialMessage, err
 	}
 	// SpyreNodeState is only needed for device plugin mode, not for DRA mode
-	if clusterPolicy.Spec.DevicePlugin.DRADriver {
+	if clusterPolicy.Spec.DevicePlugin.Mode == spyrev1alpha1.DevicePluginModeDRA {
 		// When DRA is enabled, check for active device plugin workloads
 		if err := c.CheckActiveDevicePluginWorkloads(ctx); err != nil {
 			message := fmt.Sprintf("migration to DRA blocked: %v", err)
