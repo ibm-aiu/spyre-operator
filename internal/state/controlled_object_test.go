@@ -165,7 +165,7 @@ var _ = Describe("ControlledObject", Ordered, func() {
 		)
 
 		It("can handle DeviceClass object", func() {
-			deviceClassPath := filepath.Join(AssetsPath, "state-core-components", "dra-driver-spyre", "0500_deviceclass.yaml")
+			deviceClassPath := filepath.Join(AssetsPath, "state-core-components", "dra-driver-spyre", "0500_deviceclass_pf.yaml")
 			runtimeObj, gvk, err := DecodeFromFile(StateScheme, deviceClassPath)
 			Expect(err).To(BeNil())
 			Expect(gvk.Kind).To(Equal("DeviceClass"))

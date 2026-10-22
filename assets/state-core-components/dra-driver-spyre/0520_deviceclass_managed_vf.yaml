@@ -1,0 +1,23 @@
+# +-------------------------------------------------------------------+
+# | Copyright IBM Corp. 2025 All Rights Reserved                      |
+# | PID 5698-SPR                                                      |
+# +-------------------------------------------------------------------+
+
+# spyre-managed-vf: VF (productId 06a8) devices with card management enabled.
+# Restricted to privileged namespaces (e.g. spyre-operator).
+
+apiVersion: resource.k8s.io/v1
+kind: DeviceClass
+metadata:
+  name: spyre-managed-vf
+spec:
+  selectors:
+  - cel:
+      expression: >
+        device.driver == 'spyre.ibm.com' && device.attributes["spyre.ibm.com"].productId
+        == "06a8"
+  # managed by card management
+  - cel:
+      expression: >
+        has(device.attributes["spyre.ibm.com"].managed) && device.attributes["spyre.ibm.com"].managed
+        == true
