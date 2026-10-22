@@ -157,7 +157,13 @@ var _ = Describe("SpyreclusterpolicyController", func() {
 
 			BeforeEach(func() {
 				cp := &spyrev1alpha1.SpyreClusterPolicy{
-					ObjectMeta: metav1.ObjectMeta{Name: cpName}}
+					ObjectMeta: metav1.ObjectMeta{Name: cpName},
+					Spec: spyrev1alpha1.SpyreClusterPolicySpec{
+						DevicePlugin: spyrev1alpha1.DevicePluginSpec{
+							Mode: spyrev1alpha1.DevicePluginModeClassic,
+						},
+					},
+				}
 				err = k8sClient.Create(ctx, cp)
 				Expect(err).To(BeNil())
 				time.Sleep(1000 * time.Millisecond)

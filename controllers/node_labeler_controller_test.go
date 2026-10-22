@@ -111,6 +111,9 @@ var _ = Describe("NodeLabelerReconciler", func() {
 			cp := &spyrev1alpha1.SpyreClusterPolicy{
 				ObjectMeta: metav1.ObjectMeta{Name: "spyreclusterpolicy"},
 				Spec: spyrev1alpha1.SpyreClusterPolicySpec{
+					DevicePlugin: spyrev1alpha1.DevicePluginSpec{
+						Mode: spyrev1alpha1.DevicePluginModeClassic,
+					},
 					ExperimentalMode: []spyrev1alpha1.SpyreClusterPolicyExperimentalMode{
 						spyrev1alpha1.PseudoDeviceMode,
 					},
@@ -129,6 +132,9 @@ var _ = Describe("NodeLabelerReconciler", func() {
 			cp := &spyrev1alpha1.SpyreClusterPolicy{
 				ObjectMeta: metav1.ObjectMeta{Name: "spyreclusterpolicy"},
 				Spec: spyrev1alpha1.SpyreClusterPolicySpec{
+					DevicePlugin: spyrev1alpha1.DevicePluginSpec{
+						Mode: spyrev1alpha1.DevicePluginModeClassic,
+					},
 					ExperimentalMode: []spyrev1alpha1.SpyreClusterPolicyExperimentalMode{
 						spyrev1alpha1.PseudoDeviceMode,
 					},

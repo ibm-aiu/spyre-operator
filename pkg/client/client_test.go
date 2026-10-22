@@ -299,6 +299,9 @@ var _ = Describe("general CRUD", Ordered, func() {
 					Name: testSpyreClusterPolicy,
 				},
 				Spec: spyrev1alpha1.SpyreClusterPolicySpec{
+					DevicePlugin: spyrev1alpha1.DevicePluginSpec{
+						Mode: spyrev1alpha1.DevicePluginModeClassic,
+					},
 					ExperimentalMode: []spyrev1alpha1.SpyreClusterPolicyExperimentalMode{spyrev1alpha1.PerDeviceAllocationMode},
 				},
 			}
@@ -312,6 +315,9 @@ var _ = Describe("general CRUD", Ordered, func() {
 					Name: testSpyreClusterPolicy,
 				},
 				Spec: spyrev1alpha1.SpyreClusterPolicySpec{
+					DevicePlugin: spyrev1alpha1.DevicePluginSpec{
+						Mode: spyrev1alpha1.DevicePluginModeClassic,
+					},
 					ExperimentalMode: []spyrev1alpha1.SpyreClusterPolicyExperimentalMode{spyrev1alpha1.PerDeviceAllocationMode},
 				},
 			}
@@ -346,6 +352,9 @@ var _ = Describe("general CRUD", Ordered, func() {
 					Name: testSpyreClusterPolicy,
 				},
 				Spec: spyrev1alpha1.SpyreClusterPolicySpec{
+					DevicePlugin: spyrev1alpha1.DevicePluginSpec{
+						Mode: spyrev1alpha1.DevicePluginModeClassic,
+					},
 					ExperimentalMode: []spyrev1alpha1.SpyreClusterPolicyExperimentalMode{spyrev1alpha1.PerDeviceAllocationMode},
 				},
 			}

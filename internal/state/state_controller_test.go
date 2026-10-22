@@ -95,6 +95,7 @@ var _ = Describe("StateController", Ordered, func() {
 						},
 						Spec: spyrev1alpha1.SpyreClusterPolicySpec{
 							DevicePlugin: spyrev1alpha1.DevicePluginSpec{
+								Mode:             spyrev1alpha1.DevicePluginModeClassic,
 								DeploymentConfig: ValidDeploymentConfig("device-plugin"),
 							},
 						},
@@ -121,6 +122,7 @@ var _ = Describe("StateController", Ordered, func() {
 					},
 					Spec: spyrev1alpha1.SpyreClusterPolicySpec{
 						DevicePlugin: spyrev1alpha1.DevicePluginSpec{
+							Mode:             spyrev1alpha1.DevicePluginModeClassic,
 							DeploymentConfig: ValidDeploymentConfig("device-plugin"),
 						},
 					},
@@ -152,6 +154,7 @@ var _ = Describe("StateController", Ordered, func() {
 					},
 					Spec: spyrev1alpha1.SpyreClusterPolicySpec{
 						DevicePlugin: spyrev1alpha1.DevicePluginSpec{
+							Mode:             spyrev1alpha1.DevicePluginModeClassic,
 							DeploymentConfig: ValidDeploymentConfig("device-plugin"),
 						},
 					},
@@ -177,6 +180,7 @@ var _ = Describe("StateController", Ordered, func() {
 					},
 					Spec: spyrev1alpha1.SpyreClusterPolicySpec{
 						DevicePlugin: spyrev1alpha1.DevicePluginSpec{
+							Mode:             spyrev1alpha1.DevicePluginModeClassic,
 							DeploymentConfig: ValidDeploymentConfig("device-plugin"),
 						},
 					},
@@ -205,7 +209,7 @@ var _ = Describe("StateController", Ordered, func() {
 					Spec: spyrev1alpha1.SpyreClusterPolicySpec{
 						DevicePlugin: spyrev1alpha1.DevicePluginSpec{
 							DeploymentConfig: ValidDeploymentConfig("device-plugin"),
-							DRADriver:        true,
+							Mode:             spyrev1alpha1.DevicePluginModeDRA,
 						},
 					},
 				}

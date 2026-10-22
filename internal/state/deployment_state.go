@@ -26,15 +26,17 @@ import (
 )
 
 var (
-	componentToName = map[spyrev1alpha1.Component]string{
-		spyrev1alpha1.ComponentCommonInit:      "common",
-		spyrev1alpha1.ComponentDevicePlugin:    spyreconst.DevicePluginResourceName,
-		spyrev1alpha1.ComponentDRADriver:       spyreconst.DRADriverResourceName,
-		spyrev1alpha1.ComponentCardManagement:  spyreconst.CardManagementResourceName,
-		spyrev1alpha1.ComponentMetricsExporter: spyreconst.MonitorResourceName,
-		spyrev1alpha1.ComponentScheduler:       spyreconst.SchedulerResourceName,
-		spyrev1alpha1.ComponentPodValidator:    spyreconst.ValidatorResourceName,
-		spyrev1alpha1.ComponentHealthChecker:   spyreconst.HealthCheckerResourceName,
+	// componentToName maps a Component enum value to the directory/resource name used on disk.
+	// DevicePlugin maps to both device-plugin and DRA-driver resource names; the active one is
+	// determined at runtime by DevicePluginSpec.Mode.
+	componentToName = map[spyrev1alpha1.Component][]string{
+		spyrev1alpha1.ComponentCommonInit:      {"common"},
+		spyrev1alpha1.ComponentDevicePlugin:    {spyreconst.DevicePluginResourceName, spyreconst.DRADriverResourceName},
+		spyrev1alpha1.ComponentCardManagement:  {spyreconst.CardManagementResourceName},
+		spyrev1alpha1.ComponentMetricsExporter: {spyreconst.MonitorResourceName},
+		spyrev1alpha1.ComponentScheduler:       {spyreconst.SchedulerResourceName},
+		spyrev1alpha1.ComponentPodValidator:    {spyreconst.ValidatorResourceName},
+		spyrev1alpha1.ComponentHealthChecker:   {spyreconst.HealthCheckerResourceName},
 	}
 )
 
@@ -203,13 +205,14 @@ func (s *DeploymentState) transform(clusterPolicy *spyrev1alpha1.SpyreClusterPol
 }
 
 func (s *DeploymentState) setDisabled(clusterPolicy *spyrev1alpha1.SpyreClusterPolicy) {
+	draMode := clusterPolicy.Spec.DevicePlugin.Mode == spyrev1alpha1.DevicePluginModeDRA
 	for _, component := range s.components {
 		disabled := true
 		switch component.name {
 		case spyreconst.DevicePluginResourceName:
-			disabled = clusterPolicy.Spec.DevicePlugin.DRADriver
+			disabled = draMode
 		case spyreconst.DRADriverResourceName:
-			disabled = !clusterPolicy.Spec.DevicePlugin.DRADriver
+			disabled = !draMode
 		case spyreconst.CardManagementResourceName:
 			disabled = !clusterPolicy.Spec.CardManagement.Enabled
 		case spyreconst.MonitorResourceName:
@@ -277,8 +280,7 @@ func (s *DeploymentState) RemoveZombieAssets(ctx context.Context) int {
 func getSkipUpdateComponentNames(skipComponents []spyrev1alpha1.Component) []string {
 	names := make([]string, 0, len(skipComponents))
 	for _, component := range skipComponents {
-		name := componentToName[component]
-		names = append(names, name)
+		names = append(names, componentToName[component]...)
 	}
 	return names
 }

@@ -379,9 +379,11 @@ func transformRuntimeInitContainer(obj *appsv1.DaemonSet,
 
 // TransformPodValidator transforms pod validator deployment
 func TransformPodValidator(obj *appsv1.Deployment, clusterPolicy *spyrev1alpha1.SpyreClusterPolicy) error {
-	applyExperimentalModes(&(obj.Spec.Template.Spec.Containers[0]), clusterPolicy.Spec.ExperimentalMode)
-	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "VF_MODE_ENABLED", boolEnvValue(clusterPolicy.Spec.CardManagement.Enabled))
-	setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), "DRA_DRIVER_ENABLED", boolEnvValue(clusterPolicy.Spec.DevicePlugin.DRADriver))
+	c := &obj.Spec.Template.Spec.Containers[0]
+	applyExperimentalModes(c, clusterPolicy.Spec.ExperimentalMode)
+	setContainerEnv(c, "VF_MODE_ENABLED", boolEnvValue(clusterPolicy.Spec.CardManagement.Enabled))
+	draEnabled := clusterPolicy.Spec.DevicePlugin.Mode == spyrev1alpha1.DevicePluginModeDRA
+	setContainerEnv(c, "DRA_DRIVER_ENABLED", boolEnvValue(draEnabled))
 	if err := TransformDeployment(obj, &clusterPolicy.Spec.PodValidator.DeploymentConfig,
 		clusterPolicy.Spec.PodValidator.Replicas); err != nil {
 		return fmt.Errorf("failed to transform deployment: %w", err)
@@ -426,15 +428,18 @@ func TransformCardManagement(obj *appsv1.DaemonSet,
 		return nil
 	}
 
-	if clusterPolicy.Spec.DevicePlugin.DRADriver {
+	switch clusterPolicy.Spec.DevicePlugin.Mode {
+	case spyrev1alpha1.DevicePluginModeClassic:
+		return transformCardManagementDevicePluginResources(obj, cluster, nodeName)
+	case spyrev1alpha1.DevicePluginModeDRA:
 		// Request devices through the ResourceClaimTemplates instead of
 		// device-plugin extended resources. Device selection is handled at
 		// schedule time by the DeviceClass selectors, so this does not depend
 		// on node capacity.
 		injectCardManagementResourceClaim(obj)
 		return nil
-	} else {
-		return transformCardManagementDevicePluginResources(obj, cluster, nodeName)
+	default:
+		return fmt.Errorf("unknown mode: %v", clusterPolicy.Spec.DevicePlugin.Mode)
 	}
 }
 
