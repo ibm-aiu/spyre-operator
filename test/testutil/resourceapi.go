@@ -42,9 +42,8 @@ const (
 	PfProductId         = "06a7"
 	VfProductId         = "06a8"
 
-	pfDeviceClassName           = "spyre-pf"
-	vfDeviceClassName           = "spyre-standard-vf"
-	vfPrivilegedDeviceClassName = "spyre-privileged-vf"
+	pfDeviceClassName = "spyre-pf"
+	vfDeviceClassName = "spyre-vf"
 )
 
 const ResourceClaimTemplate = `
@@ -129,17 +128,12 @@ func (c *ResourceClaimTemplateData) SetProductId(productId string) *ResourceClai
 	return c
 }
 
-// DeviceClassNameForDevice returns the DeviceClass name (spyre-pf,
-// spyre-privileged-vf, or spyre-standard-vf) matching the given productId
-// and pciFunctionIndex. pciFunctionIndex is only consulted for VF devices,
-// since privileged VFs (pciFunctionIndex == 1) require spyre-privileged-vf
-// rather than spyre-standard-vf.
-func DeviceClassNameForDevice(productId string, pciFunctionIndex int64) string {
+// DeviceClassNameForDevice returns the DeviceClass name (spyre-pf or spyre-vf)
+// matching the given productId. pciFunctionIndex is unused but kept for call-site
+// compatibility.
+func DeviceClassNameForDevice(productId string, _ int64) string {
 	if productId != VfProductId {
 		return pfDeviceClassName
-	}
-	if pciFunctionIndex == 1 {
-		return vfPrivilegedDeviceClassName
 	}
 	return vfDeviceClassName
 }

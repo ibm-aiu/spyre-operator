@@ -3,18 +3,21 @@
 # | PID 5698-SPR                                                      |
 # +-------------------------------------------------------------------+
 
+# spyre-managed-pf: PF (productId 06a7) devices with card management enabled.
+# Restricted to privileged namespaces (e.g. spyre-operator).
+
 apiVersion: resource.k8s.io/v1
 kind: DeviceClass
 metadata:
-  name: spyre-standard-vf
+  name: spyre-managed-pf
 spec:
   selectors:
   - cel:
       expression: >
-        device.driver == 'spyre.ibm.com' && device.attributes["spyre.ibm.com"].pciFunctionIndex
-        != 1 && !(device.attributes["spyre.ibm.com"].pciFunctionIndex == 0 &&
-          device.attributes["spyre.ibm.com"].vfEnabled == true)
-  # only healthy devices are allocatable
+        device.driver == 'spyre.ibm.com' && device.attributes["spyre.ibm.com"].productId
+        == "06a7"
+  # managed by card management
   - cel:
       expression: >
-        device.attributes["spyre.ibm.com"].deviceState == 'ONLINE'
+        has(device.attributes["spyre.ibm.com"].managed) && device.attributes["spyre.ibm.com"].managed
+        == true

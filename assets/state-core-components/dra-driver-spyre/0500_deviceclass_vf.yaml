@@ -3,17 +3,25 @@
 # | PID 5698-SPR                                                      |
 # +-------------------------------------------------------------------+
 
+# spyre-vf: VF (productId 06a8) devices without card management.
+# Generally available for users.
+
 apiVersion: resource.k8s.io/v1
 kind: DeviceClass
 metadata:
-  name: spyre-privileged-vf
+  name: spyre-vf
 spec:
   selectors:
   - cel:
       expression: >
-        device.driver == 'spyre.ibm.com' && device.attributes["spyre.ibm.com"].pciFunctionIndex
-        == 1
+        device.driver == 'spyre.ibm.com' && device.attributes["spyre.ibm.com"].productId
+        == "06a8"
   # only healthy devices are allocatable
   - cel:
       expression: >
         device.attributes["spyre.ibm.com"].deviceState == 'ONLINE'
+  # not managed by card management
+  - cel:
+      expression: >
+        !has(device.attributes["spyre.ibm.com"].managed) ||
+          device.attributes["spyre.ibm.com"].managed == false
