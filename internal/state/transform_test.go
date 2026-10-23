@@ -912,6 +912,141 @@ var _ = Describe("Transform", func() {
 				Expect(err).NotTo(BeNil())
 			})
 		})
+
+		Context("DRA resource claim", func() {
+			newDraPolicy := func(dra bool) *spyrev1alpha1.SpyreClusterPolicy {
+				return &spyrev1alpha1.SpyreClusterPolicy{
+					Spec: spyrev1alpha1.SpyreClusterPolicySpec{
+						DevicePlugin: spyrev1alpha1.DevicePluginSpec{
+							DRADriver: dra,
+						},
+						CardManagement: spyrev1alpha1.CardManagementSpec{
+							Enabled: true,
+						},
+					},
+				}
+			}
+
+			It("injects resource claims when DRA driver is enabled", func() {
+				ds := newDaemonset("test-cardmgmt")
+				ds.Spec.Template.Spec.NodeSelector = map[string]string{
+					"kubernetes.io/hostname": "test-node",
+				}
+				// existing cpu/memory limits must be preserved (not clobbered)
+				cpuLimit := resource.MustParse("1000m")
+				ds.Spec.Template.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{corev1.ResourceCPU: cpuLimit},
+				}
+
+				err := TransformCardManagement(ds, newDraPolicy(true), nil, false)
+				Expect(err).To(BeNil())
+
+				// device selection is handled by the DRA scheduler plugin, so
+				// the spyre-scheduler extender must not be used and the
+				// manifest's unset SchedulerName is left as-is
+				Expect(ds.Spec.Template.Spec.SchedulerName).To(BeEmpty())
+
+				// PF and VF must be requested through separate claims since
+				// dra-driver-spyre rejects claims mixing product IDs
+				claims := ds.Spec.Template.Spec.ResourceClaims
+				Expect(claims).To(HaveLen(2))
+				Expect(claims[0].Name).To(Equal(spyreconst.CardManagementPfPodResourceClaimName))
+				Expect(claims[0].ResourceClaimTemplateName).NotTo(BeNil())
+				Expect(*claims[0].ResourceClaimTemplateName).To(Equal(spyreconst.CardManagementPfResourceClaimTemplateName))
+				Expect(claims[1].Name).To(Equal(spyreconst.CardManagementVfPodResourceClaimName))
+				Expect(claims[1].ResourceClaimTemplateName).NotTo(BeNil())
+				Expect(*claims[1].ResourceClaimTemplateName).To(Equal(spyreconst.CardManagementVfResourceClaimTemplateName))
+
+				containerClaims := ds.Spec.Template.Spec.Containers[0].Resources.Claims
+				Expect(containerClaims).To(HaveLen(2))
+				Expect(containerClaims[0].Name).To(Equal(spyreconst.CardManagementPfPodResourceClaimName))
+				Expect(containerClaims[0].Request).To(Equal(spyreconst.DRADeviceRequestManagedPf))
+				Expect(containerClaims[1].Name).To(Equal(spyreconst.CardManagementVfPodResourceClaimName))
+				Expect(containerClaims[1].Request).To(Equal(spyreconst.DRADeviceRequestManagedVf))
+
+				// cpu/memory limits preserved, no device-plugin extended resources
+				Expect(ds.Spec.Template.Spec.Containers[0].Resources.Limits).To(HaveKeyWithValue(corev1.ResourceCPU, cpuLimit))
+			})
+
+			It("does not inject resource claims when DRA driver is disabled", func() {
+				ds := newDaemonset("test-cardmgmt")
+				ds.Spec.Template.Spec.NodeSelector = map[string]string{
+					"kubernetes.io/hostname": "test-node",
+				}
+
+				err := TransformCardManagement(ds, newDraPolicy(false), nil, false)
+				Expect(err).To(BeNil())
+
+				Expect(ds.Spec.Template.Spec.ResourceClaims).To(BeEmpty())
+				Expect(ds.Spec.Template.Spec.Containers[0].Resources.Claims).To(BeEmpty())
+				// device-plugin allocation still relies on the spyre-scheduler extender
+				Expect(ds.Spec.Template.Spec.SchedulerName).To(Equal(spyreconst.SpyreSchedulerName))
+			})
+
+			It("does not request device-plugin extended resources when DRA driver is enabled", func() {
+				ds := newDaemonset("test-cardmgmt")
+				ds.Spec.Template.Spec.NodeSelector = map[string]string{
+					"kubernetes.io/hostname": "test-node",
+				}
+
+				err := TransformCardManagement(ds, newDraPolicy(true), nil, false)
+				Expect(err).To(BeNil())
+
+				// devices come only from the claims, so no spyre_pf/spyre_vf limit or request may be left,
+				// otherwise the Pod would also wait for a device-plugin resource that never exists
+				res := ds.Spec.Template.Spec.Containers[0].Resources
+				for name := range res.Limits {
+					Expect(string(name)).NotTo(HavePrefix(spyreconst.ResourcePrefix))
+				}
+				for name := range res.Requests {
+					Expect(string(name)).NotTo(HavePrefix(spyreconst.ResourcePrefix))
+				}
+			})
+
+			It("is idempotent when transformed twice", func() {
+				ds := newDaemonset("test-cardmgmt")
+				ds.Spec.Template.Spec.NodeSelector = map[string]string{
+					"kubernetes.io/hostname": "test-node",
+				}
+				policy := newDraPolicy(true)
+				Expect(TransformCardManagement(ds, policy, nil, false)).To(Succeed())
+				Expect(TransformCardManagement(ds, policy, nil, false)).To(Succeed())
+
+				// claims are replaced, not appended
+				Expect(ds.Spec.Template.Spec.ResourceClaims).To(HaveLen(2))
+				Expect(ds.Spec.Template.Spec.Containers[0].Resources.Claims).To(HaveLen(2))
+			})
+
+			It("does not inject resource claims on a node excluded by spyreFilter", func() {
+				ds := newDaemonset("test-cardmgmt")
+				ds.Spec.Template.Spec.NodeSelector = map[string]string{
+					"kubernetes.io/hostname": "test-node",
+				}
+				policy := newDraPolicy(true)
+				filter := "^other-node$"
+				policy.Spec.CardManagement.Config = &spyrev1alpha1.CardManagementConfig{SpyreFilter: &filter}
+
+				Expect(TransformCardManagement(ds, policy, nil, false)).To(Succeed())
+
+				// the Pod is blocked from scheduling, so it must not hold any claim either
+				Expect(ds.Spec.Template.Spec.ResourceClaims).To(BeEmpty())
+				Expect(ds.Spec.Template.Spec.Containers[0].Resources.Claims).To(BeEmpty())
+			})
+
+			It("injects resource claims on a node matched by spyreFilter", func() {
+				ds := newDaemonset("test-cardmgmt")
+				ds.Spec.Template.Spec.NodeSelector = map[string]string{
+					"kubernetes.io/hostname": "test-node",
+				}
+				policy := newDraPolicy(true)
+				filter := "^test-node$"
+				policy.Spec.CardManagement.Config = &spyrev1alpha1.CardManagementConfig{SpyreFilter: &filter}
+
+				Expect(TransformCardManagement(ds, policy, nil, false)).To(Succeed())
+
+				Expect(ds.Spec.Template.Spec.ResourceClaims).To(HaveLen(2))
+			})
+		})
 	})
 
 	Context("hardware mount", func() {

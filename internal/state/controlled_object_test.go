@@ -15,8 +15,10 @@ import (
 	spyrev1alpha1 "github.com/ibm-aiu/spyre-operator/api/v1alpha1"
 	spyreconst "github.com/ibm-aiu/spyre-operator/const"
 	. "github.com/ibm-aiu/spyre-operator/internal/state"
+	spyreerr "github.com/ibm-aiu/spyre-operator/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	resourcev1 "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -184,6 +186,81 @@ var _ = Describe("ControlledObject", Ordered, func() {
 			// Test GetObject
 			obj := controlledObj.GetObject()
 			Expect(obj).NotTo(BeNil())
+		})
+	})
+
+	Context("ResourceClaimTemplate", func() {
+		cardmgmtDir := filepath.Join(AssetsPath, "state-plugin-components", "spyre-card-management")
+		coreDir := filepath.Join(AssetsPath, "state-core-components", "dra-driver-spyre")
+
+		// deviceClassNames returns the names of all DeviceClass assets of the DRA driver.
+		deviceClassNames := func() []string {
+			files, err := filepath.Glob(filepath.Join(coreDir, "*deviceclass*.yaml"))
+			Expect(err).To(BeNil())
+			Expect(files).NotTo(BeEmpty())
+			names := make([]string, 0, len(files))
+			for _, f := range files {
+				runtimeObj, gvk, err := DecodeFromFile(StateScheme, f)
+				Expect(err).To(BeNil())
+				Expect(gvk.Kind).To(Equal("DeviceClass"))
+				dc, ok := runtimeObj.(*resourcev1.DeviceClass)
+				Expect(ok).To(BeTrue())
+				names = append(names, dc.Name)
+			}
+			return names
+		}
+
+		DescribeTable("can handle ResourceClaimTemplate object", func(fileName, templateName, requestName, deviceClassName string) {
+			runtimeObj, gvk, err := DecodeFromFile(StateScheme, filepath.Join(cardmgmtDir, fileName))
+			Expect(err).To(BeNil())
+			Expect(gvk.Kind).To(Equal("ResourceClaimTemplate"))
+
+			defaultObj, err := NewDefaultObject(ctx, gvk.Kind, OpNs, runtimeObj)
+			Expect(err).To(BeNil())
+			controlledObj, err := NewResourceClaimTemplate(defaultObj, runtimeObj, OpNs)
+			Expect(err).To(BeNil())
+			Expect(controlledObj).NotTo(BeNil())
+			Expect(controlledObj.GetID().Kind).To(Equal("ResourceClaimTemplate"))
+			Expect(controlledObj.GetID().Name).To(Equal(templateName))
+
+			// the placeholder namespace in the asset must be replaced by the operator namespace
+			obj, ok := controlledObj.GetObject().(*resourcev1.ResourceClaimTemplate)
+			Expect(ok).To(BeTrue())
+			Expect(obj.Namespace).To(Equal(OpNs))
+
+			By("checking the device request")
+			requests := obj.Spec.Spec.Devices.Requests
+			Expect(requests).To(HaveLen(1))
+			Expect(requests[0].Name).To(Equal(requestName))
+			Expect(requests[0].Exactly).NotTo(BeNil())
+			Expect(requests[0].Exactly.DeviceClassName).To(Equal(deviceClassName))
+			// cardmgmt must hold every device of the class, not a single one
+			Expect(requests[0].Exactly.AllocationMode).To(Equal(resourcev1.DeviceAllocationModeAll))
+
+			By("checking that the DeviceClass is defined by the DRA driver assets")
+			Expect(deviceClassNames()).To(ContainElement(deviceClassName))
+		},
+			Entry("PF", "0550_resourceclaimtemplate_managed_pf.yaml",
+				spyreconst.CardManagementPfResourceClaimTemplateName,
+				spyreconst.DRADeviceRequestManagedPf, "spyre-managed-pf"),
+			Entry("VF", "0551_resourceclaimtemplate_managed_vf.yaml",
+				spyreconst.CardManagementVfResourceClaimTemplateName,
+				spyreconst.DRADeviceRequestManagedVf, "spyre-managed-vf"),
+		)
+
+		It("rejects a non-ResourceClaimTemplate object", func() {
+			runtimeObj := &resourcev1.DeviceClass{ObjectMeta: metav1.ObjectMeta{Name: "not-a-template"}}
+			defaultObj, err := NewDefaultObject(ctx, "DeviceClass", OpNs, runtimeObj)
+			Expect(err).To(BeNil())
+			_, err = NewResourceClaimTemplate(defaultObj, runtimeObj, OpNs)
+			Expect(err).To(MatchError(spyreerr.ErrParseFile))
+		})
+
+		It("keeps the PF and VF templates distinct", func() {
+			Expect(spyreconst.CardManagementPfResourceClaimTemplateName).
+				NotTo(Equal(spyreconst.CardManagementVfResourceClaimTemplateName))
+			Expect(spyreconst.CardManagementPfPodResourceClaimName).
+				NotTo(Equal(spyreconst.CardManagementVfPodResourceClaimName))
 		})
 	})
 

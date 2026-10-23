@@ -448,6 +448,19 @@ func TransformCardManagement(obj *appsv1.DaemonSet,
 		return nil
 	}
 
+	// When the DRA driver is used, request devices through the
+	// ResourceClaimTemplate instead of device-plugin extended resources. Device
+	// selection is handled at schedule time by the DeviceClass selectors, so this
+	// does not depend on node capacity.
+	if clusterPolicy.Spec.DevicePlugin.DRADriver {
+		injectCardManagementResourceClaim(obj)
+		return nil
+	}
+
+	// Device-plugin allocation relies on the spyre-scheduler extender to
+	// account for extended resources across the PF/VF resource pools.
+	obj.Spec.Template.Spec.SchedulerName = spyreconst.SpyreSchedulerName
+
 	// update number of spyre cards
 	if cluster == nil {
 		return nil // tentatively skip
@@ -534,6 +547,35 @@ func transformCardManagementHealthApi(obj *appsv1.DaemonSet, healthApi *spyrev1a
 		}
 	}
 	return nil
+}
+
+// injectCardManagementResourceClaim wires the card-management Pod to the DRA
+// ResourceClaimTemplates, binding the container to the managed PF and managed
+// VF device requests. PF and VF are requested through separate claims because
+// dra-driver-spyre rejects a claim that mixes devices with different product
+// IDs. Only the container's resource claims are set; existing cpu/memory limits
+// and requests from the manifest are preserved.
+//
+// The manifest leaves SchedulerName unset, so the Pod uses the default
+// scheduler here: device selection is handled by the DRA scheduler plugin via
+// the ResourceClaimTemplates, so the spyre-scheduler extender is not needed.
+func injectCardManagementResourceClaim(obj *appsv1.DaemonSet) {
+	pfTemplateName := spyreconst.CardManagementPfResourceClaimTemplateName
+	vfTemplateName := spyreconst.CardManagementVfResourceClaimTemplateName
+	obj.Spec.Template.Spec.ResourceClaims = []corev1.PodResourceClaim{
+		{
+			Name:                      spyreconst.CardManagementPfPodResourceClaimName,
+			ResourceClaimTemplateName: &pfTemplateName,
+		},
+		{
+			Name:                      spyreconst.CardManagementVfPodResourceClaimName,
+			ResourceClaimTemplateName: &vfTemplateName,
+		},
+	}
+	obj.Spec.Template.Spec.Containers[0].Resources.Claims = []corev1.ResourceClaim{
+		{Name: spyreconst.CardManagementPfPodResourceClaimName, Request: spyreconst.DRADeviceRequestManagedPf},
+		{Name: spyreconst.CardManagementVfPodResourceClaimName, Request: spyreconst.DRADeviceRequestManagedVf},
+	}
 }
 
 // mountCardManagementClaim mounts a PersistentVolumeClaim to a Deployment.

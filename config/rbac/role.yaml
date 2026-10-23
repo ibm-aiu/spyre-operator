@@ -139,6 +139,7 @@ rules:
   - resource.k8s.io
   resources:
   - deviceclasses
+  - resourceclaimtemplates
   - resourceslices
   verbs:
   - create
