@@ -982,6 +982,70 @@ var _ = Describe("Transform", func() {
 				// device-plugin allocation still relies on the spyre-scheduler extender
 				Expect(ds.Spec.Template.Spec.SchedulerName).To(Equal(spyreconst.SpyreSchedulerName))
 			})
+
+			It("does not request device-plugin extended resources when DRA driver is enabled", func() {
+				ds := newDaemonset("test-cardmgmt")
+				ds.Spec.Template.Spec.NodeSelector = map[string]string{
+					"kubernetes.io/hostname": "test-node",
+				}
+
+				err := TransformCardManagement(ds, newDraPolicy(true), nil, false)
+				Expect(err).To(BeNil())
+
+				// devices come only from the claims, so no spyre_pf/spyre_vf limit or request may be left,
+				// otherwise the Pod would also wait for a device-plugin resource that never exists
+				res := ds.Spec.Template.Spec.Containers[0].Resources
+				for name := range res.Limits {
+					Expect(string(name)).NotTo(HavePrefix(spyreconst.ResourcePrefix))
+				}
+				for name := range res.Requests {
+					Expect(string(name)).NotTo(HavePrefix(spyreconst.ResourcePrefix))
+				}
+			})
+
+			It("is idempotent when transformed twice", func() {
+				ds := newDaemonset("test-cardmgmt")
+				ds.Spec.Template.Spec.NodeSelector = map[string]string{
+					"kubernetes.io/hostname": "test-node",
+				}
+				policy := newDraPolicy(true)
+				Expect(TransformCardManagement(ds, policy, nil, false)).To(Succeed())
+				Expect(TransformCardManagement(ds, policy, nil, false)).To(Succeed())
+
+				// claims are replaced, not appended
+				Expect(ds.Spec.Template.Spec.ResourceClaims).To(HaveLen(2))
+				Expect(ds.Spec.Template.Spec.Containers[0].Resources.Claims).To(HaveLen(2))
+			})
+
+			It("does not inject resource claims on a node excluded by spyreFilter", func() {
+				ds := newDaemonset("test-cardmgmt")
+				ds.Spec.Template.Spec.NodeSelector = map[string]string{
+					"kubernetes.io/hostname": "test-node",
+				}
+				policy := newDraPolicy(true)
+				filter := "^other-node$"
+				policy.Spec.CardManagement.Config = &spyrev1alpha1.CardManagementConfig{SpyreFilter: &filter}
+
+				Expect(TransformCardManagement(ds, policy, nil, false)).To(Succeed())
+
+				// the Pod is blocked from scheduling, so it must not hold any claim either
+				Expect(ds.Spec.Template.Spec.ResourceClaims).To(BeEmpty())
+				Expect(ds.Spec.Template.Spec.Containers[0].Resources.Claims).To(BeEmpty())
+			})
+
+			It("injects resource claims on a node matched by spyreFilter", func() {
+				ds := newDaemonset("test-cardmgmt")
+				ds.Spec.Template.Spec.NodeSelector = map[string]string{
+					"kubernetes.io/hostname": "test-node",
+				}
+				policy := newDraPolicy(true)
+				filter := "^test-node$"
+				policy.Spec.CardManagement.Config = &spyrev1alpha1.CardManagementConfig{SpyreFilter: &filter}
+
+				Expect(TransformCardManagement(ds, policy, nil, false)).To(Succeed())
+
+				Expect(ds.Spec.Template.Spec.ResourceClaims).To(HaveLen(2))
+			})
 		})
 	})
 
