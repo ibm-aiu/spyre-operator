@@ -10,11 +10,13 @@ package testutil
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
 
 	spyrev2 "github.com/ibm-aiu/spyre-operator/api/v1alpha1"
+	spyreconst "github.com/ibm-aiu/spyre-operator/const"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
@@ -116,6 +118,120 @@ func EnabledCardmgmtForWorkers(ctx context.Context, clusterPolicy *spyrev2.Spyre
 	*clusterPolicy.Spec.CardManagement.Config.SpyreFilter = nodeFilter
 	clusterPolicy.Spec.CardManagement.Enabled = true
 	UpdateClusterPolicy(ctx, spyreV2Client, k8sClientset, clusterPolicy, len(nodeList.Items), spyrev2.Ready)
+}
+
+// cardmgmtRegistrySecretName is the (non-optional) image pull secret volume of the card management DaemonSet.
+const cardmgmtRegistrySecretName = "registry-dockerconfig-secret" // pragma: allowlist secret
+
+// EnsureCardmgmtRegistrySecret creates an empty dockerconfigjson secret in the operator namespace
+// if it does not exist, because the card management Pod cannot start without it.
+// It returns true if the secret was created by this call, and the caller must delete it then.
+func EnsureCardmgmtRegistrySecret(ctx context.Context, k8sClientset *kubernetes.Clientset) bool {
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: cardmgmtRegistrySecretName, Namespace: OperatorNamespace},
+		Type:       corev1.SecretTypeDockerConfigJson,
+		Data:       map[string][]byte{corev1.DockerConfigJsonKey: []byte(`{"auths":{}}`)},
+	}
+	_, err := k8sClientset.CoreV1().Secrets(OperatorNamespace).Create(ctx, secret, metav1.CreateOptions{})
+	if errors.IsAlreadyExists(err) {
+		return false
+	}
+	Expect(err).To(BeNil())
+	return true
+}
+
+// DeleteCardmgmtRegistrySecret deletes the secret created by EnsureCardmgmtRegistrySecret; errors are ignored.
+func DeleteCardmgmtRegistrySecret(ctx context.Context, k8sClientset *kubernetes.Clientset) {
+	_ = k8sClientset.CoreV1().Secrets(OperatorNamespace).Delete(ctx, cardmgmtRegistrySecretName, metav1.DeleteOptions{})
+}
+
+// EnableCardmgmtDummy enables card management only on nodeName with the dummy image (containerTestImage,
+// the same image as the simple test Pods) in place of the card management, PF runner and VF runner images.
+// The container args are "tail -f /dev/null" (the template command is "/bin/sh -c") to keep it running.
+func EnableCardmgmtDummy(clusterPolicy *spyrev2.SpyreClusterPolicy, nodeName string) {
+	repository, imageVersion, _ := strings.Cut(containerTestImage, "/")
+	image, version, _ := strings.Cut(imageVersion, ":")
+	filter := "^" + regexp.QuoteMeta(nodeName) + "$"
+	runnerImage := containerTestImage
+	clusterPolicy.Spec.CardManagement = spyrev2.CardManagementSpec{
+		Enabled: true,
+		DeploymentConfig: spyrev2.DeploymentConfig{
+			Repository:      repository,
+			Image:           image,
+			Version:         version,
+			ImagePullPolicy: "IfNotPresent",
+			Args:            []string{"tail -f /dev/null"},
+		},
+		Config: &spyrev2.CardManagementConfig{
+			SpyreFilter:   &filter,
+			PfRunnerImage: &runnerImage,
+			VfRunnerImage: &runnerImage,
+		},
+	}
+}
+
+// ExpectCardmgmtHoldsAllDevices waits until the card management Pod on nodeName is Running,
+// scheduled by the Spyre secondary scheduler, and holds all devices (either PFs or VFs,
+// as the device plugin records either PF or VF allocation when both are requested)
+// according to the allocation list of SpyreNodeState.
+func ExpectCardmgmtHoldsAllDevices(ctx context.Context, k8sClientset *kubernetes.Clientset, spyreV2Client client.Client, nodeName string) {
+	Eventually(func(g Gomega) {
+		pods := GetPodsWithLabels(ctx, k8sClientset, g, OperatorNamespace, cardManagementLabel, nodeName)
+		g.Expect(pods).To(HaveLen(1))
+		g.Expect(pods[0].Spec.SchedulerName).To(Equal(spyreconst.SpyreSchedulerName))
+		g.Expect(pods[0].Status.Phase).To(Equal(corev1.PodRunning))
+
+		ns, err := GetSpyreNodeState(ctx, spyreV2Client, nodeName)
+		g.Expect(err).To(BeNil())
+		g.Expect(ns.Spec.SpyreInterfaces).NotTo(BeEmpty())
+
+		// Due to device plugin limitation when a Pod requests both PF and VF,
+		// the allocation list records either PF or VF allocation for the Pod.
+		allocatedDevices := []string{}
+		for _, allocation := range ns.Status.AllocationList {
+			if allocation.Pod != nil && allocation.Pod.Name == pods[0].Name &&
+				(allocation.ResourcePool == spyreconst.PfResourceName || allocation.ResourcePool == spyreconst.VfResourceName) {
+				allocatedDevices = append(allocatedDevices, allocation.DeviceList...)
+				break
+			}
+		}
+		g.Expect(allocatedDevices).To(HaveLen(len(ns.Spec.SpyreInterfaces)))
+	}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
+}
+
+// DeployVfPodAndExpectVfSuffix creates a Pod requesting one ibm.com/spyre_vf on nodeName via the Spyre
+// secondary scheduler, waits for it to be Running, and verifies that the VF allocated to the Pod in
+// SpyreNodeState has the PCI address suffix (e.g., ".1" or ".2").
+// labels are added to the Pod. If owner is not nil, it becomes the controller of the Pod so that a workload
+// controller whose selector matches the labels (e.g., the card management DaemonSet) does not adopt the Pod.
+// The caller must delete the returned Pod.
+func DeployVfPodAndExpectVfSuffix(ctx context.Context, k8sClientset *kubernetes.Clientset, spyreV2Client client.Client,
+	name, namespace, nodeName string, labels map[string]string, owner *corev1.Pod, suffix string) *corev1.Pod {
+	pod := BuildPod(name, namespace, spyreconst.ResourcePrefix+"/"+spyreconst.VfResourceName, 1, nodeName, true)
+	pod.Labels = labels
+	if owner != nil {
+		isController := true
+		pod.OwnerReferences = []metav1.OwnerReference{{
+			APIVersion: "v1", Kind: "Pod", Name: owner.Name, UID: owner.UID, Controller: &isController,
+		}}
+	}
+	_, err := k8sClientset.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{})
+	Expect(err).To(BeNil())
+	WaitForPodRunning(ctx, k8sClientset, pod)
+	Eventually(func(g Gomega) {
+		ns, err := GetSpyreNodeState(ctx, spyreV2Client, nodeName)
+		g.Expect(err).To(BeNil())
+		allocatedVfs := []string{}
+		for _, allocation := range ns.Status.AllocationList {
+			if allocation.Pod != nil && allocation.Pod.Name == name && allocation.Pod.Namespace == namespace &&
+				allocation.ResourcePool == spyreconst.VfResourceName {
+				allocatedVfs = append(allocatedVfs, allocation.DeviceList...)
+			}
+		}
+		g.Expect(allocatedVfs).To(HaveLen(1))
+		g.Expect(allocatedVfs[0]).To(HaveSuffix(suffix))
+	}).WithTimeout(2 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
+	return pod
 }
 
 var (

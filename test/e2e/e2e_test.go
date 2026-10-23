@@ -525,6 +525,58 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 		})
 	})
 
+	// Verifies with a dummy card management image (ubi9-minimal running "tail -f /dev/null") that the
+	// Spyre secondary scheduler allocates every PF of the node to the card management Pod.
+	Context("Card management with secondary scheduler (pseudo mode, amd64)", Ordered, func() {
+		BeforeAll(func() {
+			if nodeArchitecture != "amd64" || !testConfig.PseudoDeviceMode {
+				Skip("only available for pseudo device mode on amd64")
+			}
+			By("ensuring all pods are deleted")
+			WaitUntilNoPod(ctx, k8sClientset, spyreV2Client, testNamespace, targetNodeName)
+			if EnsureCardmgmtRegistrySecret(ctx, k8sClientset) {
+				// Registered first so it runs last (DeferCleanup is LIFO), after the policy is restored.
+				DeferCleanup(func() {
+					DeleteCardmgmtRegistrySecret(ctx, k8sClientset)
+				})
+			}
+
+			clusterPolicy := &spyrev1alpha1.SpyreClusterPolicy{}
+			err := spyreV2Client.Get(ctx,
+				client.ObjectKey{Namespace: metav1.NamespaceAll, Name: ClusterPolicyName}, clusterPolicy)
+			Expect(err).To(BeNil())
+			originalSpec := *clusterPolicy.Spec.DeepCopy()
+			DeferCleanup(func() {
+				restored := &spyrev1alpha1.SpyreClusterPolicy{}
+				err := spyreV2Client.Get(ctx,
+					client.ObjectKey{Namespace: metav1.NamespaceAll, Name: ClusterPolicyName}, restored)
+				Expect(err).To(BeNil())
+				restored.Spec = originalSpec
+				UpdateClusterPolicy(ctx, spyreV2Client, k8sClientset, restored, len(nodeNames), spyrev1alpha1.Ready)
+			})
+
+			By("enabling reservation mode (secondary scheduler) with pseudo device")
+			clusterPolicy.Spec.ExperimentalMode = append(DefaultModes(), spyrev1alpha1.PseudoDeviceMode)
+			clusterPolicy.Spec.DevicePlugin.DRADriver = false
+			clusterPolicy.Spec.HealthChecker.Enabled = false
+			EnableCardmgmtDummy(clusterPolicy, targetNodeName)
+			UpdateClusterPolicy(ctx, spyreV2Client, k8sClientset, clusterPolicy, len(nodeNames), spyrev1alpha1.Ready)
+		})
+
+		It("allocates all devices to the card management pod", func() {
+			ExpectCardmgmtHoldsAllDevices(ctx, k8sClientset, spyreV2Client, targetNodeName)
+		})
+
+		// The scheduler regards a Pod as card management only if it has the card management label
+		// and is in the operator namespace; any other Pod must not get the VF ".1" of the card.
+		It("allocates VF .2 to a user pod requesting one VF in the test namespace", func() {
+			pod := DeployVfPodAndExpectVfSuffix(ctx, k8sClientset, spyreV2Client,
+				"cardmgmt-user-vf", testNamespace, targetNodeName, nil, nil, ".2")
+			DeletePod(ctx, k8sClientset, pod)
+		})
+
+	})
+
 	Context("Pod deployment", Ordered, func() {
 
 		DescribeTable("deploy/delete single pod",

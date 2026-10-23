@@ -15,10 +15,12 @@ import (
 	"slices"
 	"strings"
 
+	spyrev1alpha1 "github.com/ibm-aiu/spyre-operator/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -45,12 +47,90 @@ func DumpPodStatus(ctx context.Context, k8sClientset *kubernetes.Clientset, name
 		return
 	}
 	for _, pod := range pods.Items {
-		By(fmt.Sprintf("Pod %s/%s is %s", pod.Namespace, pod.Name, pod.Status.Phase))
+		By(fmt.Sprintf("Pod %s/%s is %s (node: %s, scheduler: %s)",
+			pod.Namespace, pod.Name, pod.Status.Phase, pod.Spec.NodeName, pod.Spec.SchedulerName))
+		for _, cond := range pod.Status.Conditions {
+			if cond.Status != corev1.ConditionTrue {
+				By(fmt.Sprintf("  Condition %s is %s: reason=%s message=%s",
+					cond.Type, cond.Status, cond.Reason, cond.Message))
+			}
+		}
 		for _, status := range pod.Status.InitContainerStatuses {
 			dumpContainerStatus(ctx, k8sClientset, pod, "init container", status)
 		}
 		for _, status := range pod.Status.ContainerStatuses {
 			dumpContainerStatus(ctx, k8sClientset, pod, "container", status)
+		}
+	}
+}
+
+// DumpDaemonSets reports the status, node selectors, tolerations, and container resources of every DaemonSet in namespace.
+func DumpDaemonSets(ctx context.Context, k8sClientset *kubernetes.Clientset, namespace string) {
+	daemonSets, err := k8sClientset.AppsV1().DaemonSets(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		By(fmt.Sprintf("failed to list DaemonSets in %s: %v", namespace, err))
+		return
+	}
+	for _, ds := range daemonSets.Items {
+		By(fmt.Sprintf("DaemonSet %s/%s: desired=%d, current=%d, ready=%d, available=%d, unavailable=%d, misscheduled=%d",
+			ds.Namespace, ds.Name,
+			ds.Status.DesiredNumberScheduled, ds.Status.CurrentNumberScheduled,
+			ds.Status.NumberReady, ds.Status.NumberAvailable,
+			ds.Status.NumberUnavailable, ds.Status.NumberMisscheduled))
+		By(fmt.Sprintf("  NodeSelector: %v, SchedulerName: %s",
+			ds.Spec.Template.Spec.NodeSelector, ds.Spec.Template.Spec.SchedulerName))
+		for _, c := range ds.Spec.Template.Spec.Containers {
+			By(fmt.Sprintf("  Container %s: image=%s, requests=%v, limits=%v",
+				c.Name, c.Image, c.Resources.Requests, c.Resources.Limits))
+		}
+	}
+}
+
+// DumpPodEvents reports recent events in namespace to aid failure diagnosis.
+func DumpPodEvents(ctx context.Context, k8sClientset *kubernetes.Clientset, namespace string) {
+	events, err := k8sClientset.CoreV1().Events(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		By(fmt.Sprintf("failed to list Events in %s: %v", namespace, err))
+		return
+	}
+	By(fmt.Sprintf("Events in %s (%d events):", namespace, len(events.Items)))
+	for _, event := range events.Items {
+		By(fmt.Sprintf("  [%s] %s %s/%s: %s (reason: %s, count: %d)",
+			event.Type, event.InvolvedObject.Kind, event.InvolvedObject.Namespace, event.InvolvedObject.Name,
+			event.Message, event.Reason, event.Count))
+	}
+}
+
+// DumpSpyreNodeStates reports the spec and status of all SpyreNodeState CRs.
+func DumpSpyreNodeStates(ctx context.Context, spyreV2Client client.Client) {
+	var nodeStates spyrev1alpha1.SpyreNodeStateList
+	if err := spyreV2Client.List(ctx, &nodeStates); err != nil {
+		By(fmt.Sprintf("failed to list SpyreNodeStates: %v", err))
+		return
+	}
+	By(fmt.Sprintf("SpyreNodeStates (%d items):", len(nodeStates.Items)))
+	for _, ns := range nodeStates.Items {
+		By(fmt.Sprintf("SpyreNodeState %s:", ns.Name))
+		By(fmt.Sprintf("  Spec SpyreInterfaces (%d):", len(ns.Spec.SpyreInterfaces)))
+		for _, iface := range ns.Spec.SpyreInterfaces {
+			By(fmt.Sprintf("    PCI: %s, Health: %s, VFs: %v", iface.PciAddress, iface.Health, iface.Vfs))
+		}
+		status := ns.Status.DeepCopy()
+		status.NormalizeReservations()
+		By(fmt.Sprintf("  Status Allocations (%d):", len(status.AllocationList)))
+		for _, alloc := range status.AllocationList {
+			podDesc := "<none>"
+			if alloc.Pod != nil {
+				podDesc = fmt.Sprintf("%s/%s (UID: %s)", alloc.Pod.Namespace, alloc.Pod.Name, alloc.Pod.UID)
+			}
+			By(fmt.Sprintf("    Pool: %s, Pod: %s, Devices: %v", alloc.ResourcePool, podDesc, alloc.DeviceList))
+		}
+		By(fmt.Sprintf("  Status Reservations (%d pools, reserved devices: %v):", len(status.Reservations), status.ReservedDevices()))
+		for pool, res := range status.Reservations {
+			for _, entry := range res.Entries {
+				By(fmt.Sprintf("    Pool: %s, Pod: %s/%s (UID: %s), Devices: %v, ReservedAt: %v",
+					pool, entry.Pod.Namespace, entry.Pod.Name, entry.Pod.UID, entry.DeviceList, entry.ReservedAt))
+			}
 		}
 	}
 }
