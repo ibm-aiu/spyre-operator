@@ -218,6 +218,7 @@ func WaitForSpyreClusterPolicyState(ctx context.Context, spyreV2Client client.Cl
 			DumpPodStatus(ctx, k8sClientset, OperatorNamespace)
 			DumpDaemonSets(ctx, k8sClientset, OperatorNamespace)
 			DumpPodEvents(ctx, k8sClientset, OperatorNamespace)
+			DumpResourceSlices(ctx, k8sClientset)
 			DumpSpyreNodeStates(ctx, spyreV2Client)
 			return
 		}
@@ -366,17 +367,16 @@ func CheckOperatorAssetsRunning(ctx context.Context, spyreV2Client client.Client
 	if clusterPolicy.Spec.CardManagement.Enabled {
 		By("checking card management deployment")
 		Eventually(func(g Gomega) {
-			cardManagementPod := GetPodsWithLabels(ctx, k8sClientset, g, OperatorNamespace, cardManagementLabel, "")
+			cardMgmtPods := GetPodsWithLabels(ctx, k8sClientset, g, OperatorNamespace, cardManagementLabel, "")
 			if clusterPolicy.Spec.PodValidator.Replicas != nil {
-				g.Expect(cardManagementPod).To(HaveLen(int(*clusterPolicy.Spec.PodValidator.Replicas)))
+				g.Expect(cardMgmtPods).To(HaveLen(int(*clusterPolicy.Spec.PodValidator.Replicas)))
 			} else {
-				g.Expect(cardManagementPod).To(HaveLen(1))
+				g.Expect(cardMgmtPods).To(HaveLen(1))
 			}
-			for _, cardManagementPod := range cardManagementPod {
-				printMessageIfPodNotRunning(cardManagementPod)
-				g.Expect(cardManagementPod.Status.Phase).To(BeEquivalentTo(v1.PodRunning))
+			for _, p := range cardMgmtPods {
+				printMessageIfPodNotRunning(p)
+				g.Expect(p.Status.Phase).To(BeEquivalentTo(v1.PodRunning))
 			}
-			g.Expect(err).To(BeNil())
 		}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
 	} else {
 		Eventually(func(g Gomega) {
