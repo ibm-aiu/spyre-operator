@@ -173,7 +173,7 @@ var _ = Describe("DeploymentState", Ordered, func() {
 			cp.Spec = spyrev1alpha1.SpyreClusterPolicySpec{
 				DevicePlugin: spyrev1alpha1.DevicePluginSpec{
 					DeploymentConfig: devicePluginDeploymentConfig,
-					DRADriver:        true,
+					Mode:             spyrev1alpha1.DevicePluginModeDRA,
 				},
 			}
 			Expect(err).To(BeNil())
@@ -338,7 +338,6 @@ var _ = Describe("DeploymentState", Ordered, func() {
 				// all components
 				spyrev1alpha1.ComponentCommonInit,
 				spyrev1alpha1.ComponentDevicePlugin,
-				spyrev1alpha1.ComponentDRADriver,
 				spyrev1alpha1.ComponentCardManagement,
 				spyrev1alpha1.ComponentMetricsExporter,
 				spyrev1alpha1.ComponentScheduler,

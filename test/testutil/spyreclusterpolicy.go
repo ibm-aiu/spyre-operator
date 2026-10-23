@@ -109,7 +109,7 @@ func ClusterPolicy(testConfig TestConfig, modes []spyrev1alpha1.SpyreClusterPoli
 		}
 	}
 	if draDriverEnabled {
-		clusterPolicy.Spec.DevicePlugin.DRADriver = true
+		clusterPolicy.Spec.DevicePlugin.Mode = spyrev1alpha1.DevicePluginModeDRA
 		clusterPolicy.Spec.DevicePlugin.DeploymentConfig = spyrev1alpha1.DeploymentConfig{
 			Repository:      testConfig.DraDriver.Repository,
 			Image:           testConfig.DraDriver.Image,
@@ -124,7 +124,7 @@ func ClusterPolicy(testConfig TestConfig, modes []spyrev1alpha1.SpyreClusterPoli
 }
 
 func EnableDRADriver(testConfig TestConfig, clusterPolicy *spyrev1alpha1.SpyreClusterPolicy) {
-	clusterPolicy.Spec.DevicePlugin.DRADriver = true
+	clusterPolicy.Spec.DevicePlugin.Mode = spyrev1alpha1.DevicePluginModeDRA
 	clusterPolicy.Spec.DevicePlugin.DeploymentConfig = spyrev1alpha1.DeploymentConfig{
 		Repository:      testConfig.DraDriver.Repository,
 		Image:           testConfig.DraDriver.Image,
@@ -145,7 +145,7 @@ func EnableDRADriver(testConfig TestConfig, clusterPolicy *spyrev1alpha1.SpyreCl
 }
 
 func DisableDRADriver(testConfig TestConfig, clusterPolicy *spyrev1alpha1.SpyreClusterPolicy) {
-	clusterPolicy.Spec.DevicePlugin.DRADriver = false
+	clusterPolicy.Spec.DevicePlugin.Mode = spyrev1alpha1.DevicePluginModeClassic
 	clusterPolicy.Spec.DevicePlugin.DeploymentConfig = spyrev1alpha1.DeploymentConfig{
 		Repository:      testConfig.DevicePlugin.Repository,
 		Image:           testConfig.DevicePlugin.Image,
@@ -314,7 +314,7 @@ func CheckOperatorAssetsRunning(ctx context.Context, spyreV2Client client.Client
 	Eventually(func(g Gomega) {
 		dsName := spyreconst.DevicePluginResourceName
 		label := devicePluginLabel
-		if clusterPolicy.Spec.DevicePlugin.DRADriver {
+		if clusterPolicy.Spec.DevicePlugin.Mode == spyrev1alpha1.DevicePluginModeDRA {
 			dsName = spyreconst.DRADriverResourceName
 			label = draDriverLabel
 		}
