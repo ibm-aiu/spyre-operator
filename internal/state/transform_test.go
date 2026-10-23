@@ -946,22 +946,18 @@ var _ = Describe("Transform", func() {
 				// manifest's unset SchedulerName is left as-is
 				Expect(ds.Spec.Template.Spec.SchedulerName).To(BeEmpty())
 
-				// PF and VF must be requested through separate claims since
-				// dra-driver-spyre rejects claims mixing product IDs
+				// a single claim carries both the PF and the VF request
 				claims := ds.Spec.Template.Spec.ResourceClaims
-				Expect(claims).To(HaveLen(2))
-				Expect(claims[0].Name).To(Equal(spyreconst.CardManagementPfPodResourceClaimName))
+				Expect(claims).To(HaveLen(1))
+				Expect(claims[0].Name).To(Equal(spyreconst.CardManagementPodResourceClaimName))
 				Expect(claims[0].ResourceClaimTemplateName).NotTo(BeNil())
-				Expect(*claims[0].ResourceClaimTemplateName).To(Equal(spyreconst.CardManagementPfResourceClaimTemplateName))
-				Expect(claims[1].Name).To(Equal(spyreconst.CardManagementVfPodResourceClaimName))
-				Expect(claims[1].ResourceClaimTemplateName).NotTo(BeNil())
-				Expect(*claims[1].ResourceClaimTemplateName).To(Equal(spyreconst.CardManagementVfResourceClaimTemplateName))
+				Expect(*claims[0].ResourceClaimTemplateName).To(Equal(spyreconst.CardManagementResourceClaimTemplateName))
 
 				containerClaims := ds.Spec.Template.Spec.Containers[0].Resources.Claims
 				Expect(containerClaims).To(HaveLen(2))
-				Expect(containerClaims[0].Name).To(Equal(spyreconst.CardManagementPfPodResourceClaimName))
+				Expect(containerClaims[0].Name).To(Equal(spyreconst.CardManagementPodResourceClaimName))
 				Expect(containerClaims[0].Request).To(Equal(spyreconst.DRADeviceRequestManagedPf))
-				Expect(containerClaims[1].Name).To(Equal(spyreconst.CardManagementVfPodResourceClaimName))
+				Expect(containerClaims[1].Name).To(Equal(spyreconst.CardManagementPodResourceClaimName))
 				Expect(containerClaims[1].Request).To(Equal(spyreconst.DRADeviceRequestManagedVf))
 
 				// cpu/memory limits preserved, no device-plugin extended resources
@@ -1013,7 +1009,7 @@ var _ = Describe("Transform", func() {
 				Expect(TransformCardManagement(ds, policy, nil, false)).To(Succeed())
 
 				// claims are replaced, not appended
-				Expect(ds.Spec.Template.Spec.ResourceClaims).To(HaveLen(2))
+				Expect(ds.Spec.Template.Spec.ResourceClaims).To(HaveLen(1))
 				Expect(ds.Spec.Template.Spec.Containers[0].Resources.Claims).To(HaveLen(2))
 			})
 
@@ -1044,7 +1040,7 @@ var _ = Describe("Transform", func() {
 
 				Expect(TransformCardManagement(ds, policy, nil, false)).To(Succeed())
 
-				Expect(ds.Spec.Template.Spec.ResourceClaims).To(HaveLen(2))
+				Expect(ds.Spec.Template.Spec.ResourceClaims).To(HaveLen(1))
 			})
 		})
 	})
