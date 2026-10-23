@@ -210,8 +210,9 @@ var _ = Describe("ControlledObject", Ordered, func() {
 			return names
 		}
 
-		DescribeTable("can handle ResourceClaimTemplate object", func(fileName, templateName, requestName, deviceClassName string) {
-			runtimeObj, gvk, err := DecodeFromFile(StateScheme, filepath.Join(cardmgmtDir, fileName))
+		It("can handle ResourceClaimTemplate object", func() {
+			runtimeObj, gvk, err := DecodeFromFile(StateScheme,
+				filepath.Join(cardmgmtDir, "0550_resourceclaimtemplate_managed.yaml"))
 			Expect(err).To(BeNil())
 			Expect(gvk.Kind).To(Equal("ResourceClaimTemplate"))
 
@@ -221,32 +222,31 @@ var _ = Describe("ControlledObject", Ordered, func() {
 			Expect(err).To(BeNil())
 			Expect(controlledObj).NotTo(BeNil())
 			Expect(controlledObj.GetID().Kind).To(Equal("ResourceClaimTemplate"))
-			Expect(controlledObj.GetID().Name).To(Equal(templateName))
+			Expect(controlledObj.GetID().Name).To(Equal(spyreconst.CardManagementResourceClaimTemplateName))
 
 			// the placeholder namespace in the asset must be replaced by the operator namespace
 			obj, ok := controlledObj.GetObject().(*resourcev1.ResourceClaimTemplate)
 			Expect(ok).To(BeTrue())
 			Expect(obj.Namespace).To(Equal(OpNs))
 
-			By("checking the device request")
+			By("checking the PF and VF device requests")
 			requests := obj.Spec.Spec.Devices.Requests
-			Expect(requests).To(HaveLen(1))
-			Expect(requests[0].Name).To(Equal(requestName))
-			Expect(requests[0].Exactly).NotTo(BeNil())
-			Expect(requests[0].Exactly.DeviceClassName).To(Equal(deviceClassName))
-			// cardmgmt must hold every device of the class, not a single one
-			Expect(requests[0].Exactly.AllocationMode).To(Equal(resourcev1.DeviceAllocationModeAll))
+			Expect(requests).To(HaveLen(2))
+			expected := []struct{ requestName, deviceClassName string }{
+				{spyreconst.DRADeviceRequestManagedPf, "spyre-managed-pf"},
+				{spyreconst.DRADeviceRequestManagedVf, "spyre-managed-vf"},
+			}
+			for i, e := range expected {
+				Expect(requests[i].Name).To(Equal(e.requestName))
+				Expect(requests[i].Exactly).NotTo(BeNil())
+				Expect(requests[i].Exactly.DeviceClassName).To(Equal(e.deviceClassName))
+				// cardmgmt must hold every device of the class, not a single one
+				Expect(requests[i].Exactly.AllocationMode).To(Equal(resourcev1.DeviceAllocationModeAll))
 
-			By("checking that the DeviceClass is defined by the DRA driver assets")
-			Expect(deviceClassNames()).To(ContainElement(deviceClassName))
-		},
-			Entry("PF", "0550_resourceclaimtemplate_managed_pf.yaml",
-				spyreconst.CardManagementPfResourceClaimTemplateName,
-				spyreconst.DRADeviceRequestManagedPf, "spyre-managed-pf"),
-			Entry("VF", "0551_resourceclaimtemplate_managed_vf.yaml",
-				spyreconst.CardManagementVfResourceClaimTemplateName,
-				spyreconst.DRADeviceRequestManagedVf, "spyre-managed-vf"),
-		)
+				By("checking that the DeviceClass is defined by the DRA driver assets")
+				Expect(deviceClassNames()).To(ContainElement(e.deviceClassName))
+			}
+		})
 
 		It("rejects a non-ResourceClaimTemplate object", func() {
 			runtimeObj := &resourcev1.DeviceClass{ObjectMeta: metav1.ObjectMeta{Name: "not-a-template"}}
@@ -256,12 +256,6 @@ var _ = Describe("ControlledObject", Ordered, func() {
 			Expect(err).To(MatchError(spyreerr.ErrParseFile))
 		})
 
-		It("keeps the PF and VF templates distinct", func() {
-			Expect(spyreconst.CardManagementPfResourceClaimTemplateName).
-				NotTo(Equal(spyreconst.CardManagementVfResourceClaimTemplateName))
-			Expect(spyreconst.CardManagementPfPodResourceClaimName).
-				NotTo(Equal(spyreconst.CardManagementVfPodResourceClaimName))
-		})
 	})
 
 	Context("DaemonSet.Ready", func() {

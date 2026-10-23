@@ -1119,6 +1119,114 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 			})
 		})
 
+		// Verifies with a dummy card management image (ubi9-minimal running "tail -f /dev/null") that
+		// the DRA driver allocates a ResourceClaim to the card management Pod when card management is
+		// enabled. The claim must reach an allocated state, with both managed-pf and managed-vf
+		// requests each allocating all PF-count devices (published 1:1 per card).
+		Context("card management", Ordered, func() {
+			BeforeAll(func() {
+				if nodeArchitecture != "amd64" || !testConfig.PseudoDeviceMode {
+					Skip("only available for pseudo device mode on amd64")
+				}
+				By("ensuring all pods are deleted")
+				WaitUntilNoPod(ctx, k8sClientset, spyreV2Client, testNamespace, targetNodeName)
+				By("ensuring no leftover ResourceClaims in operator namespace")
+				Eventually(func(g Gomega) {
+					claims := ListResourceClaims(ctx, k8sClientset, OperatorNamespace)
+					g.Expect(claims).To(BeEmpty())
+				}).WithTimeout(2 * time.Minute).WithPolling(5 * time.Second).Should(Succeed())
+				if EnsureCardmgmtRegistrySecret(ctx, k8sClientset) {
+					DeferCleanup(func() {
+						DeleteCardmgmtRegistrySecret(ctx, k8sClientset)
+					})
+				}
+
+				// The outer DRA Driver BeforeAll already set originalSpec; save our own
+				// snapshot so DeferCleanup can restore it after this sub-context runs.
+				clusterPolicy := &spyrev1alpha1.SpyreClusterPolicy{}
+				err := spyreV2Client.Get(ctx,
+					client.ObjectKey{Namespace: metav1.NamespaceAll, Name: ClusterPolicyName}, clusterPolicy)
+				Expect(err).To(BeNil())
+				savedSpec := *clusterPolicy.Spec.DeepCopy()
+				DeferCleanup(func() {
+					restored := &spyrev1alpha1.SpyreClusterPolicy{}
+					err := spyreV2Client.Get(ctx,
+						client.ObjectKey{Namespace: metav1.NamespaceAll, Name: ClusterPolicyName}, restored)
+					Expect(err).To(BeNil())
+					restored.Spec = savedSpec
+					UpdateClusterPolicy(ctx, spyreV2Client, k8sClientset, restored, len(nodeNames), spyrev1alpha1.Ready)
+				})
+
+				By("enabling card management with dummy image (DRA driver already active)")
+				EnableCardmgmtDummy(clusterPolicy, targetNodeName)
+				UpdateClusterPolicy(ctx, spyreV2Client, k8sClientset, clusterPolicy, len(nodeNames), spyrev1alpha1.Ready)
+			})
+
+			It("allocates the managed-device ResourceClaim to the card management pod", func() {
+				By("counting PF devices from ResourceSlices")
+				nPf := 0
+				for _, slice := range ListResourceSlices(ctx, k8sClientset) {
+					if slice.Spec.NodeName == nil || *slice.Spec.NodeName != targetNodeName {
+						continue
+					}
+					for _, d := range slice.Spec.Devices {
+						pid, ok := d.Attributes["productId"]
+						if !ok || pid.StringValue == nil {
+							continue
+						}
+						if *pid.StringValue == PfProductId {
+							nPf++
+						}
+					}
+				}
+				Expect(nPf).To(BeNumerically(">", 0), "no PF devices found in ResourceSlices for node %s", targetNodeName)
+				By(fmt.Sprintf("found %d PF devices in ResourceSlices", nPf))
+
+				By("waiting for the card management pod to be Running")
+				cmLabel := spyreconst.CardManagementLabelKey + "=" + spyreconst.CardManagementLabelValue
+				var cmPod v1.Pod
+				Eventually(func(g Gomega) {
+					pods := GetPodsWithLabels(ctx, k8sClientset, g, OperatorNamespace, cmLabel, targetNodeName)
+					g.Expect(pods).To(HaveLen(1))
+					g.Expect(pods[0].Status.Phase).To(Equal(v1.PodRunning))
+					cmPod = pods[0]
+				}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
+
+				By("resolving the ResourceClaim name from the pod status")
+				var claimName string
+				for _, s := range cmPod.Status.ResourceClaimStatuses {
+					if s.Name == spyreconst.CardManagementPodResourceClaimName && s.ResourceClaimName != nil {
+						claimName = *s.ResourceClaimName
+						break
+					}
+				}
+				Expect(claimName).NotTo(BeEmpty(),
+					"pod %s must have a ResourceClaimStatus entry for %q",
+					cmPod.Name, spyreconst.CardManagementPodResourceClaimName)
+
+				By("verifying the ResourceClaim allocation result")
+				claim, err := k8sClientset.ResourceV1().ResourceClaims(OperatorNamespace).Get(
+					ctx, claimName, metav1.GetOptions{})
+				Expect(err).To(BeNil())
+				Expect(claim.Status.Allocation).NotTo(BeNil(),
+					"ResourceClaim %s must be allocated", claimName)
+
+				results := claim.Status.Allocation.Devices.Results
+				Expect(results).To(HaveLen(2*nPf),
+					"expected one result entry per device (nPf PF + nPf VF = %d), got %d", 2*nPf, len(results))
+				// Each managed request (PF and VF) must have allocated exactly nPf devices
+				// since managed PFs and VFs are published 1:1 per card.
+				deviceCountPerRequest := map[string]int{}
+				for _, r := range results {
+					deviceCountPerRequest[r.Request]++
+				}
+				Expect(deviceCountPerRequest[spyreconst.DRADeviceRequestManagedPf]).To(Equal(nPf),
+					"managed-pf request must allocate all %d PF devices", nPf)
+				Expect(deviceCountPerRequest[spyreconst.DRADeviceRequestManagedVf]).To(Equal(nPf),
+					"managed-vf request must allocate all %d VF devices (same count as PF)", nPf)
+			})
+		})
+
 		It("can gradually allocate 50 Spyres", func() {
 			draAllocationTestCase(ctx, testNamespace, productId, pciFunctionIndex)
 		})

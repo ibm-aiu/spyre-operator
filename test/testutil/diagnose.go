@@ -23,6 +23,25 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// DumpResourceSlices reports the name, driver, node, and device count of every
+// ResourceSlice in the cluster; best-effort.
+func DumpResourceSlices(ctx context.Context, k8sClientset *kubernetes.Clientset) {
+	list, err := k8sClientset.ResourceV1().ResourceSlices().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		By(fmt.Sprintf("failed to list ResourceSlices: %v", err))
+		return
+	}
+	By(fmt.Sprintf("ResourceSlices (%d items):", len(list.Items)))
+	for _, rs := range list.Items {
+		nodeName := "<cluster-scoped>"
+		if rs.Spec.NodeName != nil {
+			nodeName = *rs.Spec.NodeName
+		}
+		By(fmt.Sprintf("  ResourceSlice %s: driver=%s, node=%s, devices=%d",
+			rs.Name, rs.Spec.Driver, nodeName, len(rs.Spec.Devices)))
+	}
+}
+
 const (
 	// terminalRestartCount is the restart count at which a crash loop is treated as unrecoverable.
 	terminalRestartCount = 3
