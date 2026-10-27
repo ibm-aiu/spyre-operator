@@ -45,27 +45,29 @@ const (
 
 var (
 	objectControllerMap = map[string]func(*DefaultControlledObject, runtime.Object, string) (ControlledObject, error){
-		"ServiceAccount":                 NewServiceAccount,
-		"Role":                           NewRole,
-		"RoleBinding":                    NewRoleBinding,
-		"ClusterRole":                    NewClusterRole,
-		"ClusterRoleBinding":             NewClusterRoleBinding,
-		"ConfigMap":                      NewConfigMap,
-		"DaemonSet":                      NewDaemonSet,
-		"Deployment":                     NewDeployment,
-		"Service":                        NewService,
-		"SecurityContextConstraints":     NewSecurityContextConstraints,
-		"PrometheusRule":                 NewPrometheusRule,
-		"ServiceMonitor":                 NewServiceMonitor,
-		"Issuer":                         NewIssuer,
-		"Certificate":                    NewCertificate,
-		"SecondaryScheduler":             NewSecondScheduler,
-		"ValidatingWebhookConfiguration": NewValidatingWebhookConfiguration,
-		"NodeFeatureRule":                NewNodeFeatureRule,
-		"PersistentVolume":               NewPersistentVolume,
-		"PersistentVolumeClaim":          NewPersistentVolumeClaim,
-		"DeviceClass":                    NewDeviceClass,
-		"ResourceClaimTemplate":          NewResourceClaimTemplate,
+		"ServiceAccount":                   NewServiceAccount,
+		"Role":                             NewRole,
+		"RoleBinding":                      NewRoleBinding,
+		"ClusterRole":                      NewClusterRole,
+		"ClusterRoleBinding":               NewClusterRoleBinding,
+		"ConfigMap":                        NewConfigMap,
+		"DaemonSet":                        NewDaemonSet,
+		"Deployment":                       NewDeployment,
+		"Service":                          NewService,
+		"SecurityContextConstraints":       NewSecurityContextConstraints,
+		"PrometheusRule":                   NewPrometheusRule,
+		"ServiceMonitor":                   NewServiceMonitor,
+		"Issuer":                           NewIssuer,
+		"Certificate":                      NewCertificate,
+		"SecondaryScheduler":               NewSecondScheduler,
+		"ValidatingWebhookConfiguration":   NewValidatingWebhookConfiguration,
+		"ValidatingAdmissionPolicy":        NewValidatingAdmissionPolicy,
+		"ValidatingAdmissionPolicyBinding": NewValidatingAdmissionPolicyBinding,
+		"NodeFeatureRule":                  NewNodeFeatureRule,
+		"PersistentVolume":                 NewPersistentVolume,
+		"PersistentVolumeClaim":            NewPersistentVolumeClaim,
+		"DeviceClass":                      NewDeviceClass,
+		"ResourceClaimTemplate":            NewResourceClaimTemplate,
 	}
 )
 
@@ -1412,6 +1414,98 @@ func (obj *ValidatingWebhookConfiguration) Sync(ctx context.Context,
 	}
 	obj.syncOwners(&getObj.ObjectMeta)
 	getObj.Webhooks = obj.loadedObj.Webhooks
+	return getObj, nil
+}
+
+type ValidatingAdmissionPolicy struct {
+	*DefaultControlledObject
+	loadedObj *admissionv1.ValidatingAdmissionPolicy
+}
+
+func NewValidatingAdmissionPolicy(defaultObj *DefaultControlledObject,
+	runtimeObj runtime.Object, targetNamespace string) (ControlledObject, error) {
+	if obj, ok := runtimeObj.(*admissionv1.ValidatingAdmissionPolicy); ok {
+		defaultObj.Object = obj
+		return &ValidatingAdmissionPolicy{
+			DefaultControlledObject: defaultObj,
+			loadedObj:               obj,
+		}, nil
+	}
+	return nil, spyreerr.ErrParseFile
+}
+
+func (obj *ValidatingAdmissionPolicy) Fetch(ctx context.Context,
+	k8sClient client.Client) (client.Object, error) {
+	fetchObj := &admissionv1.ValidatingAdmissionPolicy{}
+	namespacedName := types.NamespacedName{Name: obj.loadedObj.Name, Namespace: obj.loadedObj.Namespace}
+	err := k8sClient.Get(ctx, namespacedName, fetchObj)
+	return fetchObj, err //nolint:wrapcheck
+}
+
+func (obj *ValidatingAdmissionPolicy) Sync(ctx context.Context,
+	k8sClient client.Client) (client.Object, error) {
+	getObj := &admissionv1.ValidatingAdmissionPolicy{}
+	namespacedName := types.NamespacedName{Name: obj.loadedObj.Name, Namespace: obj.loadedObj.Namespace}
+	err := k8sClient.Get(ctx, namespacedName, getObj)
+	if err != nil {
+		return nil, err //nolint:wrapcheck
+	}
+	obj.syncOwners(&getObj.ObjectMeta)
+	getObj.Spec = obj.loadedObj.Spec
+	return getObj, nil
+}
+
+type ValidatingAdmissionPolicyBinding struct {
+	*DefaultControlledObject
+	loadedObj *admissionv1.ValidatingAdmissionPolicyBinding
+}
+
+func replacePolicyBindingNamespace(obj *admissionv1.ValidatingAdmissionPolicyBinding, targetNamespace string) {
+	if obj.Spec.MatchResources == nil || obj.Spec.MatchResources.NamespaceSelector == nil {
+		return
+	}
+	for idx := range obj.Spec.MatchResources.NamespaceSelector.MatchExpressions {
+		expr := &obj.Spec.MatchResources.NamespaceSelector.MatchExpressions[idx]
+		for vIdx := range expr.Values {
+			if expr.Values[vIdx] == spyreconst.OPERATOR_FILLED {
+				expr.Values[vIdx] = targetNamespace
+			}
+		}
+	}
+}
+
+func NewValidatingAdmissionPolicyBinding(defaultObj *DefaultControlledObject,
+	runtimeObj runtime.Object, targetNamespace string) (ControlledObject, error) {
+	obj, ok := runtimeObj.(*admissionv1.ValidatingAdmissionPolicyBinding)
+	if !ok {
+		return nil, spyreerr.ErrParseFile
+	}
+	defaultObj.Object = obj
+	replacePolicyBindingNamespace(obj, targetNamespace)
+	return &ValidatingAdmissionPolicyBinding{
+		DefaultControlledObject: defaultObj,
+		loadedObj:               obj,
+	}, nil
+}
+
+func (obj *ValidatingAdmissionPolicyBinding) Fetch(ctx context.Context,
+	k8sClient client.Client) (client.Object, error) {
+	fetchObj := &admissionv1.ValidatingAdmissionPolicyBinding{}
+	namespacedName := types.NamespacedName{Name: obj.loadedObj.Name, Namespace: obj.loadedObj.Namespace}
+	err := k8sClient.Get(ctx, namespacedName, fetchObj)
+	return fetchObj, err //nolint:wrapcheck
+}
+
+func (obj *ValidatingAdmissionPolicyBinding) Sync(ctx context.Context,
+	k8sClient client.Client) (client.Object, error) {
+	getObj := &admissionv1.ValidatingAdmissionPolicyBinding{}
+	namespacedName := types.NamespacedName{Name: obj.loadedObj.Name, Namespace: obj.loadedObj.Namespace}
+	err := k8sClient.Get(ctx, namespacedName, getObj)
+	if err != nil {
+		return nil, err //nolint:wrapcheck
+	}
+	obj.syncOwners(&getObj.ObjectMeta)
+	getObj.Spec = obj.loadedObj.Spec
 	return getObj, nil
 }
 

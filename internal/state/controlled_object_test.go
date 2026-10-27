@@ -16,6 +16,7 @@ import (
 	spyreconst "github.com/ibm-aiu/spyre-operator/const"
 	. "github.com/ibm-aiu/spyre-operator/internal/state"
 	spyreerr "github.com/ibm-aiu/spyre-operator/pkg/errors"
+	admissionv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	resourcev1 "k8s.io/api/resource/v1"
@@ -305,6 +306,45 @@ var _ = Describe("ControlledObject", Ordered, func() {
 			Entry("ready when all conditions are satisfied",
 				int64(1), int32(2), int32(2), int32(0), int32(2), true),
 		)
+	})
+
+	Context("ValidatingAdmissionPolicy and Binding", func() {
+		coreDir := filepath.Join(AssetsPath, "state-core-components", "dra-driver-spyre")
+
+		DescribeTable("can handle admission registration objects",
+			func(fileName, expectedKind, expectedName string) {
+				objPath := filepath.Join(coreDir, fileName)
+				runtimeObj, gvk, err := DecodeFromFile(StateScheme, objPath)
+				Expect(err).To(BeNil())
+				Expect(gvk.Kind).To(Equal(expectedKind))
+
+				controlledObj, err := NewControlledObject(ctx, gvk.Kind, OpNs, runtimeObj)
+				Expect(err).To(BeNil())
+				Expect(controlledObj).NotTo(BeNil())
+				Expect(controlledObj.GetID().Kind).To(Equal(expectedKind))
+				Expect(controlledObj.GetID().Name).To(Equal(expectedName))
+				Expect(controlledObj.Ready(ctx, K8sClient)).To(BeTrue())
+
+				switch expectedKind {
+				case "ValidatingAdmissionPolicy":
+					policy, ok := controlledObj.GetObject().(*admissionv1.ValidatingAdmissionPolicy)
+					Expect(ok).To(BeTrue())
+					Expect(policy.Spec.MatchConstraints.ResourceRules).NotTo(BeEmpty())
+					Expect(policy.Spec.Validations).NotTo(BeEmpty())
+				case "ValidatingAdmissionPolicyBinding":
+					binding, ok := controlledObj.GetObject().(*admissionv1.ValidatingAdmissionPolicyBinding)
+					Expect(ok).To(BeTrue())
+					Expect(binding.Spec.PolicyName).To(Equal("block-restricted-device-classes"))
+					Expect(binding.Spec.ValidationActions).To(ContainElement(admissionv1.Deny))
+					Expect(binding.Spec.MatchResources.NamespaceSelector.MatchExpressions[0].Values).To(ContainElement(OpNs))
+				}
+			},
+			Entry("ValidatingAdmissionPolicy", "0530_validatingadmissionpolicy.yaml",
+				"ValidatingAdmissionPolicy", "block-restricted-device-classes"),
+			Entry("ValidatingAdmissionPolicyBinding", "0540_validatingadmissionpolicybinding.yaml",
+				"ValidatingAdmissionPolicyBinding", "block-restricted-device-classes-binding"),
+		)
+
 	})
 
 })
