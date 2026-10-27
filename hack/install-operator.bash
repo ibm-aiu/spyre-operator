@@ -1,7 +1,7 @@
 #!/bin/bash
 # +-------------------------------------------------------------------+
-# | Copyright IBM Corp. 2025 All Rights Reserved                      |
-# | PID 5698-SPR                                                      |
+# | Copyright (c) 2025, 2026 IBM Corp.                                |
+# | SPDX-License-Identifier: Apache-2.0                               |
 # +-------------------------------------------------------------------+
 
 ## Usage:
