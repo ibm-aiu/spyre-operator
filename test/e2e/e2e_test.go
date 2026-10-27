@@ -1120,9 +1120,9 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 		})
 
 		// Verifies with a dummy card management image (ubi9-minimal running "tail -f /dev/null") that
-		// the DRA driver allocates the ResourceClaims to the card management Pod when card management
-		// is enabled. The managed-pf and managed-vf claims must each reach an allocated state with
-		// all PF-count devices (published 1:1 per card).
+		// the DRA driver allocates the ResourceClaim to the card management Pod when card management
+		// is enabled. The single claim holds a managed-pf and a managed-vf request and must reach an
+		// allocated state with all PF-count devices for each request (published 1:1 per card).
 		Context("card management", Ordered, func() {
 			BeforeAll(func() {
 				if nodeArchitecture != "amd64" || !testConfig.PseudoDeviceMode {
@@ -1162,13 +1162,12 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 				Expect(clusterPolicy.ExperimentalModeEnabled(spyrev1alpha1.ReservationMode)).To(BeFalse(),
 					"%s mode must not be enabled with the DRA driver", spyrev1alpha1.ReservationMode)
 
-				By("enabling the init container and card management with dummy image (DRA driver already active)")
-				EnableInitContainer(clusterPolicy, testConfig, testConfig.DevicePluginInit.ExecutePolicy)
+				By("enabling card management with dummy image (DRA driver already active)")
 				EnableCardmgmtDummy(clusterPolicy, targetNodeName)
 				UpdateClusterPolicy(ctx, spyreV2Client, k8sClientset, clusterPolicy, len(nodeNames), spyrev1alpha1.Ready)
 			})
 
-			It("allocates the managed-device ResourceClaims to the card management pod", func() {
+			It("allocates the managed-device ResourceClaim to the card management pod", func() {
 				By("counting PF devices from ResourceSlices")
 				nPf := 0
 				for _, slice := range ListResourceSlices(ctx, k8sClientset) {
@@ -1198,23 +1197,28 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 					cmPod = pods[0]
 				}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
 
-				// PF and VF are requested through separate claims, each holding a single request.
-				By("verifying the allocation results of the pod's ResourceClaims")
-				Expect(cmPod.Status.ResourceClaimStatuses).To(HaveLen(2),
-					"pod %s must have a ResourceClaimStatus entry for each of the PF and VF claims", cmPod.Name)
-				for _, s := range cmPod.Status.ResourceClaimStatuses {
-					Expect(s.ResourceClaimName).NotTo(BeNil(),
-						"ResourceClaimStatus %q of pod %s has no ResourceClaim", s.Name, cmPod.Name)
-					claim, err := k8sClientset.ResourceV1().ResourceClaims(OperatorNamespace).Get(
-						ctx, *s.ResourceClaimName, metav1.GetOptions{})
-					Expect(err).To(BeNil())
-					Expect(claim.Status.Allocation).NotTo(BeNil(),
-						"ResourceClaim %s must be allocated", claim.Name)
-					// Each claim must have allocated exactly nPf devices
-					// since managed PFs and VFs are published 1:1 per card.
-					Expect(claim.Status.Allocation.Devices.Results).To(HaveLen(nPf),
-						"ResourceClaim %s must allocate all %d devices", claim.Name, nPf)
+				// PF and VF are requested through one claim holding two requests.
+				By("verifying the allocation results of the pod's ResourceClaim")
+				Expect(cmPod.Status.ResourceClaimStatuses).To(HaveLen(1),
+					"pod %s must have a single ResourceClaimStatus entry for the PF and VF claim", cmPod.Name)
+				s := cmPod.Status.ResourceClaimStatuses[0]
+				Expect(s.ResourceClaimName).NotTo(BeNil(),
+					"ResourceClaimStatus %q of pod %s has no ResourceClaim", s.Name, cmPod.Name)
+				claim, err := k8sClientset.ResourceV1().ResourceClaims(OperatorNamespace).Get(
+					ctx, *s.ResourceClaimName, metav1.GetOptions{})
+				Expect(err).To(BeNil())
+				Expect(claim.Status.Allocation).NotTo(BeNil(),
+					"ResourceClaim %s must be allocated", claim.Name)
+				// Each request must have allocated exactly nPf devices
+				// since managed PFs and VFs are published 1:1 per card.
+				perRequest := map[string]int{}
+				for _, r := range claim.Status.Allocation.Devices.Results {
+					perRequest[r.Request]++
 				}
+				Expect(perRequest).To(HaveLen(2),
+					"ResourceClaim %s must have allocation results for both requests", claim.Name)
+				Expect(perRequest).To(HaveKeyWithValue(spyreconst.DRADeviceRequestManagedPf, nPf))
+				Expect(perRequest).To(HaveKeyWithValue(spyreconst.DRADeviceRequestManagedVf, nPf))
 			})
 		})
 

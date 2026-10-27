@@ -10,13 +10,12 @@
 # card-management DaemonSet references it only when DevicePlugin.DRADriver is
 # enabled (see TransformCardManagement in internal/state/transform.go).
 #
-# PF and VF devices are requested through separate templates (see
-# 0551_resourceclaimtemplate_managed_vf.yaml) because dra-driver-spyre
-# rejects a single claim that mixes devices with different product IDs.
+# A single claim holds two requests: one for all managed PF devices and one
+# for all managed VF devices.
 apiVersion: resource.k8s.io/v1
 kind: ResourceClaimTemplate
 metadata:
-  name: spyre-card-management-pf
+  name: spyre-card-management
   namespace: "FILLED BY THE OPERATOR"
   labels:
     app: cardmgmt
@@ -27,4 +26,8 @@ spec:
       - name: spyre-managed-pf
         exactly:
           deviceClassName: spyre-managed-pf
+          allocationMode: All
+      - name: spyre-managed-vf
+        exactly:
+          deviceClassName: spyre-managed-vf
           allocationMode: All

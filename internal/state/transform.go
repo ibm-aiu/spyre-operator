@@ -433,8 +433,9 @@ func TransformCardManagement(obj *appsv1.DaemonSet,
 		// on node capacity.
 		injectCardManagementResourceClaim(obj)
 		return nil
+	} else {
+		return transformCardManagementDevicePluginResources(obj, cluster, nodeName)
 	}
-	return transformCardManagementDevicePluginResources(obj, cluster, nodeName)
 }
 
 // applyCardManagementSpyreFilter matches nodeName against the configured
@@ -569,31 +570,25 @@ func transformCardManagementHealthApi(obj *appsv1.DaemonSet, healthApi *spyrev1a
 }
 
 // injectCardManagementResourceClaim wires the card-management Pod to the DRA
-// ResourceClaimTemplates, binding the container to the managed PF and managed
-// VF device requests. PF and VF are requested through separate claims because
-// dra-driver-spyre rejects a claim that mixes devices with different product
-// IDs. Only the container's resource claims are set; existing cpu/memory limits
-// and requests from the manifest are preserved.
+// ResourceClaimTemplate, binding the container to the managed PF and managed
+// VF device requests of a single claim. Only the container's resource claims
+// are set; existing cpu/memory limits and requests from the manifest are
+// preserved.
 //
 // The manifest leaves SchedulerName unset, so the Pod uses the default
 // scheduler here: device selection is handled by the DRA scheduler plugin via
-// the ResourceClaimTemplates, so the spyre-scheduler extender is not needed.
+// the ResourceClaimTemplate, so the spyre-scheduler extender is not needed.
 func injectCardManagementResourceClaim(obj *appsv1.DaemonSet) {
-	pfTemplateName := spyreconst.CardManagementPfResourceClaimTemplateName
-	vfTemplateName := spyreconst.CardManagementVfResourceClaimTemplateName
+	templateName := spyreconst.CardManagementResourceClaimTemplateName
 	obj.Spec.Template.Spec.ResourceClaims = []corev1.PodResourceClaim{
 		{
-			Name:                      spyreconst.CardManagementPfPodResourceClaimName,
-			ResourceClaimTemplateName: &pfTemplateName,
-		},
-		{
-			Name:                      spyreconst.CardManagementVfPodResourceClaimName,
-			ResourceClaimTemplateName: &vfTemplateName,
+			Name:                      spyreconst.CardManagementPodResourceClaimName,
+			ResourceClaimTemplateName: &templateName,
 		},
 	}
 	obj.Spec.Template.Spec.Containers[0].Resources.Claims = []corev1.ResourceClaim{
-		{Name: spyreconst.CardManagementPfPodResourceClaimName, Request: spyreconst.DRADeviceRequestManagedPf},
-		{Name: spyreconst.CardManagementVfPodResourceClaimName, Request: spyreconst.DRADeviceRequestManagedVf},
+		{Name: spyreconst.CardManagementPodResourceClaimName, Request: spyreconst.DRADeviceRequestManagedPf},
+		{Name: spyreconst.CardManagementPodResourceClaimName, Request: spyreconst.DRADeviceRequestManagedVf},
 	}
 }
 
