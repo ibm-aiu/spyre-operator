@@ -13,15 +13,86 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"strconv"
 	"strings"
 
 	spyrev1alpha1 "github.com/ibm-aiu/spyre-operator/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	corev1 "k8s.io/api/core/v1"
+	resourcev1 "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+// resourceSliceDeviceAttributes are the device attributes printed by DumpResourceSlices;
+// the DeviceClass selectors of the DRA driver match on productId and managed.
+var resourceSliceDeviceAttributes = []string{"productId", "pciAddress", "isPf", "managed", "deviceState"}
+
+// deviceAttributeString formats a DRA device attribute value, or "<unset>" if absent.
+func deviceAttributeString(attrs map[resourcev1.QualifiedName]resourcev1.DeviceAttribute, name string) string {
+	attr, ok := attrs[resourcev1.QualifiedName(name)]
+	switch {
+	case !ok:
+		return "<unset>"
+	case attr.StringValue != nil:
+		return *attr.StringValue
+	case attr.BoolValue != nil:
+		return strconv.FormatBool(*attr.BoolValue)
+	case attr.IntValue != nil:
+		return strconv.FormatInt(*attr.IntValue, 10)
+	case attr.VersionValue != nil:
+		return *attr.VersionValue
+	}
+	return "<unset>"
+}
+
+// DumpResourceSlices reports the name, driver, node, pool, and every device of every
+// ResourceSlice in the cluster, with the attributes the DeviceClasses select on; best-effort.
+func DumpResourceSlices(ctx context.Context, k8sClientset *kubernetes.Clientset) {
+	list, err := k8sClientset.ResourceV1().ResourceSlices().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		By(fmt.Sprintf("failed to list ResourceSlices: %v", err))
+		return
+	}
+	By(fmt.Sprintf("ResourceSlices (%d items):", len(list.Items)))
+	for _, rs := range list.Items {
+		nodeName := "<cluster-scoped>"
+		if rs.Spec.NodeName != nil {
+			nodeName = *rs.Spec.NodeName
+		}
+		By(fmt.Sprintf("  ResourceSlice %s: driver=%s, node=%s, pool=%s (generation=%d, slices=%d), devices=%d",
+			rs.Name, rs.Spec.Driver, nodeName, rs.Spec.Pool.Name, rs.Spec.Pool.Generation,
+			rs.Spec.Pool.ResourceSliceCount, len(rs.Spec.Devices)))
+		for _, d := range rs.Spec.Devices {
+			attrs := make([]string, 0, len(resourceSliceDeviceAttributes))
+			for _, name := range resourceSliceDeviceAttributes {
+				attrs = append(attrs, fmt.Sprintf("%s=%s", name, deviceAttributeString(d.Attributes, name)))
+			}
+			By(fmt.Sprintf("    device %s: %s", d.Name, strings.Join(attrs, ", ")))
+		}
+	}
+}
+
+// DumpResourceClaims reports the device requests and allocation state of every
+// ResourceClaim in namespace; best-effort.
+func DumpResourceClaims(ctx context.Context, k8sClientset *kubernetes.Clientset, namespace string) {
+	list, err := k8sClientset.ResourceV1().ResourceClaims(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		By(fmt.Sprintf("failed to list ResourceClaims in %s: %v", namespace, err))
+		return
+	}
+	By(fmt.Sprintf("ResourceClaims in %s (%d items):", namespace, len(list.Items)))
+	for _, rc := range list.Items {
+		allocatedDevices := 0
+		if rc.Status.Allocation != nil {
+			allocatedDevices = len(rc.Status.Allocation.Devices.Results)
+		}
+		By(fmt.Sprintf("  ResourceClaim %s: requests=%d, allocated=%t, allocatedDevices=%d, reservedFor=%d",
+			rc.Name, len(rc.Spec.Devices.Requests), rc.Status.Allocation != nil,
+			allocatedDevices, len(rc.Status.ReservedFor)))
+	}
+}
 
 const (
 	// terminalRestartCount is the restart count at which a crash loop is treated as unrecoverable.

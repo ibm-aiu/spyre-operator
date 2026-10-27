@@ -418,45 +418,62 @@ func TransformCardManagement(obj *appsv1.DaemonSet,
 		return fmt.Errorf("failed to transform cardmgmt: no hostname is designated in Daemonset: %s", obj.Name)
 	}
 
-	// Get spyreFilter regex pattern from config
-	var spyreFilterPattern string
-	if clusterPolicy.Spec.CardManagement.Config != nil && clusterPolicy.Spec.CardManagement.Config.SpyreFilter != nil {
-		spyreFilterPattern = *clusterPolicy.Spec.CardManagement.Config.SpyreFilter
-	} else {
-		spyreFilterPattern = "." // default pattern matches all
-	}
-
-	// Compile the regex pattern
-	spyreFilterRegex, err := regexp.Compile(spyreFilterPattern)
+	allowed, err := applyCardManagementSpyreFilter(obj, clusterPolicy.Spec.CardManagement.Config, nodeName)
 	if err != nil {
-		return fmt.Errorf("failed to compile spyreFilter regex pattern \"%s\": %w", spyreFilterPattern, err)
+		return err
 	}
-
-	// Check if the node name matches the spyreFilter pattern
-	if spyreFilterRegex.MatchString(nodeName) {
-		// Node matches the filter, remove blocking label if it exists
-		if obj.Spec.Template.Spec.NodeSelector != nil {
-			delete(obj.Spec.Template.Spec.NodeSelector, blockingLabel)
-		}
-	} else {
-		// Node name doesn't match the filter, prevent Pod from running by adding
-		// a node selector with a non-existent label
-		if obj.Spec.Template.Spec.NodeSelector == nil {
-			obj.Spec.Template.Spec.NodeSelector = make(map[string]string)
-		}
-		obj.Spec.Template.Spec.NodeSelector[blockingLabel] = "true"
+	if !allowed {
 		return nil
 	}
 
-	// When the DRA driver is used, request devices through the
-	// ResourceClaimTemplate instead of device-plugin extended resources. Device
-	// selection is handled at schedule time by the DeviceClass selectors, so this
-	// does not depend on node capacity.
 	if clusterPolicy.Spec.DevicePlugin.DRADriver {
+		// Request devices through the ResourceClaimTemplates instead of
+		// device-plugin extended resources. Device selection is handled at
+		// schedule time by the DeviceClass selectors, so this does not depend
+		// on node capacity.
 		injectCardManagementResourceClaim(obj)
 		return nil
 	}
+	return transformCardManagementDevicePluginResources(obj, cluster, nodeName)
+}
 
+// applyCardManagementSpyreFilter matches nodeName against the configured
+// spyreFilter regex (default "." matches all). When the node matches, the
+// blocking node-selector label is removed and true is returned. Otherwise the
+// blocking label is added so the Pod cannot be scheduled, and false is returned.
+func applyCardManagementSpyreFilter(obj *appsv1.DaemonSet, config *spyrev1alpha1.CardManagementConfig,
+	nodeName string) (bool, error) {
+	spyreFilterPattern := "." // default pattern matches all
+	if config != nil && config.SpyreFilter != nil {
+		spyreFilterPattern = *config.SpyreFilter
+	}
+
+	spyreFilterRegex, err := regexp.Compile(spyreFilterPattern)
+	if err != nil {
+		return false, fmt.Errorf("failed to compile spyreFilter regex pattern \"%s\": %w", spyreFilterPattern, err)
+	}
+
+	podSpec := &obj.Spec.Template.Spec
+	if spyreFilterRegex.MatchString(nodeName) {
+		// Node matches the filter, remove blocking label if it exists
+		delete(podSpec.NodeSelector, blockingLabel)
+		return true, nil
+	}
+
+	// Node name doesn't match the filter, prevent Pod from running by adding
+	// a node selector with a non-existent label
+	if podSpec.NodeSelector == nil {
+		podSpec.NodeSelector = make(map[string]string)
+	}
+	podSpec.NodeSelector[blockingLabel] = "true"
+	return false, nil
+}
+
+// transformCardManagementDevicePluginResources sets the card-management
+// container's extended-resource limits from the node's PF capacity when the
+// device plugin (not DRA) allocates devices.
+func transformCardManagementDevicePluginResources(obj *appsv1.DaemonSet, cluster *ClusterState,
+	nodeName string) error {
 	// Device-plugin allocation relies on the spyre-scheduler extender to
 	// account for extended resources across the PF/VF resource pools.
 	obj.Spec.Template.Spec.SchedulerName = spyreconst.SpyreSchedulerName
@@ -466,9 +483,9 @@ func TransformCardManagement(obj *appsv1.DaemonSet,
 		return nil // tentatively skip
 	}
 
-	ctx := context.Background()
 	nodeList := &corev1.NodeList{}
-	err = cluster.k8sClient.List(ctx, nodeList, client.MatchingLabels{"node-role.kubernetes.io/worker": ""})
+	err := cluster.k8sClient.List(context.Background(), nodeList,
+		client.MatchingLabels{"node-role.kubernetes.io/worker": ""})
 	if err != nil {
 		return fmt.Errorf("failed to transform cardmgmt: %w", err)
 	}
@@ -478,18 +495,20 @@ func TransformCardManagement(obj *appsv1.DaemonSet,
 			continue
 		}
 
-		if q, exists := node.Status.Capacity[spyreconst.ResourcePrefix+"/"+spyreconst.PfResourceName]; exists {
-			v, ok := q.AsInt64()
-			if !ok {
-				return fmt.Errorf("failed to convert quantity of spyre_pf: %s", q.String())
+		q, exists := node.Status.Capacity[spyreconst.ResourcePrefix+"/"+spyreconst.PfResourceName]
+		if !exists {
+			break
+		}
+		v, ok := q.AsInt64()
+		if !ok {
+			return fmt.Errorf("failed to convert quantity of spyre_pf: %s", q.String())
+		}
+		if v > 0 {
+			m := map[corev1.ResourceName]resource.Quantity{
+				corev1.ResourceName(spyreconst.ResourcePrefix + "/" + spyreconst.PfResourceName): q,
+				corev1.ResourceName(spyreconst.ResourcePrefix + "/" + spyreconst.VfResourceName): q,
 			}
-			if v > 0 {
-				m := map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceName(spyreconst.ResourcePrefix + "/" + spyreconst.PfResourceName): q,
-					corev1.ResourceName(spyreconst.ResourcePrefix + "/" + spyreconst.VfResourceName): q,
-				}
-				obj.Spec.Template.Spec.Containers[0].Resources = corev1.ResourceRequirements{Limits: m}
-			}
+			obj.Spec.Template.Spec.Containers[0].Resources = corev1.ResourceRequirements{Limits: m}
 		}
 		break
 	}
