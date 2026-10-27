@@ -33,6 +33,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
+	resourcev1 "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -1027,6 +1028,49 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 				}
 			}),
 		)
+
+		Context("restricted device classes", Ordered, func() {
+			DescribeTable("cannot request managed device classes in user namespace",
+				func(restrictedClass string) {
+					By("attempting to create ResourceClaimTemplate with " + restrictedClass)
+					templateData := ResourceClaimTemplateData{
+						Name:            testClaimName,
+						Namespace:       testNamespace,
+						Count:           1,
+						DeviceClassName: restrictedClass,
+					}
+					yamlData := YamlFromTemplate(ResourceClaimTemplate, templateData)
+					_, err := CreateResourceFromYaml(ctx, dynClient, discoClient, testNamespace, yamlData)
+					Expect(err).NotTo(BeNil(), "creating ResourceClaimTemplate with %s in namespace %s must be blocked", restrictedClass, testNamespace)
+					Expect(err.Error()).To(ContainSubstring("The requested DeviceClass is restricted and cannot be used in this namespace."))
+
+					By("attempting to create direct ResourceClaim with " + restrictedClass)
+					claim := &resourcev1.ResourceClaim{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      testClaimName,
+							Namespace: testNamespace,
+						},
+						Spec: resourcev1.ResourceClaimSpec{
+							Devices: resourcev1.DeviceClaim{
+								Requests: []resourcev1.DeviceRequest{
+									{
+										Name: "req-1",
+										Exactly: &resourcev1.ExactDeviceRequest{
+											DeviceClassName: restrictedClass,
+										},
+									},
+								},
+							},
+						},
+					}
+					_, err = k8sClientset.ResourceV1().ResourceClaims(testNamespace).Create(ctx, claim, metav1.CreateOptions{})
+					Expect(err).NotTo(BeNil(), "creating ResourceClaim with %s in namespace %s must be blocked", restrictedClass, testNamespace)
+					Expect(err.Error()).To(ContainSubstring("The requested DeviceClass is restricted and cannot be used in this namespace."))
+				},
+				Entry("spyre-managed-pf", "spyre-managed-pf"),
+				Entry("spyre-managed-vf", "spyre-managed-vf"),
+			)
+		})
 
 		Context("tier allocation", Ordered, func() {
 			// tier0GroupSize is the number of devices that share the same tier0Group value,

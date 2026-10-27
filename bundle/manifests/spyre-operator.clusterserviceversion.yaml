@@ -63,7 +63,7 @@ metadata:
     capabilities: Basic Install
     categories: AI/Machine Learning
     containerImage: docker.io/spyre-operator/spyre-operator:1.5.0
-    createdAt: "2026-10-15T04:32:45Z"
+    createdAt: "2026-10-27T06:05:16Z"
     description: Operator for IBM Spyre devices
     features.operators.openshift.io/disconnected: "false"
     features.operators.openshift.io/fips-compliant: "false"
@@ -416,6 +416,20 @@ spec:
           - update
           - watch
         - apiGroups:
+          - admissionregistration.k8s.io
+          resources:
+          - validatingadmissionpolicies
+          - validatingadmissionpolicybindings
+          - validatingwebhookconfigurations
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
           - apps
           resources:
           - daemonsets
@@ -623,6 +637,8 @@ spec:
           - admissionregistration.k8s.io
           resources:
           - validatingwebhookconfigurations
+          - validatingadmissionpolicies
+          - validatingadmissionpolicybindings
           verbs:
           - create
           - delete

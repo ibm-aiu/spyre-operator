@@ -1,0 +1,42 @@
+# Copyright (c) 2025, 2026 IBM Corp.
+# SPDX-License-Identifier: Apache-2.0
+
+# Restrict the creation and update of ResourceClaims and ResourceClaimTemplates
+# that request managed Spyre DeviceClasses (spyre-managed-pf, spyre-managed-vf).
+
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: block-restricted-device-classes
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - apiGroups: ["resource.k8s.io"]
+      apiVersions: ["v1", "v1beta1"]
+      operations: ["CREATE", "UPDATE"]
+      resources: ["resourceclaims", "resourceclaimtemplates"]
+  validations:
+  # Check ResourceClaim for restricted device classes
+  - expression: |
+      object.kind != "ResourceClaim" ||
+      !has(object.spec.devices) ||
+      !has(object.spec.devices.requests) ||
+      object.spec.devices.requests.all(r,
+        (!has(r.deviceClassName) || !(r.deviceClassName in ["spyre-managed-pf", "spyre-managed-vf"])) &&
+        (!has(r.exactly) || !has(r.exactly.deviceClassName) || !(r.exactly.deviceClassName in ["spyre-managed-pf", "spyre-managed-vf"])) &&
+        (!has(r.firstAvailable) || r.firstAvailable.all(sub, !has(sub.deviceClassName) || !(sub.deviceClassName in ["spyre-managed-pf", "spyre-managed-vf"])))
+      )
+    message: "The requested DeviceClass is restricted and cannot be used in this namespace."
+
+  # Check ResourceClaimTemplate for restricted device classes
+  - expression: |
+      object.kind != "ResourceClaimTemplate" ||
+      !has(object.spec.spec.devices) ||
+      !has(object.spec.spec.devices.requests) ||
+      object.spec.spec.devices.requests.all(r,
+        (!has(r.deviceClassName) || !(r.deviceClassName in ["spyre-managed-pf", "spyre-managed-vf"])) &&
+        (!has(r.exactly) || !has(r.exactly.deviceClassName) || !(r.exactly.deviceClassName in ["spyre-managed-pf", "spyre-managed-vf"])) &&
+        (!has(r.firstAvailable) || r.firstAvailable.all(sub, !has(sub.deviceClassName) || !(sub.deviceClassName in ["spyre-managed-pf", "spyre-managed-vf"])))
+      )
+    message: "The requested DeviceClass is restricted and cannot be used in this namespace."

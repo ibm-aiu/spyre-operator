@@ -1,0 +1,20 @@
+# Copyright (c) 2025, 2026 IBM Corp.
+# SPDX-License-Identifier: Apache-2.0
+
+# Bind the block-restricted-device-classes policy to deny requests in all
+# namespaces other than the operator namespace.
+
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: block-restricted-device-classes-binding
+spec:
+  policyName: block-restricted-device-classes
+  validationActions: [Deny]
+  matchResources:
+    namespaceSelector:
+      matchExpressions:
+      - key: kubernetes.io/metadata.name
+        operator: NotIn
+        values:
+        - "FILLED BY THE OPERATOR"
