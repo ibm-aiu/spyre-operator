@@ -101,20 +101,15 @@ const (
 	CardManagementHealthApiSocketMountPath   = "/var/run/cardmgmt-health-check-api"
 
 	// DRA (Dynamic Resource Allocation) card management.
-	// CardManagementPfResourceClaimTemplateName and
-	// CardManagementVfResourceClaimTemplateName are the names of the
-	// ResourceClaimTemplate objects (see
-	// `assets/state-plugin-components/spyre-card-management/055*_resourceclaimtemplate_managed_*.yaml`)
+	// CardManagementResourceClaimTemplateName is the name of the
+	// ResourceClaimTemplate object (see
+	// `assets/state-plugin-components/spyre-card-management/0550_resourceclaimtemplate_managed.yaml`)
 	// that the card-management Pod references when DevicePlugin.DRADriver is enabled.
-	// PF and VF are requested through separate claims because dra-driver-spyre
-	// rejects a claim that mixes devices with different product IDs.
-	CardManagementPfResourceClaimTemplateName = "spyre-card-management-pf"
-	CardManagementVfResourceClaimTemplateName = "spyre-card-management-vf"
-	// CardManagementPfPodResourceClaimName and
-	// CardManagementVfPodResourceClaimName are the pod-local names used
+	// The single claim holds one request for managed PF devices and one for managed VF devices.
+	CardManagementResourceClaimTemplateName = "spyre-card-management"
+	// CardManagementPodResourceClaimName is the pod-local name used
 	// in pod.spec.resourceClaims and referenced from container.resources.claims.
-	CardManagementPfPodResourceClaimName = "spyre-managed-pf"
-	CardManagementVfPodResourceClaimName = "spyre-managed-vf"
+	CardManagementPodResourceClaimName = "spyre-managed-claim"
 	// DRADeviceRequestManagedPf and DRADeviceRequestManagedVf are the request names
 	// defined in the ResourceClaimTemplates. They must match the request names in
 	// the YAML assets and target the spyre-managed-pf / spyre-managed-vf DeviceClasses.
