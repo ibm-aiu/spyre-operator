@@ -38,6 +38,7 @@ var _ = Describe("ControlledObject", Ordered, func() {
 			ObjectMeta: metav1.ObjectMeta{Name: cpName},
 			Spec: spyrev1alpha1.SpyreClusterPolicySpec{
 				DevicePlugin: spyrev1alpha1.DevicePluginSpec{
+					Mode:             spyrev1alpha1.DevicePluginModeClassic,
 					DeploymentConfig: ValidDeploymentConfig("device-plugin"),
 				},
 				CardManagement: spyrev1alpha1.CardManagementSpec{

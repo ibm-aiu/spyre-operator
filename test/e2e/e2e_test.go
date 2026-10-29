@@ -558,7 +558,7 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 
 			By("enabling reservation mode (secondary scheduler) with pseudo device")
 			clusterPolicy.Spec.ExperimentalMode = append(DefaultModes(), spyrev1alpha1.PseudoDeviceMode)
-			clusterPolicy.Spec.DevicePlugin.DRADriver = false
+			clusterPolicy.Spec.DevicePlugin.Mode = spyrev1alpha1.DevicePluginModeClassic
 			clusterPolicy.Spec.HealthChecker.Enabled = false
 			EnableCardmgmtDummy(clusterPolicy, targetNodeName)
 			UpdateClusterPolicy(ctx, spyreV2Client, k8sClientset, clusterPolicy, len(nodeNames), spyrev1alpha1.Ready)
@@ -1202,7 +1202,7 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 				})
 
 				By("ensuring the DRA driver is enabled and externalReservationMode is not enabled")
-				Expect(clusterPolicy.Spec.DevicePlugin.DRADriver).To(BeTrue(), "DRA driver must be enabled")
+				Expect(clusterPolicy.Spec.DevicePlugin.Mode).To(Equal(spyrev1alpha1.DevicePluginModeDRA), "DRA driver must be enabled")
 				Expect(clusterPolicy.ExperimentalModeEnabled(spyrev1alpha1.ReservationMode)).To(BeFalse(),
 					"%s mode must not be enabled with the DRA driver", spyrev1alpha1.ReservationMode)
 

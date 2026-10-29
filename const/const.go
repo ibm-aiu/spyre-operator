@@ -104,7 +104,7 @@ const (
 	// CardManagementResourceClaimTemplateName is the name of the
 	// ResourceClaimTemplate object (see
 	// `assets/state-plugin-components/spyre-card-management/0550_resourceclaimtemplate_managed.yaml`)
-	// that the card-management Pod references when DevicePlugin.DRADriver is enabled.
+	// that the card-management Pod references when devicePlugin.mode is dra.
 	// The single claim holds one request for managed PF devices and one for managed VF devices.
 	CardManagementResourceClaimTemplateName = "spyre-card-management"
 	// CardManagementPodResourceClaimName is the pod-local name used

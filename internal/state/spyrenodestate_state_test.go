@@ -32,7 +32,13 @@ var _ = Describe("SpyreNodeState State", Ordered, func() {
 	cpName := "spyrenodestate-test-policy"
 	BeforeAll(func() {
 		cp := &spyrev1alpha1.SpyreClusterPolicy{
-			ObjectMeta: metav1.ObjectMeta{Name: cpName}}
+			ObjectMeta: metav1.ObjectMeta{Name: cpName},
+			Spec: spyrev1alpha1.SpyreClusterPolicySpec{
+				DevicePlugin: spyrev1alpha1.DevicePluginSpec{
+					Mode: spyrev1alpha1.DevicePluginModeClassic,
+				},
+			},
+		}
 		err := K8sClient.Create(ctx, cp)
 		Expect(err).To(BeNil())
 	})

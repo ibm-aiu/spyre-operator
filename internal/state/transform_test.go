@@ -180,6 +180,7 @@ var _ = Describe("Transform", func() {
 		config := &spyrev1alpha1.SpyreClusterPolicySpec{
 			DevicePlugin: spyrev1alpha1.DevicePluginSpec{
 				DeploymentConfig: ValidDeploymentConfig("some-image"),
+				Mode:             spyrev1alpha1.DevicePluginModeClassic,
 				P2PDMA:           p2pdma,
 			},
 		}
@@ -301,6 +302,7 @@ var _ = Describe("Transform", func() {
 			if pseudoMode {
 				config.ExperimentalMode = []spyrev1alpha1.SpyreClusterPolicyExperimentalMode{spyrev1alpha1.PseudoDeviceMode}
 			}
+			config.DevicePlugin.Mode = spyrev1alpha1.DevicePluginModeClassic
 			config.DevicePlugin.DeploymentConfig = ValidDeploymentConfig("some-image")
 			initConfig := ValidDeploymentConfig("some-init-image")
 			if hasImage {
@@ -395,6 +397,7 @@ var _ = Describe("Transform", func() {
 			config := spyrev1alpha1.SpyreClusterPolicySpec{
 				DevicePlugin: spyrev1alpha1.DevicePluginSpec{
 					DeploymentConfig: ValidDeploymentConfig("device-plugin"),
+					Mode:             spyrev1alpha1.DevicePluginModeClassic,
 					P2PDMA:           p2pdma,
 					InitContainer: &spyrev1alpha1.ExternalInitContainerSpec{
 						DeploymentConfig: ValidDeploymentConfig("init-container"),
@@ -478,6 +481,7 @@ var _ = Describe("Transform", func() {
 			config := spyrev1alpha1.SpyreClusterPolicySpec{
 				DevicePlugin: spyrev1alpha1.DevicePluginSpec{
 					DeploymentConfig: ValidDeploymentConfig("device-plugin"),
+					Mode:             spyrev1alpha1.DevicePluginModeClassic,
 					InitContainer: &spyrev1alpha1.ExternalInitContainerSpec{
 						DeploymentConfig: dataConfig,
 						Runtime:          runtimeConfig,
@@ -554,6 +558,7 @@ var _ = Describe("Transform", func() {
 					Enabled:     true,
 				},
 				DevicePlugin: spyrev1alpha1.DevicePluginSpec{
+					Mode: spyrev1alpha1.DevicePluginModeClassic,
 					DeviceConfigSpec: spyrev1alpha1.DeviceConfigSpec{
 						ConfigName: expectedConfigName,
 						ConfigPath: expectedConfigPath,
@@ -599,6 +604,7 @@ var _ = Describe("Transform", func() {
 				spyreconst.SpyreHealthSocketEnvKey, originalSocket)
 			cpSpec := &spyrev1alpha1.SpyreClusterPolicySpec{
 				DevicePlugin: spyrev1alpha1.DevicePluginSpec{
+					Mode:             spyrev1alpha1.DevicePluginModeClassic,
 					DeviceConfigSpec: spyrev1alpha1.DeviceConfigSpec{},
 				},
 				HealthChecker: spyrev1alpha1.HealthCheckerSpec{
@@ -625,6 +631,9 @@ var _ = Describe("Transform", func() {
 
 	Context("card management", func() {
 		cardMgmtCpSpec := spyrev1alpha1.SpyreClusterPolicySpec{
+			DevicePlugin: spyrev1alpha1.DevicePluginSpec{
+				Mode: spyrev1alpha1.DevicePluginModeClassic,
+			},
 			CardManagement: spyrev1alpha1.CardManagementSpec{
 				Enabled: true,
 			},
@@ -701,6 +710,9 @@ var _ = Describe("Transform", func() {
 
 					cardMgmtCp := &spyrev1alpha1.SpyreClusterPolicy{
 						Spec: spyrev1alpha1.SpyreClusterPolicySpec{
+							DevicePlugin: spyrev1alpha1.DevicePluginSpec{
+								Mode: spyrev1alpha1.DevicePluginModeClassic,
+							},
 							CardManagement: spyrev1alpha1.CardManagementSpec{
 								Enabled: true,
 								Config:  config,
@@ -758,6 +770,9 @@ var _ = Describe("Transform", func() {
 				}
 				cardMgmtCp := &spyrev1alpha1.SpyreClusterPolicy{
 					Spec: spyrev1alpha1.SpyreClusterPolicySpec{
+						DevicePlugin: spyrev1alpha1.DevicePluginSpec{
+							Mode: spyrev1alpha1.DevicePluginModeClassic,
+						},
 						CardManagement: spyrev1alpha1.CardManagementSpec{
 							Enabled: true,
 							Config:  config,
@@ -819,6 +834,9 @@ var _ = Describe("Transform", func() {
 				ds := newCardManagementDaemonset()
 				cp := &spyrev1alpha1.SpyreClusterPolicy{
 					Spec: spyrev1alpha1.SpyreClusterPolicySpec{
+						DevicePlugin: spyrev1alpha1.DevicePluginSpec{
+							Mode: spyrev1alpha1.DevicePluginModeClassic,
+						},
 						CardManagement: spyrev1alpha1.CardManagementSpec{
 							Enabled: true,
 						},
@@ -842,6 +860,9 @@ var _ = Describe("Transform", func() {
 				ds := newCardManagementDaemonset()
 				cp := &spyrev1alpha1.SpyreClusterPolicy{
 					Spec: spyrev1alpha1.SpyreClusterPolicySpec{
+						DevicePlugin: spyrev1alpha1.DevicePluginSpec{
+							Mode: spyrev1alpha1.DevicePluginModeClassic,
+						},
 						CardManagement: spyrev1alpha1.CardManagementSpec{
 							Enabled: true,
 							HealthApi: &spyrev1alpha1.HealthApiSpec{
@@ -918,7 +939,12 @@ var _ = Describe("Transform", func() {
 				return &spyrev1alpha1.SpyreClusterPolicy{
 					Spec: spyrev1alpha1.SpyreClusterPolicySpec{
 						DevicePlugin: spyrev1alpha1.DevicePluginSpec{
-							DRADriver: dra,
+							Mode: func() spyrev1alpha1.DevicePluginMode {
+								if dra {
+									return spyrev1alpha1.DevicePluginModeDRA
+								}
+								return spyrev1alpha1.DevicePluginModeClassic
+							}(),
 						},
 						CardManagement: spyrev1alpha1.CardManagementSpec{
 							Enabled: true,
@@ -1051,6 +1077,7 @@ var _ = Describe("Transform", func() {
 			cpSpec := &spyrev1alpha1.SpyreClusterPolicySpec{
 				DevicePlugin: spyrev1alpha1.DevicePluginSpec{
 					DeploymentConfig: ValidDeploymentConfig("device-plugin"),
+					Mode:             spyrev1alpha1.DevicePluginModeClassic,
 				},
 			}
 			if pseudoMode {
