@@ -76,6 +76,16 @@ func NewStateController(ctx context.Context, cfg *rest.Config, scheme *runtime.S
 	if err != nil {
 		return nil, fmt.Errorf("failed to init deployment state for plugin components: %w", err)
 	}
+	// A component failing on a node taints the node to hold the components of the later states.
+	// The components of the same and earlier states tolerate the taint to keep running.
+	states := []*DeploymentState{initState, coreComponentsState, pluginComponentState}
+	for i, state := range states {
+		var tolerated []string
+		for _, later := range states[i:] {
+			tolerated = append(tolerated, later.componentNames()...)
+		}
+		state.setHoldTolerated(tolerated)
+	}
 	return &StateController{
 		ClusterState:         clusterState,
 		SpyreNodeStateState:  spyreNodeState,
@@ -119,10 +129,6 @@ func (c *StateController) Sync(ctx context.Context,
 			return spyrev1alpha1.NotReady, message, errors.New(message)
 		}
 	}
-	if err := c.UpdateSpyreNodeStates(ctx, clusterPolicy); err != nil {
-		message := fmt.Sprintf("failed to update SpyreNodeState: %v", err)
-		return spyrev1alpha1.NotReady, message, errors.New(message)
-	}
 	if !c.PseudoDeviceMode.Load() {
 		if !slices.Contains(supportedArchitectures, c.nodeArchitecture) {
 			message := fmt.Sprintf("%s unsupported. supported architectures: %v", c.nodeArchitecture, supportedArchitectures) //nolint:lll
@@ -158,23 +164,59 @@ func (c *StateController) syncCoreAndPluginState(ctx context.Context,
 	if err != nil {
 		return spyrev1alpha1.NotReady, fmt.Sprintf("%v", coreMessages), fmt.Errorf("failed to sync core components: %w", err)
 	}
+	// A cluster whose previous state is Ready (or Degraded) keeps syncing the plugin components even if a component
+	// is not ready, so that the existing components keep running. The cluster is then reported as Degraded
+	// instead of NotReady, e.g., a core component is failing on some nodes (held by the taint), or a DaemonSet
+	// is initializing for a new node.
+	// Otherwise (e.g., the first deployment), the plugin components wait for the core components, the same as
+	// the core components wait for the init ones, so that they are not deployed on the node of a failing component,
+	// and the cluster is NotReady until it becomes Ready.
+	running := clusterPolicy.Status.State == spyrev1alpha1.Ready || clusterPolicy.Status.State == spyrev1alpha1.Degraded
+	if !coreSuccess && !running {
+		state, message := overallState(false, false, false, coreMessages, c.heldNodes(), nil)
+		return state, message, nil
+	}
 	optionalSuccess, optionalMessages, err := c.PluginComponentState.TransformAndSync(ctx, clusterPolicy, c.ClusterState)
 	if err != nil {
 		return spyrev1alpha1.NotReady, fmt.Sprintf("%v", optionalMessages), fmt.Errorf("failed to sync plugin components: %w", err)
 	}
-	degradedNodes := append(c.CoreComponentState.DegradedNodes(), c.PluginComponentState.DegradedNodes()...)
+	degradedNodes := slices.Concat(c.CoreComponentState.DegradedNodes(), c.PluginComponentState.DegradedNodes())
+	state, message := overallState(running, coreSuccess, optionalSuccess,
+		slices.Concat(coreMessages, optionalMessages), c.heldNodes(), degradedNodes)
+	return state, message, nil
+}
+
+// overallState decides the state and the message of the core and plugin components.
+// running is true if the previous state of the cluster is Ready or Degraded. A running cluster is Degraded,
+// not NotReady, when some components are not ready, so that the components which are running keep serving.
+// heldNodes are the nodes held by the taint of a failing component, either confirmed as degraded or not yet,
+// and degradedNodes are the nodes confirmed as degraded.
+func overallState(running, coreSuccess, optionalSuccess bool, messages []string,
+	heldNodes, degradedNodes []DegradedNode) (spyrev1alpha1.State, string) {
 	if coreSuccess && optionalSuccess {
 		if len(degradedNodes) > 0 {
 			// healthy nodes keep serving while degraded nodes are tainted and reported.
-			return spyrev1alpha1.Degraded, DegradedMessage(degradedNodes), nil
+			return spyrev1alpha1.Degraded, DegradedMessage(degradedNodes)
 		}
-		return spyrev1alpha1.Ready, "", nil
+		return spyrev1alpha1.Ready, ""
 	}
-	messages := slices.Concat(coreMessages, optionalMessages)
-	if len(degradedNodes) > 0 {
-		messages = append(messages, DegradedMessage(degradedNodes))
+	messages = slices.Clone(messages)
+	if len(heldNodes) > 0 {
+		messages = append(messages, DegradedMessage(heldNodes))
 	}
-	return spyrev1alpha1.NotReady, fmt.Sprintf("%v", messages), nil
+	state := spyrev1alpha1.NotReady
+	if running {
+		state = spyrev1alpha1.Degraded
+	}
+	return state, fmt.Sprintf("%v", messages)
+}
+
+// heldNodes returns the nodes held by the taint of a failing component in the core and plugin states,
+// either confirmed as degraded or not yet.
+func (c *StateController) heldNodes() []DegradedNode {
+	return slices.Concat(
+		c.CoreComponentState.DegradedNodes(), c.PluginComponentState.DegradedNodes(),
+		c.CoreComponentState.FailingNodes(), c.PluginComponentState.FailingNodes())
 }
 
 // Clear calls cleaning up cluster and states

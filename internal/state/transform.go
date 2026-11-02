@@ -314,6 +314,10 @@ func transformDevicePluginInitContainer(obj *appsv1.DaemonSet,
 		return fmt.Errorf("cannot find index of %s in init containers", spyreconst.DataInitContainerName)
 	}
 
+	// update env from experimental modes before applying the container config
+	// so that the env of the policy can override them (same as the device plugin container)
+	applyExperimentalModes(&(obj.Spec.Template.Spec.InitContainers[dataInitIndex]), config.ExperimentalMode)
+
 	if err := applyContainerConfig(&obj.Spec.Template.Spec.InitContainers[dataInitIndex],
 		&config.DevicePlugin.InitContainer.DeploymentConfig); err != nil {
 		obj.Spec.Template.Spec.InitContainers = []corev1.Container{}
@@ -334,9 +338,6 @@ func transformDevicePluginInitContainer(obj *appsv1.DaemonSet,
 		config.DevicePlugin.InitContainer.ExecutePolicy)
 	applyVerifyP2P(&obj.Spec.Template.Spec.InitContainers[dataInitIndex], nodeArchitecture,
 		config.DevicePlugin.P2PDMA)
-
-	// update env from experimental modes
-	applyExperimentalModes(&(obj.Spec.Template.Spec.InitContainers[dataInitIndex]), config.ExperimentalMode)
 
 	if err != nil {
 		return fmt.Errorf("failed to transform runtime init container: %w", err)

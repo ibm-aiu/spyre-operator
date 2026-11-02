@@ -31,6 +31,7 @@ import (
 	resourcev1 "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -92,14 +93,17 @@ type DegradedNode struct {
 }
 
 // DegradableObject is implemented by controlled objects which can be permanently unable to become ready
-// on some of the nodes they run on (e.g., a Pod stays unschedulable because no device is available on the node).
+// on some of the nodes they run on (e.g., a Pod stays unschedulable because no device is available on the node,
+// or a container of the Pod keeps failing on creation or at runtime).
 // Such an object must not block the other objects from being synced.
 type DegradableObject interface {
+	// Failing returns the nodes on which the object is failing right now, regardless of the grace period.
+	// The failure might be transient. The nodes are held from deploying the later components
+	// until the failure is confirmed as degraded or recovered.
+	Failing(ctx context.Context, k8sClient client.Client) []DegradedNode
 	// Degraded returns the nodes on which the object is permanently, not temporarily, unable to become ready.
 	// Returns an empty list if there is no such node.
 	Degraded(ctx context.Context, k8sClient client.Client) []DegradedNode
-	// NodeNames returns the names of all the nodes on which the object runs
-	NodeNames() []string
 }
 
 // ControlledID identifies controlled object by kind, name, and namespace
@@ -423,6 +427,11 @@ func (obj *Service) get(ctx context.Context,
 	return getObj, err //nolint:wrapcheck
 }
 
+// dependsOnEndpoints tells that the service is ready only if the Pods behind it are serving
+func (obj *Service) dependsOnEndpoints() {
+	// Intentionally empty: the method only marks the Service as an endpointDependent.
+}
+
 func (obj *Service) Ready(ctx context.Context, k8sClient client.Client) bool {
 	logger := log.FromContext(ctx)
 	getObj, err := obj.get(ctx, k8sClient)
@@ -446,6 +455,13 @@ func (obj *Service) Ready(ctx context.Context, k8sClient client.Client) bool {
 		return false
 	}
 
+	// A service whose DaemonSets have no pod desired (e.g., all the nodes are held by the taint of a failing
+	// component, or no node is labeled) has no endpoint and never will, which is not a failure of the service.
+	if obj.selectsOnlyEmptyDaemonSets(ctx, k8sClient, getObj) {
+		logger.Info(fmt.Sprintf("%s is ready: the daemon sets behind it have no desired pod", obj.ControlledID))
+		return true
+	}
+
 	if len(endpointSliceList.Items) == 0 {
 		logger.Info("no endpoint slices found")
 		return false
@@ -465,6 +481,31 @@ func (obj *Service) Ready(ctx context.Context, k8sClient client.Client) bool {
 
 	logger.Info("no ready endpoints with addresses found")
 	return false
+}
+
+// selectsOnlyEmptyDaemonSets returns true if the service selects at least one DaemonSet and every selected
+// DaemonSet has been observed by the controller with no pod desired.
+func (obj *Service) selectsOnlyEmptyDaemonSets(ctx context.Context, k8sClient client.Client, svc *corev1.Service) bool {
+	if len(svc.Spec.Selector) == 0 {
+		return false
+	}
+	dsList := &appsv1.DaemonSetList{}
+	if err := k8sClient.List(ctx, dsList, client.InNamespace(svc.Namespace)); err != nil {
+		return false
+	}
+	selector := labels.SelectorFromSet(svc.Spec.Selector)
+	selected := 0
+	for i := range dsList.Items {
+		ds := &dsList.Items[i]
+		if !selector.Matches(labels.Set(ds.Spec.Template.Labels)) {
+			continue
+		}
+		if ds.Status.ObservedGeneration < ds.Generation || ds.Status.DesiredNumberScheduled != 0 {
+			return false
+		}
+		selected++
+	}
+	return selected > 0
 }
 
 type MetricsExporterService struct {
@@ -681,6 +722,199 @@ func (obj *DaemonSet) Sync(ctx context.Context,
 	return getObj, nil
 }
 
+var _ DegradableObject = &DaemonSet{}
+
+// containerFailureGracePeriod is how long a container of a DaemonSet Pod must be continuously failing on creation
+// before the failure is regarded as permanent. It absorbs transient failures
+// (e.g., a ConfigMap or a Secret which is about to be created). A runtime crash does not wait for it.
+var containerFailureGracePeriod = 1 * time.Minute
+
+// containerCrashRestartThreshold is the number of restarts of a container which exits with a non-zero code
+// at runtime (e.g., exit 1) before the crash is regarded as permanent (degraded), instantly.
+const containerCrashRestartThreshold = 3
+
+// containerFailingRestartThreshold is the number of restarts of a container which exits with a non-zero code
+// at runtime before the container is regarded as failing, i.e., the node is held from deploying the later
+// components while waiting for the failure to be confirmed as degraded.
+const containerFailingRestartThreshold = 1
+
+// containerCrashLoopReason is the waiting reason of a container which keeps crashing at runtime
+const containerCrashLoopReason = "CrashLoopBackOff"
+
+// containerCreationFailureReasons are the waiting reasons of a container which explicitly fail on creation
+var containerCreationFailureReasons = []string{
+	"CreateContainerConfigError",
+	"CreateContainerError",
+	"RunContainerError",
+	"InvalidImageName",
+}
+
+// addDegradedToleration lets the Pod tolerate the NoSchedule taint put on a degraded node
+// by the operator for the component so that the Pod is able to recover from it.
+func (obj *DaemonSet) addDegradedToleration(component string) {
+	podSpec := &obj.loadedObj.Spec.Template.Spec
+	key := degradedTaintKey(component)
+	for _, t := range podSpec.Tolerations {
+		if t.Key == key {
+			return
+		}
+	}
+	podSpec.Tolerations = append(podSpec.Tolerations, corev1.Toleration{
+		Key:      key,
+		Operator: corev1.TolerationOpExists,
+		Effect:   corev1.TaintEffectNoSchedule,
+	})
+}
+
+// Failing returns the nodes on which a container of the DaemonSet Pod is failing right now on creation
+// (e.g., CreateContainerConfigError) or at runtime (non-zero exit code, e.g., exit 1, restarted) regardless
+// of the grace period. The failure might be transient and is confirmed later by Degraded.
+func (obj *DaemonSet) Failing(ctx context.Context, k8sClient client.Client) []DegradedNode {
+	return obj.failedNodes(ctx, k8sClient, false)
+}
+
+// Degraded returns the nodes on which a container of the DaemonSet Pod has been failing over the grace period
+// on creation (e.g., CreateContainerConfigError) or at runtime (non-zero exit code, e.g., exit 1, repeatedly).
+func (obj *DaemonSet) Degraded(ctx context.Context, k8sClient client.Client) []DegradedNode {
+	return obj.failedNodes(ctx, k8sClient, true)
+}
+
+// heldByTaint returns true if the DaemonSet has no Pod only because every node it is meant for carries the
+// degraded taint of another component which the Pod does not tolerate, i.e., the DaemonSet is held back
+// from the nodes by the failure of an earlier component, and so can never become ready until they recover.
+func (obj *DaemonSet) heldByTaint(ctx context.Context, k8sClient client.Client) bool {
+	ds, err := obj.get(ctx, k8sClient)
+	if err != nil || ds.Status.DesiredNumberScheduled != 0 {
+		return false
+	}
+	nodeList := &corev1.NodeList{}
+	if err := k8sClient.List(ctx, nodeList,
+		client.MatchingLabels(ds.Spec.Template.Spec.NodeSelector)); err != nil || len(nodeList.Items) == 0 {
+		return false
+	}
+	for i := range nodeList.Items {
+		if !heldNode(&nodeList.Items[i], ds.Spec.Template.Spec.Tolerations) {
+			return false
+		}
+	}
+	return true
+}
+
+// heldNode returns true if the node has a degraded taint which none of the tolerations tolerates
+func heldNode(node *corev1.Node, tolerations []corev1.Toleration) bool {
+	for _, taint := range node.Spec.Taints {
+		if taint.Effect != corev1.TaintEffectNoSchedule || !isDegradedTaintKey(taint.Key) {
+			continue
+		}
+		if !slices.ContainsFunc(tolerations, func(t corev1.Toleration) bool { return t.Key == taint.Key }) {
+			return true
+		}
+	}
+	return false
+}
+
+// failedNodes returns the nodes on which a container of the DaemonSet Pod is failing.
+// When confirmed is true, the failure must have lasted over the grace period and the restarts must have piled up.
+func (obj *DaemonSet) failedNodes(ctx context.Context, k8sClient client.Client, confirmed bool) []DegradedNode {
+	logger := log.FromContext(ctx)
+	ds, err := obj.get(ctx, k8sClient)
+	if err != nil {
+		return nil
+	}
+	podList := &corev1.PodList{}
+	if err := k8sClient.List(ctx, podList, client.InNamespace(ds.Namespace),
+		client.MatchingLabels(ds.Spec.Template.Labels)); err != nil {
+		logger.Info("failed to list daemon set pods", "name", ds.Name, "error", err)
+		return nil
+	}
+	failed := []DegradedNode{}
+	found := map[string]struct{}{}
+	for i := range podList.Items {
+		pod := &podList.Items[i]
+		// a Pod on its way out is about to be replaced, its failures are stale
+		if pod.Spec.NodeName == "" || pod.DeletionTimestamp != nil || !metav1.IsControlledBy(pod, ds) {
+			continue
+		}
+		if _, dup := found[pod.Spec.NodeName]; dup {
+			continue
+		}
+		if reason, failing := containerFailure(pod, confirmed); failing {
+			logger.Info("daemon set pod has a failing container", "name", ds.Name,
+				"node", pod.Spec.NodeName, "confirmed", confirmed, "reason", reason)
+			found[pod.Spec.NodeName] = struct{}{}
+			failed = append(failed, DegradedNode{Name: pod.Spec.NodeName, Reason: reason})
+		}
+	}
+	return failed
+}
+
+// containerFailure returns the reason if a (init) container of the Pod is failing on creation or at runtime.
+// When confirmed is true, a creation failure must have lasted over the grace period, and a runtime crash
+// must have restarted the container enough, which is confirmed instantly without waiting for the grace period.
+func containerFailure(pod *corev1.Pod, confirmed bool) (string, bool) {
+	if pod.Status.Phase != corev1.PodPending && pod.Status.Phase != corev1.PodRunning {
+		return "", false
+	}
+	restartThreshold := int32(containerFailingRestartThreshold)
+	if confirmed {
+		restartThreshold = containerCrashRestartThreshold
+	}
+	creationConfirmed := !confirmed || failingOverGracePeriod(pod)
+	statuses := slices.Concat(pod.Status.InitContainerStatuses, pod.Status.ContainerStatuses)
+	for i := range statuses {
+		if reason, failing := containerStatusFailure(pod, &statuses[i], restartThreshold, creationConfirmed); failing {
+			return reason, true
+		}
+	}
+	return "", false
+}
+
+// containerStatusFailure returns the reason if the container is failing on creation (when creationConfirmed),
+// or keeps exiting with a non-zero code at runtime after restarted the threshold times.
+func containerStatusFailure(pod *corev1.Pod, status *corev1.ContainerStatus,
+	restartThreshold int32, creationConfirmed bool) (string, bool) {
+	waiting := status.State.Waiting
+	if waiting != nil && slices.Contains(containerCreationFailureReasons, waiting.Reason) {
+		if !creationConfirmed {
+			return "", false
+		}
+		return fmt.Sprintf("container %s of pod %s failed on creation: %s: %s",
+			status.Name, pod.Name, waiting.Reason, waiting.Message), true
+	}
+	if status.RestartCount < restartThreshold {
+		return "", false
+	}
+	// the container is currently crashing: backing off after exit, or just exited with a non-zero code
+	var terminated *corev1.ContainerStateTerminated
+	switch {
+	case waiting != nil && waiting.Reason == containerCrashLoopReason:
+		terminated = status.LastTerminationState.Terminated
+	case status.State.Terminated != nil:
+		terminated = status.State.Terminated
+	}
+	if terminated == nil || terminated.ExitCode == 0 {
+		return "", false
+	}
+	return fmt.Sprintf("container %s of pod %s keeps failing at runtime (restarts: %d): exit code %d: %s %s",
+		status.Name, pod.Name, status.RestartCount, terminated.ExitCode, terminated.Reason, terminated.Message), true
+}
+
+// failingOverGracePeriod returns true if the Pod has not been ready over the grace period.
+// The time is taken from the transition of the ContainersReady condition, or the start time of the Pod.
+func failingOverGracePeriod(pod *corev1.Pod) bool {
+	since := pod.CreationTimestamp.Time
+	if pod.Status.StartTime != nil {
+		since = pod.Status.StartTime.Time
+	}
+	for _, cond := range pod.Status.Conditions {
+		if cond.Type == corev1.ContainersReady && cond.Status == corev1.ConditionFalse {
+			since = cond.LastTransitionTime.Time
+			break
+		}
+	}
+	return time.Since(since) >= containerFailureGracePeriod
+}
+
 func (obj *DaemonSet) Ready(ctx context.Context, k8sClient client.Client) bool {
 	logger := log.FromContext(ctx)
 	getObj, err := obj.get(ctx, k8sClient)
@@ -881,23 +1115,23 @@ type CardManagementDaemonset struct {
 
 var _ DegradableObject = &CardManagementDaemonset{}
 
-// NodeNames returns the node designated by the nodeSelector of the per-node DaemonSet
-func (obj *CardManagementDaemonset) NodeNames() []string {
-	if nodeName := obj.loadedObj.Spec.Template.Spec.NodeSelector[kubernetesHostnameLabel]; nodeName != "" {
-		return []string{nodeName}
-	}
-	return nil
-}
-
 // Degraded returns the node when the card management Pod of this node is pending permanently
 // because the Spyre devices requested by the Pod are not available on the node,
 // i.e., the Pod has been unschedulable over the grace period and
 // the free devices (allocatable - held by other Pods) are fewer than the requested.
+// The node is also degraded when a container of the Pod is failing on creation.
 func (obj *CardManagementDaemonset) Degraded(ctx context.Context, k8sClient client.Client) []DegradedNode {
+	if degraded := obj.deviceShortageDegraded(ctx, k8sClient); len(degraded) > 0 {
+		return degraded
+	}
+	return obj.DaemonSet.Degraded(ctx, k8sClient)
+}
+
+func (obj *CardManagementDaemonset) deviceShortageDegraded(ctx context.Context, k8sClient client.Client) []DegradedNode {
 	logger := log.FromContext(ctx)
-	nodeNames := obj.NodeNames()
+	nodeName := obj.loadedObj.Spec.Template.Spec.NodeSelector[kubernetesHostnameLabel]
 	ds, err := obj.get(ctx, k8sClient)
-	if err != nil || len(nodeNames) == 0 {
+	if err != nil || nodeName == "" {
 		return nil
 	}
 	podList := &corev1.PodList{}
@@ -911,9 +1145,9 @@ func (obj *CardManagementDaemonset) Degraded(ctx context.Context, k8sClient clie
 		if !metav1.IsControlledBy(pod, ds) || !unschedulableOverGracePeriod(pod) {
 			continue
 		}
-		if reason, short := deviceShortage(ctx, k8sClient, nodeNames[0], pod); short {
-			logger.Info("card management is degraded", "node", nodeNames[0], "reason", reason)
-			return []DegradedNode{{Name: nodeNames[0], Reason: reason}}
+		if reason, short := deviceShortage(ctx, k8sClient, nodeName, pod); short {
+			logger.Info("card management is degraded", "node", nodeName, "reason", reason)
+			return []DegradedNode{{Name: nodeName, Reason: reason}}
 		}
 	}
 	return nil

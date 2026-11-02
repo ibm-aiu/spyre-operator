@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -175,6 +176,139 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 			UpdateModes(ctx, spyreV2Client, k8sClientset, len(nodeNames), enabledModes, testConfig.PseudoDeviceMode, spyrev1alpha1.Ready)
 			By("gradually allocate 25 Spyres")
 			commonAllocationTestCase(ctx, testNamespace, false)
+		})
+	})
+
+	// Forcefully fails the init-data init container of the device plugin by overriding PSEUDO_DEVICE_MODE=0 in the
+	// init container env of the policy. Pseudo mode stays enabled in the policy so that the node keeps
+	// ibm.com/spyre.present and the DaemonSet pods are created. Without the pseudo device, the init container
+	// needs the real device and library, hence it keeps failing at runtime.
+	Context("Degraded node", func() {
+		modified := false
+
+		BeforeEach(func() {
+			if nodeArchitecture != "amd64" || testConfig.HasDevice || !testConfig.PseudoDeviceMode || !testConfig.DevicePluginInit.Enabled {
+				Skip("require pseudo device mode without device and the device plugin init container on amd64")
+			}
+			modified = false
+		})
+
+		AfterEach(func() {
+			if CurrentSpecReport().Failed() {
+				DumpPodStatus(ctx, k8sClientset, OperatorNamespace)
+				DumpDaemonSets(ctx, k8sClientset, OperatorNamespace)
+			}
+			if !modified {
+				return
+			}
+			By("restoring the device plugin init container")
+			UpdateInitContainer(ctx, spyreV2Client, k8sClientset, len(nodeNames),
+				testConfig, testConfig.DevicePluginInit.ExecutePolicy, true, spyrev1alpha1.Ready)
+			By("checking that the node is restored from degraded")
+			Eventually(func(g Gomega) {
+				node, err := k8sClientset.CoreV1().Nodes().Get(ctx, targetNodeName, metav1.GetOptions{})
+				g.Expect(err).To(BeNil())
+				g.Expect(node.Spec.Taints).NotTo(ContainElement(HaveField("Key", DevicePluginDegradedTaintKey)))
+				g.Expect(node.Status.Conditions).NotTo(ContainElement(SatisfyAll(
+					HaveField("Type", v1.NodeConditionType(DevicePluginDegradedConditionType)),
+					HaveField("Status", v1.ConditionTrue))))
+			}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
+		})
+
+		It("moves from Ready to Degraded and taints the node when the device plugin init container keeps failing", func() {
+			By("checking that the cluster policy is Ready before the failure")
+			WaitForSpyreClusterPolicyState(ctx, spyreV2Client, k8sClientset, len(nodeNames), spyrev1alpha1.Ready)
+
+			By("making the init-data init container fail by disabling the pseudo device in it")
+			err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				clusterPolicy := &spyrev1alpha1.SpyreClusterPolicy{}
+				if err := spyreV2Client.Get(ctx,
+					client.ObjectKey{Namespace: metav1.NamespaceAll, Name: ClusterPolicyName}, clusterPolicy); err != nil {
+					return fmt.Errorf("failed to get cluster policy: %w", err)
+				}
+				// always execute to not be skipped by the completed file of the previous run
+				EnableInitContainer(clusterPolicy, testConfig, spyrev1alpha1.ExecuteAlways)
+				clusterPolicy.Spec.DevicePlugin.InitContainer.Env = []v1.EnvVar{
+					{Name: spyrev1alpha1.PseudoDeviceMode.EnvKey(), Value: "0"},
+					// explicitly not skip, to ensure that the init container fails
+					{Name: "SKIP_IF_COMPLETED", Value: "false"},
+				}
+				return spyreV2Client.Update(ctx, clusterPolicy)
+			})
+			Expect(err).To(BeNil())
+			modified = true
+
+			By("waiting for the degraded state with the tainted node")
+			Eventually(func(g Gomega) {
+				clusterPolicy := &spyrev1alpha1.SpyreClusterPolicy{}
+				g.Expect(spyreV2Client.Get(ctx,
+					client.ObjectKey{Namespace: metav1.NamespaceAll, Name: ClusterPolicyName}, clusterPolicy)).To(Succeed())
+				if clusterPolicy.Status.State == spyrev1alpha1.NotReady {
+					// the policy was Ready, so the running components must keep serving: never NotReady on the way
+					StopTrying(fmt.Sprintf("state became NotReady (message: %q)", clusterPolicy.Status.Message)).Now()
+				}
+				g.Expect(clusterPolicy.Status.State).To(Equal(spyrev1alpha1.Degraded),
+					"state is %q (message: %q)", clusterPolicy.Status.State, clusterPolicy.Status.Message)
+				g.Expect(clusterPolicy.Status.Message).To(ContainSubstring(targetNodeName))
+				g.Expect(clusterPolicy.Status.Message).To(ContainSubstring(spyreconst.DataInitContainerName))
+
+				node, err := k8sClientset.CoreV1().Nodes().Get(ctx, targetNodeName, metav1.GetOptions{})
+				g.Expect(err).To(BeNil())
+				g.Expect(node.Spec.Taints).To(ContainElement(SatisfyAll(
+					HaveField("Key", DevicePluginDegradedTaintKey),
+					HaveField("Effect", v1.TaintEffectNoSchedule))))
+				g.Expect(node.Status.Conditions).To(ContainElement(SatisfyAll(
+					HaveField("Type", v1.NodeConditionType(DevicePluginDegradedConditionType)),
+					HaveField("Status", v1.ConditionTrue))))
+			}).WithTimeout(10 * time.Minute).WithPolling(15 * time.Second).Should(Succeed())
+
+			By("checking that the earlier component keeps tolerating the taint while the later one is held")
+			for name, tolerated := range map[string]bool{
+				spyreconst.HealthCheckerResourceName: true,
+				spyreconst.MonitorResourceName:       false,
+			} {
+				ds, err := k8sClientset.AppsV1().DaemonSets(OperatorNamespace).Get(ctx, name, metav1.GetOptions{})
+				if errors.IsNotFound(err) {
+					continue
+				}
+				Expect(err).To(BeNil())
+				matcher := ContainElement(HaveField("Key", DevicePluginDegradedTaintKey))
+				if !tolerated {
+					matcher = Not(matcher)
+				}
+				Expect(ds.Spec.Template.Spec.Tolerations).To(matcher, "daemon set %s", name)
+			}
+
+			By("checking that a new pod without the toleration cannot be scheduled on the degraded node")
+			probe := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: petname.Generate(2, "-") + "-degraded-probe", Namespace: testNamespace},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					NodeSelector:  map[string]string{"kubernetes.io/hostname": targetNodeName},
+					Containers: []v1.Container{{
+						Name: "probe", Image: Ubi9MicroTestImage, Command: []string{"sleep", "1000"},
+					}},
+				},
+			}
+			_, err = k8sClientset.CoreV1().Pods(testNamespace).Create(ctx, probe, metav1.CreateOptions{})
+			Expect(err).To(BeNil())
+			DeferCleanup(func() {
+				err := k8sClientset.CoreV1().Pods(testNamespace).Delete(ctx, probe.Name, metav1.DeleteOptions{})
+				Expect(client.IgnoreNotFound(err)).To(BeNil())
+			})
+			Eventually(func(g Gomega) {
+				pod, err := k8sClientset.CoreV1().Pods(testNamespace).Get(ctx, probe.Name, metav1.GetOptions{})
+				g.Expect(err).To(BeNil())
+				g.Expect(pod.Status.Conditions).To(ContainElement(SatisfyAll(
+					HaveField("Type", v1.PodScheduled),
+					HaveField("Status", v1.ConditionFalse),
+					HaveField("Reason", v1.PodReasonUnschedulable))))
+			}).WithTimeout(2 * time.Minute).WithPolling(5 * time.Second).Should(Succeed())
+			Consistently(func(g Gomega) {
+				pod, err := k8sClientset.CoreV1().Pods(testNamespace).Get(ctx, probe.Name, metav1.GetOptions{})
+				g.Expect(err).To(BeNil())
+				g.Expect(pod.Spec.NodeName).To(BeEmpty())
+			}).WithTimeout(30 * time.Second).WithPolling(5 * time.Second).Should(Succeed())
 		})
 	})
 
@@ -1172,8 +1306,6 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 				if nodeArchitecture != "amd64" || !testConfig.PseudoDeviceMode {
 					Skip("only available for pseudo device mode on amd64")
 				}
-				By("ensuring all pods are deleted")
-				WaitUntilNoPod(ctx, k8sClientset, spyreV2Client, testNamespace, targetNodeName)
 				By("ensuring no leftover ResourceClaims in operator namespace")
 				Eventually(func(g Gomega) {
 					claims := ListResourceClaims(ctx, k8sClientset, OperatorNamespace)
