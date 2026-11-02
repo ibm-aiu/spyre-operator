@@ -11,6 +11,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -45,6 +46,13 @@ type ControlledComponent struct {
 	// degraded holds the nodes on which a DegradableObject is permanently unable to become ready.
 	// It is updated on every Sync.
 	degraded []DegradedNode
+	// failing holds the nodes on which a DegradableObject is failing but not confirmed as degraded yet.
+	// The nodes are held by the taint. It is updated on every Sync.
+	failing []DegradedNode
+	// holdTolerated lists the components, other than itself, whose taint on a failing node
+	// the objects of this component must tolerate. It is the components in the same or later steps,
+	// so that a failing component holds only the components deployed after it.
+	holdTolerated []string
 }
 
 func NewControlledComponent(ctx context.Context, k8sClient client.Client, scheme *runtime.Scheme,
@@ -77,6 +85,11 @@ func (c *ControlledComponent) GetName() string {
 	return c.name
 }
 
+// FailingNodes returns the nodes found failing, but not confirmed as degraded yet, at the last Sync
+func (c *ControlledComponent) FailingNodes() []DegradedNode {
+	return c.failing
+}
+
 // DegradedNodes returns the nodes found degraded at the last Sync
 func (c *ControlledComponent) DegradedNodes() []DegradedNode {
 	return c.degraded
@@ -98,6 +111,12 @@ func (c *ControlledComponent) Transform(clusterPolicy *spyrev1alpha1.SpyreCluste
 		if err := obj.TransformByPolicy(c.scheme, clusterPolicy, cluster); err != nil {
 			return fmt.Errorf("failed to transform %s: %w", obj.GetID(), err)
 		}
+		if tolerator, ok := obj.(degradedTolerator); ok {
+			tolerator.addDegradedToleration(c.name)
+			for _, name := range c.holdTolerated {
+				tolerator.addDegradedToleration(name)
+			}
+		}
 	}
 	return nil
 }
@@ -115,13 +134,14 @@ func (c *ControlledComponent) Sync(ctx context.Context) (bool, string, error) {
 func (c *ControlledComponent) syncDisabled(ctx context.Context, logger logr.Logger) (bool, string, error) {
 	var multiErr error
 	c.degraded = nil
+	c.failing = nil
 	if c.name == spyreconst.CardManagementResourceName {
 		if err := c.deleteCardManagementRunners(ctx); err != nil {
 			multiErr = multierror.Append(multiErr, err)
 		}
-		if err := c.clearDegradedNodes(ctx); err != nil {
-			multiErr = multierror.Append(multiErr, err)
-		}
+	}
+	if err := c.clearDegradedNodes(ctx, nil); err != nil {
+		multiErr = multierror.Append(multiErr, err)
 	}
 	if err := c.deleteAll(ctx, logger); err != nil {
 		multiErr = multierror.Append(multiErr, err)
@@ -139,7 +159,7 @@ func (c *ControlledComponent) syncEnabled(ctx context.Context, logger logr.Logge
 		// previous step not ready.
 		// The step of a DegradableObject (i.e., per-node object) does not block the next steps
 		// so that a pending object of a node does not block the other nodes.
-		if i > 0 && !isDegradable(c.objects[i-1]) && !c.objects[i-1].Ready(ctx, c.client) {
+		if i > 0 && !c.stepSettled(ctx, c.objects[i-1]) {
 			return false, fmt.Sprintf("previous step %s is not ready", c.objects[i-1].GetID()), nil
 		}
 		if ok, msg, err := c.syncObject(ctx, logger, obj); !ok || err != nil {
@@ -149,8 +169,14 @@ func (c *ControlledComponent) syncEnabled(ctx context.Context, logger logr.Logge
 	// Per-node objects do not block each other, so the last step (e.g., Service) is ready as long as
 	// some nodes are serving. Objects pending within the grace period still make the component not ready,
 	// while permanently pending ones are reported as degraded nodes to the caller.
-	pending := c.reconcileDegraded(ctx, logger)
-	ready := c.Ready(ctx) && pending == 0
+	pending, held := c.reconcileDegraded(ctx, logger)
+	// When all unready degradable objects are confirmed permanently degraded (pending == 0, degraded > 0),
+	// treat the component as successful so the caller can emit Degraded instead of NotReady.
+	// The healthy nodes (if any) keep serving; the degraded ones are tainted and reported.
+	// The same applies when the objects are held back from every node by the failure of an earlier component
+	// (e.g., the only node is failing), since they cannot become ready until the node recovers.
+	allDegraded := pending == 0 && (len(c.degraded) > 0 || held > 0)
+	ready := (c.Ready(ctx) || allDegraded) && pending == 0
 	message := ""
 	if ready {
 		logger.Info(fmt.Sprintf("%s is ready", c.name))
@@ -192,67 +218,143 @@ func isDegradable(obj ControlledObject) bool {
 	return ok
 }
 
-// reconcileDegraded checks every DegradableObject, taints and reports the condition on the nodes
-// where the object is permanently not ready, and restores the other nodes of the object.
-// It updates c.degraded and returns the number of objects which are not ready but not (yet) degraded.
-func (c *ControlledComponent) reconcileDegraded(ctx context.Context, logger logr.Logger) int {
-	degraded := []DegradedNode{}
-	pending := 0
-	for _, obj := range c.objects {
-		degradable, ok := obj.(DegradableObject)
-		if !ok {
-			continue
-		}
-		objDegraded, objPending := c.reconcileDegradableObject(ctx, logger, obj, degradable)
-		degraded = append(degraded, objDegraded...)
-		if objPending {
-			pending++
-		}
-	}
-	c.degraded = degraded
-	return pending
+// degradedTolerator is implemented by the controlled objects whose Pods must tolerate
+// the taint put on the degraded node by the operator to be able to recover from it.
+type degradedTolerator interface {
+	addDegradedToleration(component string)
 }
 
-// reconcileDegradableObject marks the nodes where the object is permanently not ready as degraded
-// and restores the other nodes of the object.
-// It returns the degraded nodes and whether the object is not ready but not (yet) degraded.
-func (c *ControlledComponent) reconcileDegradableObject(ctx context.Context, logger logr.Logger,
-	obj ControlledObject, degradable DegradableObject) ([]DegradedNode, bool) {
-	var degraded []DegradedNode
-	notReady := !obj.Ready(ctx, c.client)
-	if notReady {
-		degraded = degradable.Degraded(ctx, c.client)
+// endpointDependent is implemented by the controlled objects which are ready only if the Pods behind them
+// are serving (e.g., a Service which needs a ready endpoint).
+type endpointDependent interface {
+	dependsOnEndpoints()
+}
+
+// stepSettled returns true if the next step is allowed to be synced after the step.
+// A step which is not ready blocks the next one, except for:
+//   - a DegradableObject, which does not block the other nodes.
+//   - an object depending on the endpoints of the Pods (e.g., a Service) when every DegradableObject of
+//     the component which is not ready is degraded or held back, since it has no endpoint to wait for.
+func (c *ControlledComponent) stepSettled(ctx context.Context, step ControlledObject) bool {
+	if isDegradable(step) || step.Ready(ctx, c.client) {
+		return true
 	}
-	degradedNames := make(map[string]struct{}, len(degraded))
+	if _, ok := step.(endpointDependent); !ok {
+		return false
+	}
+	unready := 0
+	for _, obj := range c.objects {
+		degradable, ok := obj.(DegradableObject)
+		if !ok || obj.Ready(ctx, c.client) {
+			continue
+		}
+		unready++
+		if len(degradable.Degraded(ctx, c.client)) == 0 && !c.heldByTaint(ctx, obj) {
+			return false
+		}
+	}
+	return unready > 0
+}
+
+// heldByTainter is implemented by the controlled objects which may be held back from every node
+// by the degraded taint of another component.
+type heldByTainter interface {
+	heldByTaint(ctx context.Context, k8sClient client.Client) bool
+}
+
+// reconcileDegraded checks every DegradableObject, taints and reports the condition on the nodes
+// where the object is permanently not ready, and restores the other nodes of the component.
+// The nodes where the object is failing but not confirmed as degraded yet are held by the taint only,
+// so that the later components are not deployed on the node during the wait.
+// It updates c.degraded and returns the number of objects which are not ready but not (yet) degraded,
+// and the number of objects which are not ready only because they are held back from every node by the taint
+// of another component. The latter are not counted as pending.
+func (c *ControlledComponent) reconcileDegraded(ctx context.Context, logger logr.Logger) (pending, held int) {
+	degraded, failing, pending, held := c.collectUnready(ctx)
+	keep := make(map[string]struct{}, len(degraded)+len(failing))
 	for _, node := range degraded {
-		degradedNames[node.Name] = struct{}{}
-		if err := markNodeDegraded(ctx, c.client, node); err != nil {
+		keep[node.Name] = struct{}{}
+		if err := markNodeDegraded(ctx, c.client, c.name, node); err != nil {
 			logger.Info("failed to mark node degraded", "node", node.Name, "error", err)
 		}
 	}
-	for _, name := range degradable.NodeNames() {
-		if _, found := degradedNames[name]; found {
-			continue
-		}
-		if err := clearNodeDegraded(ctx, c.client, name); err != nil {
-			logger.Info("failed to restore node from degraded", "node", name, "error", err)
-		}
+	heldNodes := c.holdFailingNodes(ctx, logger, failing, keep)
+	if err := c.clearDegradedNodes(ctx, keep); err != nil {
+		logger.Info("failed to restore nodes from degraded", "error", err)
 	}
-	return degraded, notReady && len(degraded) == 0
+	c.degraded = degraded
+	c.failing = heldNodes
+	return pending, held
 }
 
-// clearDegradedNodes restores all the nodes of DegradableObjects from degraded
-func (c *ControlledComponent) clearDegradedNodes(ctx context.Context) error {
-	var multiErr error
+// collectUnready checks the DegradableObjects which are not ready. It returns the degraded and the failing nodes,
+// the number of the objects pending, and the number of the objects held back by the taint of another component.
+func (c *ControlledComponent) collectUnready(ctx context.Context) (degraded, failing []DegradedNode, pending, held int) {
+	degraded = []DegradedNode{}
+	failing = []DegradedNode{}
 	for _, obj := range c.objects {
 		degradable, ok := obj.(DegradableObject)
-		if !ok {
+		if !ok || obj.Ready(ctx, c.client) {
 			continue
 		}
-		for _, name := range degradable.NodeNames() {
-			if err := clearNodeDegraded(ctx, c.client, name); err != nil {
-				multiErr = multierror.Append(multiErr, err)
-			}
+		objDegraded := degradable.Degraded(ctx, c.client)
+		switch {
+		case len(objDegraded) > 0:
+		case c.heldByTaint(ctx, obj):
+			held++
+		default:
+			pending++
+		}
+		degraded = append(degraded, objDegraded...)
+		failing = append(failing, degradable.Failing(ctx, c.client)...)
+	}
+	return degraded, failing, pending, held
+}
+
+// heldByTaint returns true if the object is held back from every node by the taint of another component
+func (c *ControlledComponent) heldByTaint(ctx context.Context, obj ControlledObject) bool {
+	holdable, ok := obj.(heldByTainter)
+	return ok && holdable.heldByTaint(ctx, c.client)
+}
+
+// holdFailingNodes taints the failing nodes which are not degraded to hold the later components from them,
+// adds them to keep, and returns them.
+func (c *ControlledComponent) holdFailingNodes(ctx context.Context, logger logr.Logger,
+	failing []DegradedNode, keep map[string]struct{}) []DegradedNode {
+	held := []DegradedNode{}
+	for _, node := range failing {
+		if _, found := keep[node.Name]; found {
+			continue
+		}
+		keep[node.Name] = struct{}{}
+		held = append(held, node)
+		logger.Info("holding node while the failure is not confirmed", "node", node.Name, "reason", node.Reason)
+		if err := markNodeFailing(ctx, c.client, c.name, node.Name); err != nil {
+			logger.Info("failed to hold failing node", "node", node.Name, "error", err)
+		}
+	}
+	return held
+}
+
+// clearDegradedNodes restores the nodes degraded by this component from degraded except for the nodes to keep.
+// It does nothing if the component has no DegradableObject.
+func (c *ControlledComponent) clearDegradedNodes(ctx context.Context, keep map[string]struct{}) error {
+	if !slices.ContainsFunc(c.objects, isDegradable) {
+		return nil
+	}
+	nodeList := &corev1.NodeList{}
+	if err := c.client.List(ctx, nodeList); err != nil {
+		return fmt.Errorf("failed to list nodes: %w", err)
+	}
+	taintKey := degradedTaintKey(c.name)
+	var multiErr error
+	for i := range nodeList.Items {
+		node := &nodeList.Items[i]
+		if _, found := keep[node.Name]; found || !hasDegradedMark(node, taintKey, degradedConditionType(c.name)) {
+			continue
+		}
+		if err := clearNodeDegraded(ctx, c.client, c.name, node.Name); err != nil {
+			multiErr = multierror.Append(multiErr, err)
 		}
 	}
 	if multiErr != nil {
@@ -361,7 +463,7 @@ func (c *ControlledComponent) Clear(ctx context.Context) error {
 		if err := c.deleteCardManagementRunners(ctx); err != nil {
 			multiErr = multierror.Append(multiErr, err)
 		}
-		if err := c.clearDegradedNodes(ctx); err != nil {
+		if err := c.clearDegradedNodes(ctx, nil); err != nil {
 			multiErr = multierror.Append(multiErr, err)
 		}
 		if multiErr != nil {
@@ -369,9 +471,12 @@ func (c *ControlledComponent) Clear(ctx context.Context) error {
 		}
 		return nil
 	case spyreconst.DevicePluginResourceName:
+		if err := c.clearDegradedNodes(ctx, nil); err != nil {
+			return fmt.Errorf("failed to clear device plugin: %w", err)
+		}
 		return c.clearAllSpyreNodeStates(ctx)
 	}
-	return nil
+	return c.clearDegradedNodes(ctx, nil)
 }
 
 func (c *ControlledComponent) deleteCertSecretFromService(ctx context.Context) error {

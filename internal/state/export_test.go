@@ -28,6 +28,9 @@ var (
 	ApplyExecutePolicy     = applyExecutePolicy
 	ApplyVerifyP2P         = applyVerifyP2P
 	SetContainerEnv        = setContainerEnv
+	DegradedTaintKey       = degradedTaintKey
+	DegradedConditionType  = degradedConditionType
+	OverallState           = overallState
 )
 
 func (s *ClusterState) ApplyLogLevel(ctx context.Context, clusterPolicy *spyrev2.SpyreClusterPolicy) error {
@@ -40,6 +43,14 @@ func (s *DeploymentState) GetComponents() []*ControlledComponent {
 
 func (c *ControlledComponent) GetObjects() []ControlledObject {
 	return c.objects
+}
+
+func (c *ControlledComponent) HoldTolerated() []string {
+	return c.holdTolerated
+}
+
+func (c *ControlledComponent) SetHoldTolerated(names []string) {
+	c.holdTolerated = names
 }
 
 func (c *ControlledComponent) GetSkipUpdate() bool {

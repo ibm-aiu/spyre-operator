@@ -57,6 +57,13 @@ const (
 	// MockCardmgmtSidecarLabel is the pod label selector for the mock DaemonSet.
 	MockCardmgmtSidecarLabel = "app=aiu-cardmgmt-health-check-api-mock"
 
+	// DevicePluginDegradedTaintKey is the NoSchedule taint put by the operator on the node
+	// where the device plugin DaemonSet keeps failing. It must match the key derived from devicePluginName.
+	DevicePluginDegradedTaintKey = "ibm.com/spyre-device-plugin-degraded"
+
+	// DevicePluginDegradedConditionType is the node condition type which reports the degraded device plugin.
+	DevicePluginDegradedConditionType = "ibm.com/SpyreDevicePluginDegraded"
+
 	// PseudoUnhealthyPCISlot is the PCI address that PSEUDO_DEVICE_MODE always
 	// reports as "unhealthy".  It must match PSEUDO_UNHEALTHY_PCI_SLOT_PREFIX
 	// ("0000:41") in aiu-cardmgmt-health-api/src/grpc_service.py.

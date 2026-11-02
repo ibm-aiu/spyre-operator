@@ -10,6 +10,7 @@ package state_test
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	spyreconst "github.com/ibm-aiu/spyre-operator/const"
@@ -41,6 +42,31 @@ var _ = Describe("StateController", Ordered, func() {
 		checkCommonNewDeploymentState(stateController.InitState)
 		checkCommonNewDeploymentState(stateController.CoreComponentState)
 		checkCommonNewDeploymentState(stateController.PluginComponentState)
+	})
+
+	It("lets a component tolerate the taints of the components in the same and later states only", func() {
+		stateController := newStateController(ctx)
+		names := func(state *DeploymentState) []string {
+			result := make([]string, 0, len(state.GetComponents()))
+			for _, component := range state.GetComponents() {
+				result = append(result, component.GetName())
+			}
+			return result
+		}
+		initNames, coreNames, pluginNames := names(stateController.InitState),
+			names(stateController.CoreComponentState), names(stateController.PluginComponentState)
+		Expect(initNames).NotTo(BeEmpty())
+		Expect(coreNames).NotTo(BeEmpty())
+		Expect(pluginNames).NotTo(BeEmpty())
+		for _, component := range stateController.InitState.GetComponents() {
+			Expect(component.HoldTolerated()).To(ConsistOf(slices.Concat(initNames, coreNames, pluginNames)))
+		}
+		for _, component := range stateController.CoreComponentState.GetComponents() {
+			Expect(component.HoldTolerated()).To(ConsistOf(slices.Concat(coreNames, pluginNames)))
+		}
+		for _, component := range stateController.PluginComponentState.GetComponents() {
+			Expect(component.HoldTolerated()).To(ConsistOf(pluginNames))
+		}
 	})
 
 	Context("TransformAndSync", Ordered, func() {

@@ -358,6 +358,9 @@ var _ = Describe("ControlledComponent", Ordered, func() {
 				clusterState, err := state.NewClusterState(ctx, K8sClient)
 				Expect(err).To(BeNil())
 
+				// the pod must also tolerate the taint of the component of the later states
+				component.SetHoldTolerated([]string{spyreconst.MonitorResourceName})
+
 				// Transform must not return error in all patterns
 				err = component.Transform(cp, clusterState)
 				Expect(err).To(BeNil())
@@ -377,9 +380,11 @@ var _ = Describe("ControlledComponent", Ordered, func() {
 						Expect(len(ds.Spec.Template.Spec.Containers)).Should(BeNumerically(">=", 1))
 						// the pod must tolerate the degraded taint (NoSchedule) of its node to recover from it
 						Expect(ds.Spec.Template.Spec.Tolerations).To(ContainElement(SatisfyAll(
-							HaveField("Key", spyreconst.CardManagementDegradedTaintKey),
+							HaveField("Key", DegradedTaintKey(componentName)),
 							HaveField("Operator", corev1.TolerationOpExists),
 							HaveField("Effect", corev1.TaintEffectNoSchedule))))
+						Expect(ds.Spec.Template.Spec.Tolerations).To(ContainElement(
+							HaveField("Key", DegradedTaintKey(spyreconst.MonitorResourceName))))
 						limits := ds.Spec.Template.Spec.Containers[0].Resources.Limits
 
 						if expectLimits {

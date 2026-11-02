@@ -167,6 +167,22 @@ func generatePerNodeCardMgmtManifest(ctx context.Context, k8sClient client.Clien
 	return nil
 }
 
+// componentNames returns the names of the components in the state.
+func (s *DeploymentState) componentNames() []string {
+	names := make([]string, 0, len(s.components))
+	for _, component := range s.components {
+		names = append(names, component.name)
+	}
+	return names
+}
+
+// setHoldTolerated lets every component of the state tolerate the taints of the given components.
+func (s *DeploymentState) setHoldTolerated(names []string) {
+	for _, component := range s.components {
+		component.holdTolerated = names
+	}
+}
+
 func (s *DeploymentState) GetName() string {
 	return s.name
 }
@@ -176,6 +192,16 @@ func (s *DeploymentState) DegradedNodes() []DegradedNode {
 	nodes := []DegradedNode{}
 	for _, component := range s.components {
 		nodes = append(nodes, component.DegradedNodes()...)
+	}
+	return nodes
+}
+
+// FailingNodes returns the nodes found failing, but not confirmed as degraded yet, at the last sync
+// in all the components
+func (s *DeploymentState) FailingNodes() []DegradedNode {
+	nodes := []DegradedNode{}
+	for _, component := range s.components {
+		nodes = append(nodes, component.FailingNodes()...)
 	}
 	return nodes
 }
