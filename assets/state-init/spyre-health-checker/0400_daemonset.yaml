@@ -118,6 +118,10 @@ spec:
         secret:
           secretName: spyre-cert
       - name: cardmgmt-health-api-socket
+        # Host directory shared with the card management DaemonSet's health-api sidecar
+        # (assets/state-plugin-components/spyre-card-management/0600_daemonset.yaml.tmpl and
+        # const.CardManagementHealthApiSocketHostPath). The two MUST be the same directory,
+        # or the cardmgmt reporter cannot see the sidecar's socket.
         hostPath:
-          path: /var/run/cardmgmt-health-check-api
+          path: /usr/local/etc/spyre-cardmgmt
           type: DirectoryOrCreate
