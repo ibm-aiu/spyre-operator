@@ -23,6 +23,13 @@ updates:
     versions: ["*"]
   - dependency-name: "github.com/onsi/ginkgo/v2"
     versions: ["*"]
+  # github.com/google/cel-go is deprecated: v0.32.0+ declares its module path as
+  # cel.dev/cel-go, so Dependabot bumps fail with a module path mismatch. It is
+  # only an indirect dependency (via k8s.io/apiserver, which is pinned above);
+  # the direct dependency is cel.dev/cel-go. Remove this entry once the
+  # Kubernetes modules migrate to cel.dev/cel-go.
+  - dependency-name: "github.com/google/cel-go"
+    versions: ["*"]
 - package-ecosystem: docker
   directory: /
   schedule:

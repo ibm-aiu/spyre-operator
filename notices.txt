@@ -50,7 +50,7 @@ github.com/go-openapi/jsonPointer
 github.com/go-openapi/jsonreference
 github.com/golang/gLOG
 github.com/google/btree
-github.com/google/cel-go
+cel.dev/cel-go
 github.com/google/gnostic-Models
 github.com/grpc-ecosystem/go-grpc-prometheus
 github.com/ibm-aiu/spyre-health-checker

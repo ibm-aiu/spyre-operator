@@ -10,18 +10,17 @@ package state_test
 import (
 	"path/filepath"
 
-	"github.com/google/cel-go/cel"
+	"cel.dev/cel-go/cel"
 	. "github.com/ibm-aiu/spyre-operator/internal/state"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	admissionv1 "k8s.io/api/admissionregistration/v1"
-	"k8s.io/apiserver/pkg/cel/environment"
 )
 
 // These tests evaluate the CEL in 0530_validatingadmissionpolicy.yaml against
-// sample objects, without a cluster. The Kubernetes base CEL environment is
-// used, but `object` is declared as dyn, so type checking is looser than in
-// the real admission plugin.
+// sample objects, without a cluster. A standard CEL environment is used with
+// `object` declared as dyn, so the Kubernetes CEL extensions are not available
+// and type checking is looser than in the real admission plugin.
 var _ = Describe("block-restricted-device-classes policy", func() {
 	var (
 		env    *cel.Env
@@ -37,10 +36,7 @@ var _ = Describe("block-restricted-device-classes policy", func() {
 		policy, ok = runtimeObj.(*admissionv1.ValidatingAdmissionPolicy)
 		Expect(ok).To(BeTrue())
 
-		base := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())
-		env, err = base.Env(environment.StoredExpressions)
-		Expect(err).To(BeNil())
-		env, err = env.Extend(
+		env, err = cel.NewEnv(
 			cel.Variable("object", cel.DynType),
 		)
 		Expect(err).To(BeNil())
