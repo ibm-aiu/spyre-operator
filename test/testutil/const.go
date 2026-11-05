@@ -73,7 +73,7 @@ const (
 	// socket into.  It must match the cardmgmt-health-api-socket volume in
 	// assets/state-init/spyre-health-checker/0400_daemonset.yaml so that the
 	// health-checker pods on the same node can reach the socket.
-	mockCardmgmtHostPath = "/var/run/cardmgmt-health-check-api"
+	mockCardmgmtHostPath = "/usr/local/etc/spyre-cardmgmt"
 
 	// mockCardmgmtSocketFile is the socket filename inside mockCardmgmtHostPath.
 	mockCardmgmtSocketFile = "health-check-api.sock"

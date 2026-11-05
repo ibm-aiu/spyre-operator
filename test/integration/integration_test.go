@@ -631,7 +631,7 @@ var _ = Describe("integration test", Label("integration"), Ordered, ContinueOnFa
 
 			// In pseudo device mode deploy the mock aiu-cardmgmt-health-api sidecar.
 			// It binds to the same hostPath the health-checker already mounts
-			// (/var/run/cardmgmt-health-check-api) so the cardmgmt reporter can
+			// (/usr/local/etc/spyre-cardmgmt) so the cardmgmt reporter can
 			// reach it without any reconfiguration of the health-checker DaemonSet.
 			if itConfig.PseudoDeviceMode {
 				testutils.DeployMockCardmgmtSidecar(ctx, k8sClientset,
