@@ -75,4 +75,3 @@ repos:
     language_version: python3
     additional_dependencies:
     - boxsdk<4 # https://github.com/IBM/detect-secrets/issues/173
-    - chardet<6 # https://github.com/IBM/detect-secrets/issues/182
