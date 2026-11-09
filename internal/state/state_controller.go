@@ -17,6 +17,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	spyrev1alpha1 "github.com/ibm-aiu/spyre-operator/api/v1alpha1"
+	spyreconst "github.com/ibm-aiu/spyre-operator/const"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -110,19 +111,15 @@ func (c *StateController) Sync(ctx context.Context,
 	if initialReady != spyrev1alpha1.Ready {
 		return initialReady, initialMessage, err
 	}
-	// SpyreNodeState is only needed for device plugin mode, not for DRA mode
-	if clusterPolicy.Spec.DevicePlugin.Mode == spyrev1alpha1.DevicePluginModeDRA {
-		// When DRA is enabled, check for active device plugin workloads
-		if err := c.CheckActiveDevicePluginWorkloads(ctx); err != nil {
-			message := fmt.Sprintf("migration to DRA blocked: %v", err)
-			return spyrev1alpha1.NotReady, message, errors.New(message)
-		}
-		// All device plugin workloads are gone, safe to delete SpyreNodeState resources
-		if err := c.DeleteAllSpyreNodeStates(ctx); err != nil {
-			message := fmt.Sprintf("failed to delete SpyreNodeState resources: %v", err)
-			return spyrev1alpha1.NotReady, message, errors.New(message)
-		}
-	} else {
+	// Card management holds Spyre devices in both modes, so it is deleted once, and kept deleted, while
+	// the device plugin and the DRA driver are being swapped, before checking for the workloads of the old mode.
+	switching, state, message, err := c.prepareModeSwitch(ctx, clusterPolicy)
+	if state != "" {
+		return state, message, err
+	}
+	// SpyreNodeState is only needed for device plugin mode, not for DRA mode,
+	// where prepareModeSwitch has already cleaned them up.
+	if clusterPolicy.Spec.DevicePlugin.Mode != spyrev1alpha1.DevicePluginModeDRA {
 		// Device plugin mode: update SpyreNodeState as usual
 		if err := c.UpdateSpyreNodeStates(ctx, clusterPolicy); err != nil {
 			message := fmt.Sprintf("failed to update SpyreNodeState: %v", err)
@@ -135,7 +132,101 @@ func (c *StateController) Sync(ctx context.Context,
 			return spyrev1alpha1.NoSpyreNodes, message, errors.New(message)
 		}
 	}
-	return c.syncCoreAndPluginState(ctx, clusterPolicy)
+	return c.syncCoreAndPluginState(ctx, clusterPolicy, clusterRunning(clusterPolicy, switching))
+}
+
+// clusterRunning returns true if the cluster is serving, i.e., its previous state is Ready or Degraded.
+// A cluster switching between the device plugin and the DRA driver is not serving the workloads
+// (card management is deleted and the driver is replaced), so it is never running, and is reported as NotReady
+// instead of Degraded until the switch completes.
+func clusterRunning(clusterPolicy *spyrev1alpha1.SpyreClusterPolicy, switching bool) bool {
+	if switching {
+		return false
+	}
+	return clusterPolicy.Status.State == spyrev1alpha1.Ready || clusterPolicy.Status.State == spyrev1alpha1.Degraded
+}
+
+// prepareModeSwitch handles a pending switch between the device plugin and the DRA driver, i.e., the policy
+// requests one mode while the driver of the other mode is still deployed.
+// The old mode's resources are its driver, and, when switching to DRA, the SpyreNodeStates.
+// While the switch is pending, card management is suspended (deleted, and waited until its Pods are gone),
+// and the switch is blocked if the old mode still has workloads using Spyre devices
+// (including the ones holding a device reservation). When switching to DRA, the SpyreNodeStates are
+// deleted once no workload is left.
+// It returns whether the switch is pending, and an empty state if the sync can proceed,
+// otherwise the state, the message and the error to return.
+func (c *StateController) prepareModeSwitch(ctx context.Context,
+	clusterPolicy *spyrev1alpha1.SpyreClusterPolicy) (bool, spyrev1alpha1.State, string, error) {
+	toDRA := clusterPolicy.Spec.DevicePlugin.Mode == spyrev1alpha1.DevicePluginModeDRA
+	switching, err := c.isModeSwitchPending(ctx, toDRA)
+	if err != nil {
+		return false, spyrev1alpha1.NotReady, err.Error(), err
+	}
+	if !switching {
+		c.PluginComponentState.setSuspended(nil)
+		return false, "", "", nil
+	}
+	c.PluginComponentState.setSuspended([]string{spyreconst.CardManagementResourceName})
+	gone, messages, err := c.PluginComponentState.syncSuspended(ctx)
+	if err != nil {
+		return true, spyrev1alpha1.NotReady, fmt.Sprintf("%v", messages),
+			fmt.Errorf("failed to suspend card management: %w", err)
+	}
+	if !gone {
+		return true, spyrev1alpha1.NotReady,
+			fmt.Sprintf("switching device plugin mode, waiting for card management: %v", messages), nil
+	}
+	if err := c.releaseOldMode(ctx, toDRA); err != nil {
+		return true, spyrev1alpha1.NotReady, err.Error(), err
+	}
+	return true, "", "", nil
+}
+
+// isModeSwitchPending returns true if the driver of the old mode is still deployed, or, when switching to DRA,
+// if any SpyreNodeState still exists.
+func (c *StateController) isModeSwitchPending(ctx context.Context, toDRA bool) (bool, error) {
+	oldDriver := spyreconst.DRADriverResourceName
+	if toDRA {
+		oldDriver = spyreconst.DevicePluginResourceName
+	}
+	if oldComponent := c.CoreComponentState.component(oldDriver); oldComponent != nil {
+		remaining, err := oldComponent.remainingResources(ctx)
+		if err != nil {
+			return false, fmt.Errorf("failed to check whether %s is deployed: %w", oldDriver, err)
+		}
+		if len(remaining) > 0 {
+			return true, nil
+		}
+	}
+	if !toDRA {
+		return false, nil
+	}
+	// The SpyreNodeStates of the device plugin must be cleaned up, even if its driver is already gone.
+	exists, err := c.SpyreNodeStatesExist(ctx)
+	if err != nil {
+		return false, fmt.Errorf("failed to check whether SpyreNodeState exists: %w", err)
+	}
+	return exists, nil
+}
+
+// releaseOldMode fails if the old mode still has workloads using Spyre devices.
+// When switching to DRA, it deletes the SpyreNodeStates once no workload is left.
+func (c *StateController) releaseOldMode(ctx context.Context, toDRA bool) error {
+	if !toDRA {
+		// The ResourceClaims of card management are released by now, the remaining ones belong to the workloads.
+		if err := c.CheckActiveDRAResourceClaims(ctx); err != nil {
+			return fmt.Errorf("migration to device plugin blocked: %w", err)
+		}
+		return nil
+	}
+	// None of the SpyreNodeStates may still hold an allocation or a reservation before they are deleted.
+	if err := c.CheckActiveDevicePluginWorkloads(ctx); err != nil {
+		return fmt.Errorf("migration to DRA blocked: %w", err)
+	}
+	if err := c.DeleteAllSpyreNodeStates(ctx); err != nil {
+		return fmt.Errorf("failed to delete SpyreNodeState resources: %w", err)
+	}
+	return nil
 }
 
 // syncInitialState syncs the initial state of the cluster.
@@ -159,7 +250,7 @@ func (c *StateController) syncInitialState(ctx context.Context,
 
 // syncCoreAndPluginState syncs the core and plugin components of the cluster.
 func (c *StateController) syncCoreAndPluginState(ctx context.Context,
-	clusterPolicy *spyrev1alpha1.SpyreClusterPolicy) (spyrev1alpha1.State, string, error) {
+	clusterPolicy *spyrev1alpha1.SpyreClusterPolicy, running bool) (spyrev1alpha1.State, string, error) {
 	coreSuccess, coreMessages, err := c.CoreComponentState.TransformAndSync(ctx, clusterPolicy, c.ClusterState)
 	if err != nil {
 		return spyrev1alpha1.NotReady, fmt.Sprintf("%v", coreMessages), fmt.Errorf("failed to sync core components: %w", err)
@@ -171,7 +262,6 @@ func (c *StateController) syncCoreAndPluginState(ctx context.Context,
 	// Otherwise (e.g., the first deployment), the plugin components wait for the core components, the same as
 	// the core components wait for the init ones, so that they are not deployed on the node of a failing component,
 	// and the cluster is NotReady until it becomes Ready.
-	running := clusterPolicy.Status.State == spyrev1alpha1.Ready || clusterPolicy.Status.State == spyrev1alpha1.Degraded
 	if !coreSuccess && !running {
 		state, message := overallState(false, false, false, coreMessages, c.heldNodes(), nil)
 		return state, message, nil
@@ -219,19 +309,21 @@ func (c *StateController) heldNodes() []DegradedNode {
 		c.CoreComponentState.FailingNodes(), c.PluginComponentState.FailingNodes())
 }
 
-// Clear calls cleaning up cluster and states
+// Clear calls cleaning up states and cluster in the reverse order of deployment:
+// plugin -> core -> init -> cluster, so that the dependents (e.g., card management)
+// are gone before what they depend on (e.g., DRA driver).
 func (c *StateController) Clear(ctx context.Context) error {
 	var multiErr error
-	if err := c.ClusterState.Clear(ctx); err != nil {
-		multiErr = multierror.Append(multiErr, err)
-	}
-	if err := c.InitState.Clear(ctx); err != nil {
+	if err := c.PluginComponentState.Clear(ctx); err != nil {
 		multiErr = multierror.Append(multiErr, err)
 	}
 	if err := c.CoreComponentState.Clear(ctx); err != nil {
 		multiErr = multierror.Append(multiErr, err)
 	}
-	if err := c.PluginComponentState.Clear(ctx); err != nil {
+	if err := c.InitState.Clear(ctx); err != nil {
+		multiErr = multierror.Append(multiErr, err)
+	}
+	if err := c.ClusterState.Clear(ctx); err != nil {
 		multiErr = multierror.Append(multiErr, err)
 	}
 	if multiErr != nil {

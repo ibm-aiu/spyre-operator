@@ -25,6 +25,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// componentErrFmt is the format used to wrap errors with the failing component name.
+const componentErrFmt = "%s: %w"
+
 var (
 	// componentToName maps a Component enum value to the directory/resource name used on disk.
 	// DevicePlugin maps to both device-plugin and DRA-driver resource names; the active one is
@@ -45,6 +48,9 @@ var (
 type DeploymentState struct {
 	name       string
 	components []*ControlledComponent
+	// suspended lists the components kept disabled regardless of the policy,
+	// e.g., card management while the device plugin and the DRA driver are being swapped.
+	suspended []string
 }
 
 func NewDeploymentState(ctx context.Context, k8sClient client.Client, scheme *runtime.Scheme,
@@ -183,6 +189,16 @@ func (s *DeploymentState) setHoldTolerated(names []string) {
 	}
 }
 
+// component returns the component of the given name, or nil if not found.
+func (s *DeploymentState) component(name string) *ControlledComponent {
+	for _, component := range s.components {
+		if component.name == name {
+			return component
+		}
+	}
+	return nil
+}
+
 func (s *DeploymentState) GetName() string {
 	return s.name
 }
@@ -224,7 +240,7 @@ func (s *DeploymentState) transform(clusterPolicy *spyrev1alpha1.SpyreClusterPol
 		skipUpdate := slices.Contains(skipUpdateComponentNames, component.name)
 		component.SetSkipUpdate(skipUpdate)
 		if err := component.Transform(clusterPolicy, cluster); err != nil {
-			return fmt.Errorf("%s: %w", component.name, err)
+			return fmt.Errorf(componentErrFmt, component.name, err)
 		}
 	}
 	return nil
@@ -257,8 +273,38 @@ func (s *DeploymentState) setDisabled(clusterPolicy *spyrev1alpha1.SpyreClusterP
 		default:
 			disabled = false
 		}
+		if slices.Contains(s.suspended, component.name) {
+			disabled = true
+		}
 		component.SetDisable(disabled)
 	}
+}
+
+// setSuspended sets the components kept disabled regardless of the policy.
+func (s *DeploymentState) setSuspended(names []string) {
+	s.suspended = names
+}
+
+// syncSuspended disables and syncs the suspended components only, i.e., deletes them,
+// and reports whether they are completely gone, including their Pods.
+func (s *DeploymentState) syncSuspended(ctx context.Context) (bool, []string, error) {
+	messages := []string{}
+	ready := true
+	for _, component := range s.components {
+		if !slices.Contains(s.suspended, component.name) {
+			continue
+		}
+		component.SetDisable(true)
+		success, message, err := component.Sync(ctx)
+		if !success {
+			messages = append(messages, fmt.Sprintf("%s (%s)", component.name, message))
+			ready = false
+		}
+		if err != nil {
+			return false, messages, fmt.Errorf(componentErrFmt, component.name, err)
+		}
+	}
+	return ready, messages, nil
 }
 
 func (s *DeploymentState) sync(ctx context.Context) (bool, []string, error) {
@@ -272,7 +318,7 @@ func (s *DeploymentState) sync(ctx context.Context) (bool, []string, error) {
 			ready = false
 		}
 		if err != nil {
-			return false, messages, fmt.Errorf("%s: %w", component.name, err)
+			return false, messages, fmt.Errorf(componentErrFmt, component.name, err)
 		}
 	}
 	return ready, messages, nil

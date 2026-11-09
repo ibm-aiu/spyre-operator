@@ -123,7 +123,8 @@ func (r *SpyreClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.R
 				return ctrl.Result{RequeueAfter: shortRequeueAfter}, fmt.Errorf("failed to update cluster policy finalizers: %w", err)
 			}
 			// WARNING: expect only single spyreclusterpolicy in the cluster
-			// This line will be called only once and not blocking the removal of finalizer.
+			// This line will be called only once and not blocking the removal of finalizer, even if the cleanup hangs.
+			// The cleanup order is plugin -> core -> init -> cluster, and each step waits until its Pods are gone.
 			err = r.stateController.Clear(ctx)
 			if err != nil {
 				logger.Info(fmt.Sprintf("something is wrong during state controller's cleanup: %v", err))

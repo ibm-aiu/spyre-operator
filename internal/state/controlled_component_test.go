@@ -257,6 +257,56 @@ var _ = Describe("ControlledComponent", Ordered, func() {
 			err = K8sClient.Get(ctx, client.ObjectKey{Name: "aiucardmanager2", Namespace: OpNs}, p)
 			Expect(err.(*errors.StatusError).ErrStatus.Code).Should(Equal(int32(404)))
 		})
+		It("ensures Pods of DaemonSet and card management runners are gone after Clear", func() {
+			podLabels := map[string]string{"app": "clear-wait-test"}
+			podSpec := corev1.PodSpec{Containers: []corev1.Container{{Name: "c1", Image: "image"}}}
+			ds := &appsv1.DaemonSet{
+				TypeMeta:   metav1.TypeMeta{Kind: "DaemonSet", APIVersion: "apps/v1"},
+				ObjectMeta: metav1.ObjectMeta{Name: "clear-wait-test", Namespace: OpNs},
+				Spec: appsv1.DaemonSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: podLabels},
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{Labels: podLabels},
+						Spec:       podSpec,
+					},
+				},
+			}
+			defaultObj, err := NewDefaultObject(ctx, ds.Kind, OpNs, ds)
+			Expect(err).To(BeNil())
+			controlledObj, err := NewDaemonSet(defaultObj, ds, OpNs)
+			Expect(err).To(BeNil())
+
+			// envtest has no garbage collector, so the Pods are created by hand
+			dsPod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "clear-wait-test-pod", Namespace: OpNs, Labels: podLabels},
+				Spec:       podSpec,
+			}
+			Expect(K8sClient.Create(ctx, dsPod)).To(Succeed())
+			runnerPod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "clear-wait-test-runner",
+					Namespace: OpNs,
+					Labels: map[string]string{
+						spyreconst.CardManagementRunnerLabelKey: spyreconst.CardManagementRunnerLabelValue},
+				},
+				Spec: podSpec,
+			}
+			Expect(K8sClient.Create(ctx, runnerPod)).To(Succeed())
+
+			c := ControlledComponent{}
+			c.ExportSetName(spyreconst.CardManagementResourceName)
+			c.ExportSetNamespace(OpNs)
+			c.ExportSetClient(K8sClient)
+			c.SetObjects([]ControlledObject{controlledObj})
+
+			Expect(c.Clear(ctx)).To(Succeed())
+
+			By("expecting the Pods are already gone right after Clear returns")
+			for _, pod := range []*corev1.Pod{dsPod, runnerPod} {
+				err = K8sClient.Get(ctx, client.ObjectKeyFromObject(pod), &corev1.Pod{})
+				Expect(errors.IsNotFound(err)).To(BeTrue(), pod.Name)
+			}
+		})
 
 		It("can skip update", func() {
 			serviceAccountName := "spyre-card-management"

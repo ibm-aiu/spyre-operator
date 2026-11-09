@@ -31,6 +31,7 @@ var (
 	DegradedTaintKey       = degradedTaintKey
 	DegradedConditionType  = degradedConditionType
 	OverallState           = overallState
+	ClusterRunning         = clusterRunning
 )
 
 func (s *ClusterState) ApplyLogLevel(ctx context.Context, clusterPolicy *spyrev2.SpyreClusterPolicy) error {
@@ -119,4 +120,13 @@ func (p *HostPathMount) GetHostPath() string {
 
 func (p *HostPathMount) GetContainPath() string {
 	return p.containerPath
+}
+
+func (c *StateController) PrepareModeSwitch(ctx context.Context,
+	clusterPolicy *spyrev2.SpyreClusterPolicy) (bool, spyrev2.State, string, error) {
+	return c.prepareModeSwitch(ctx, clusterPolicy)
+}
+
+func (s *DeploymentState) Suspended() []string {
+	return s.suspended
 }

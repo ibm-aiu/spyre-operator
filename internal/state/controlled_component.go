@@ -14,6 +14,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
 
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/go-logr/logr"
@@ -21,15 +22,23 @@ import (
 	spyrev1alpha1 "github.com/ibm-aiu/spyre-operator/api/v1alpha1"
 	spyreconst "github.com/ibm-aiu/spyre-operator/const"
 	spyreerr "github.com/ibm-aiu/spyre-operator/pkg/errors"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+)
+
+const (
+	podDeletionPollInterval = time.Second
+	podDeletionTimeout      = 2 * time.Minute
 )
 
 // ControlledComponent comprises of an ordered list of controlled objects.
@@ -131,6 +140,8 @@ func (c *ControlledComponent) Sync(ctx context.Context) (bool, string, error) {
 }
 
 // syncDisabled handles sync when the component is disabled: cleans up any running resources.
+// It reports not ready while the Pods of the deleted DaemonSets/Deployments (and card management runners)
+// are still terminating, so that the caller can wait for them to be gone before going further.
 func (c *ControlledComponent) syncDisabled(ctx context.Context, logger logr.Logger) (bool, string, error) {
 	var multiErr error
 	c.degraded = nil
@@ -150,7 +161,143 @@ func (c *ControlledComponent) syncDisabled(ctx context.Context, logger logr.Logg
 	if multiErr != nil {
 		message = multiErr.Error()
 	}
+	remaining, err := c.remainingResources(ctx)
+	if err != nil {
+		return false, fmt.Sprintf("failed to confirm %s is deleted: %v", c.name, err), nil //nolint:nilerr
+	}
+	if len(remaining) > 0 {
+		return false, fmt.Sprintf("waiting for %s to be deleted: %s", c.name, strings.Join(remaining, ", ")), nil
+	}
 	return true, message, nil
+}
+
+// podSelector is a namespaced label selector of Pods which belong to a component.
+type podSelector struct {
+	namespace string
+	selector  labels.Selector
+}
+
+// podSelectors returns the selectors of the Pods which belong to the DaemonSets and Deployments
+// of the component, and of the card management runners.
+func (c *ControlledComponent) podSelectors() ([]podSelector, error) {
+	result := []podSelector{}
+	add := func(namespace string, labelSelector *metav1.LabelSelector) error {
+		// never turn an empty selector into "match all pods"
+		if labelSelector == nil || (len(labelSelector.MatchLabels) == 0 && len(labelSelector.MatchExpressions) == 0) {
+			return nil
+		}
+		selector, err := metav1.LabelSelectorAsSelector(labelSelector)
+		if err != nil {
+			return fmt.Errorf("invalid pod selector: %w", err)
+		}
+		result = append(result, podSelector{namespace: namespace, selector: selector})
+		return nil
+	}
+	for _, obj := range c.objects {
+		var err error
+		switch o := obj.GetObject().(type) {
+		case *appsv1.DaemonSet:
+			err = add(o.Namespace, o.Spec.Selector)
+		case *appsv1.Deployment:
+			err = add(o.Namespace, o.Spec.Selector)
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+	if c.name == spyreconst.CardManagementResourceName {
+		result = append(result, podSelector{
+			namespace: c.namespace,
+			selector: labels.SelectorFromSet(labels.Set{
+				spyreconst.CardManagementRunnerLabelKey: spyreconst.CardManagementRunnerLabelValue}),
+		})
+	}
+	return result, nil
+}
+
+// remainingPods returns the Pods (namespace/name) which still exist for the DaemonSets and Deployments
+// of the component, and for the card management runners. Terminating Pods are included,
+// so the result is empty only after the cascade deletion has completed.
+func (c *ControlledComponent) remainingPods(ctx context.Context) ([]string, error) {
+	selectors, err := c.podSelectors()
+	if err != nil {
+		return nil, err
+	}
+	remaining := []string{}
+	for _, s := range selectors {
+		var podList corev1.PodList
+		if err := c.client.List(ctx, &podList, client.InNamespace(s.namespace),
+			client.MatchingLabelsSelector{Selector: s.selector}); err != nil {
+			return nil, fmt.Errorf("failed to list pods with selector %s: %w", s.selector.String(), err)
+		}
+		for _, pod := range podList.Items {
+			remaining = append(remaining, pod.Namespace+"/"+pod.Name)
+		}
+	}
+	sort.Strings(remaining)
+	return slices.Compact(remaining), nil
+}
+
+// deleteWorkloadsAndWait deletes the objects of the component and the Pods of its DaemonSets, Deployments
+// and runners, then blocks until all the Pods are gone. The Pods are deleted explicitly instead of relying on
+// the garbage collector so that this does not return before they are removed.
+func (c *ControlledComponent) deleteWorkloadsAndWait(ctx context.Context, logger logr.Logger) error {
+	if err := c.deleteAll(ctx, logger); err != nil {
+		return err
+	}
+	selectors, err := c.podSelectors()
+	if err != nil {
+		return err
+	}
+	// Pods are deleted one by one since the operator is not granted the deletecollection verb.
+	for _, s := range selectors {
+		var podList corev1.PodList
+		if err := c.client.List(ctx, &podList, client.InNamespace(s.namespace),
+			client.MatchingLabelsSelector{Selector: s.selector}); err != nil {
+			return fmt.Errorf("failed to list pods with selector %s: %w", s.selector.String(), err)
+		}
+		for i := range podList.Items {
+			if err := c.client.Delete(ctx, &podList.Items[i]); err != nil && !apiErrors.IsNotFound(err) {
+				return fmt.Errorf("failed to delete pod %s/%s: %w", podList.Items[i].Namespace, podList.Items[i].Name, err)
+			}
+		}
+	}
+	var remaining []string
+	err = wait.PollUntilContextTimeout(ctx, podDeletionPollInterval, podDeletionTimeout, true,
+		func(ctx context.Context) (bool, error) {
+			pods, listErr := c.remainingPods(ctx)
+			if listErr != nil {
+				return false, listErr
+			}
+			remaining = pods
+			return len(remaining) == 0, nil
+		})
+	if err != nil {
+		return fmt.Errorf("pods of %s are not deleted (%s): %w", c.name, strings.Join(remaining, ", "), err)
+	}
+	return nil
+}
+
+// remainingResources returns the DaemonSets and Deployments of the component which still exist,
+// and the Pods (namespace/name) which still exist for them and for the card management runners.
+// The result is empty only when the component is completely gone, i.e., not deployed.
+func (c *ControlledComponent) remainingResources(ctx context.Context) ([]string, error) {
+	remaining := []string{}
+	for _, obj := range c.objects {
+		switch obj.GetObject().(type) {
+		case *appsv1.DaemonSet, *appsv1.Deployment:
+			if _, err := obj.Fetch(ctx, c.client); err == nil {
+				remaining = append(remaining, obj.GetID().String())
+			} else if !apiErrors.IsNotFound(err) && !meta.IsNoMatchError(err) {
+				return nil, fmt.Errorf("failed to get %s: %w", obj.GetID(), err)
+			}
+		}
+	}
+	pods, err := c.remainingPods(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return append(remaining, pods...), nil
 }
 
 // syncEnabled deploys the component's objects in order and reports readiness.
@@ -451,8 +598,29 @@ func (c *ControlledComponent) deletePodsByLabels(ctx context.Context, labels map
 	return nil
 }
 
-// Clear cleans up resources which are generated by controlled object in component without garbage collection mechanism
+// Clear cleans up resources which are generated by controlled object in component without garbage collection mechanism.
+// If the component has DaemonSets, Deployments or card management runners, it returns after all their Pods are gone.
 func (c *ControlledComponent) Clear(ctx context.Context) error {
+	selectors, err := c.podSelectors()
+	if err != nil {
+		return fmt.Errorf("failed to clear %s: %w", c.name, err)
+	}
+	var multiErr error
+	if err := c.clearResources(ctx); err != nil {
+		multiErr = multierror.Append(multiErr, err)
+	}
+	if len(selectors) > 0 {
+		if err := c.deleteWorkloadsAndWait(ctx, log.FromContext(ctx).WithValues("Component", c.name)); err != nil {
+			multiErr = multierror.Append(multiErr, err)
+		}
+	}
+	if multiErr != nil {
+		return fmt.Errorf("failed to clear %s: %w", c.name, multiErr)
+	}
+	return nil
+}
+
+func (c *ControlledComponent) clearResources(ctx context.Context) error {
 	switch c.name {
 	case "common":
 		return c.deleteCertSecretFromCertificate(ctx)
@@ -460,9 +628,6 @@ func (c *ControlledComponent) Clear(ctx context.Context) error {
 		return c.deleteCertSecretFromService(ctx)
 	case spyreconst.CardManagementResourceName:
 		var multiErr error
-		if err := c.deleteCardManagementRunners(ctx); err != nil {
-			multiErr = multierror.Append(multiErr, err)
-		}
 		if err := c.clearDegradedNodes(ctx, nil); err != nil {
 			multiErr = multierror.Append(multiErr, err)
 		}
