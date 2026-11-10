@@ -287,6 +287,23 @@ func BuildMockUserPod(exporterPort int, testConfig TestConfig, name, namespace s
 	return pod
 }
 
+// BuildMockUserPodWithClaim builds the same mock user pod as BuildMockUserPod
+// but requests Spyre devices through the DRA ResourceClaimTemplate claimTemplateName
+// instead of the device plugin resource. The pod uses the default scheduler.
+func BuildMockUserPodWithClaim(exporterPort int, testConfig TestConfig, name, namespace string, nodeName, claimTemplateName string) *corev1.Pod {
+	const claimName = "spyre"
+	pod := BuildMockUserPod(exporterPort, testConfig, name, namespace, 1, nodeName)
+	pod.Spec.SchedulerName = ""
+	pod.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+		Claims: []corev1.ResourceClaim{{Name: claimName}},
+	}
+	pod.Spec.ResourceClaims = []corev1.PodResourceClaim{{
+		Name:                      claimName,
+		ResourceClaimTemplateName: &claimTemplateName,
+	}}
+	return pod
+}
+
 func BuildPodListFiles(name, namespace, resourceName string, paths []string, nodeName string, schedulerEnabled bool) *corev1.Pod {
 	args := make([]string, 0, len(paths))
 	for _, path := range paths {
