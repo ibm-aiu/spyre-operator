@@ -317,7 +317,12 @@ func (c *StateController) Clear(ctx context.Context) error {
 	if err := c.PluginComponentState.Clear(ctx); err != nil {
 		multiErr = multierror.Append(multiErr, err)
 	}
-	if err := c.CoreComponentState.Clear(ctx); err != nil {
+	// The DRA driver must not be removed while ResourceClaims are still allocated; otherwise Kubelet
+	// cannot unprepare resources and pods (including card management) get stuck terminating.
+	// For classic device plugin mode, Kubelet does not require an active device plugin to terminate pods.
+	if err := c.CheckActiveDRAResourceClaims(ctx); err != nil {
+		multiErr = multierror.Append(multiErr, fmt.Errorf("cannot clear core components: %w", err))
+	} else if err := c.CoreComponentState.Clear(ctx); err != nil {
 		multiErr = multierror.Append(multiErr, err)
 	}
 	if err := c.InitState.Clear(ctx); err != nil {
