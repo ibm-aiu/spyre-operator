@@ -64,6 +64,8 @@ spec:
           ExecStart=/usr/bin/chmod 770 /usr/local/etc/device-plugins
           ExecStart=/usr/bin/chmod 770 /usr/local/etc/device-plugins/spyre-config
           ExecStart=/usr/bin/chmod 770 /usr/local/etc/device-plugins/spyre-metrics
+          # Default ACL: subdirectories created under spyre-metrics (mounted to /data in user pods) inherit group rwx
+          ExecStart=/usr/bin/setfacl -d -m g:0:rwx /usr/local/etc/device-plugins/spyre-metrics
           ExecStart=/usr/bin/chmod 770 /usr/local/etc/device-plugins/spyre-sockets
           ExecStart=/usr/bin/chmod 770 /usr/local/etc/device-plugins/metadata
 
