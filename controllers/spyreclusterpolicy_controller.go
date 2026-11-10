@@ -113,21 +113,20 @@ func (r *SpyreClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.R
 		}
 	}
 
-	// Remove finalizer on delete (must be done before any other returns)
+	// Clean up resources and remove finalizer on delete (must be done before any other returns)
 	isDeleted := instance.GetDeletionTimestamp() != nil
 	if isDeleted {
 		if controllerutil.ContainsFinalizer(instance, SpyreClusterPolicyFinalizer) {
-			controllerutil.RemoveFinalizer(instance, SpyreClusterPolicyFinalizer)
-			err := r.Update(ctx, instance)
-			if err != nil {
-				return ctrl.Result{RequeueAfter: shortRequeueAfter}, fmt.Errorf("failed to update cluster policy finalizers: %w", err)
-			}
 			// WARNING: expect only single spyreclusterpolicy in the cluster
-			// This line will be called only once and not blocking the removal of finalizer, even if the cleanup hangs.
 			// The cleanup order is plugin -> core -> init -> cluster, and each step waits until its Pods are gone.
 			err = r.stateController.Clear(ctx)
 			if err != nil {
-				logger.Info(fmt.Sprintf("something is wrong during state controller's cleanup: %v", err))
+				return ctrl.Result{RequeueAfter: shortRequeueAfter}, fmt.Errorf("failed during state controller's cleanup: %w", err)
+			}
+			controllerutil.RemoveFinalizer(instance, SpyreClusterPolicyFinalizer)
+			err = r.Update(ctx, instance)
+			if err != nil {
+				return ctrl.Result{RequeueAfter: shortRequeueAfter}, fmt.Errorf("failed to update cluster policy finalizers: %w", err)
 			}
 		}
 		return ctrl.Result{}, nil
