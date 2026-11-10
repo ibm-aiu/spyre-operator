@@ -14,8 +14,11 @@ import (
 
 	"github.com/go-logr/logr"
 	spyrev1alpha1 "github.com/ibm-aiu/spyre-operator/api/v1alpha1"
+	spyreconst "github.com/ibm-aiu/spyre-operator/const"
 	corev1 "k8s.io/api/core/v1"
+	resourcev1 "k8s.io/api/resource/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -145,7 +148,8 @@ func (s *SpyreNodeStateState) createSpyreNodeState(ctx context.Context,
 }
 
 // CheckActiveDevicePluginWorkloads checks if there are any active device plugin workloads
-// by examining SpyreNodeState allocations. Returns an error with details if active workloads are found.
+// by examining SpyreNodeState allocations and reservations.
+// Returns an error with details if active workloads are found.
 func (s *SpyreNodeStateState) CheckActiveDevicePluginWorkloads(ctx context.Context) error {
 	logger := log.FromContext(ctx)
 	logger.V(1).Info("checking for active device plugin workloads")
@@ -155,30 +159,108 @@ func (s *SpyreNodeStateState) CheckActiveDevicePluginWorkloads(ctx context.Conte
 		return fmt.Errorf(spyreNodeStateListErr, err)
 	}
 
-	var activePods []string
+	var activePods, reservedPods []string
 	for _, nodeState := range nodeStateList.Items {
-		for _, allocation := range nodeState.Status.AllocationList {
-			isActive, err := s.allocationIsActive(ctx, logger, allocation)
+		activePods = append(activePods, s.activeAllocationPods(ctx, logger, nodeState)...)
+		reservedPods = append(reservedPods, s.activeReservationPods(ctx, logger, nodeState)...)
+	}
+
+	if len(activePods) > 0 || len(reservedPods) > 0 {
+		return fmt.Errorf("cannot enable DRA driver: %d active device plugin workload(s) still running: %s, "+
+			"%d pod(s) holding a device reservation: %s. "+
+			"Please terminate all pods using or reserving Spyre devices via device plugin before enabling DRA",
+			len(activePods), strings.Join(activePods, ", "),
+			len(reservedPods), strings.Join(reservedPods, ", "))
+	}
+
+	return nil
+}
+
+// activeAllocationPods returns the Pods ("namespace/name") of the allocations of the SpyreNodeState which are still active.
+func (s *SpyreNodeStateState) activeAllocationPods(ctx context.Context, logger logr.Logger,
+	nodeState spyrev1alpha1.SpyreNodeState) []string {
+	var pods []string
+	for _, allocation := range nodeState.Status.AllocationList {
+		isActive, err := s.allocationIsActive(ctx, logger, allocation)
+		if err != nil {
+			// Fail closed: if we cannot tell whether the Pod is still using the
+			// devices, assume it is, so that DRA is not enabled underneath it.
+			logger.Info("failed to check allocation, treating it as active",
+				"namespace", allocation.Pod.Namespace, "name", allocation.Pod.Name, "error", err)
+			isActive = true
+		}
+		if isActive {
+			pods = append(pods, fmt.Sprintf("%s/%s", allocation.Pod.Namespace, allocation.Pod.Name))
+		}
+	}
+	return pods
+}
+
+// activeReservationPods returns the Pods ("namespace/name") holding a device reservation of the SpyreNodeState
+// which are still active, or a placeholder for each reservation of an unknown owner.
+func (s *SpyreNodeStateState) activeReservationPods(ctx context.Context, logger logr.Logger,
+	nodeState spyrev1alpha1.SpyreNodeState) []string {
+	var pods []string
+	// Reconcile the reservations written by an older version before inspecting them.
+	nodeState.Status.NormalizeReservations()
+	for _, entries := range nodeState.Status.ReservationEntries() {
+		for _, entry := range entries {
+			pod := entry.Pod
+			if pod.Name == "" && pod.Namespace == "" {
+				// Fail closed: the devices are reserved by an unknown owner (adopted from an older writer).
+				pods = append(pods, fmt.Sprintf("<unknown pod on %s>", nodeState.Name))
+				continue
+			}
+			isActive, err := s.podIsActive(ctx, logger, pod)
 			if err != nil {
-				// Fail closed: if we cannot tell whether the Pod is still using the
-				// devices, assume it is, so that DRA is not enabled underneath it.
-				logger.Info("failed to check allocation, treating it as active",
-					"namespace", allocation.Pod.Namespace, "name", allocation.Pod.Name, "error", err)
+				// Fail closed, the same as for the allocations.
+				logger.Info("failed to check reservation, treating it as active",
+					"namespace", pod.Namespace, "name", pod.Name, "error", err)
 				isActive = true
 			}
 			if isActive {
-				activePods = append(activePods,
-					fmt.Sprintf("%s/%s", allocation.Pod.Namespace, allocation.Pod.Name))
+				pods = append(pods, fmt.Sprintf("%s/%s", pod.Namespace, pod.Name))
+			}
+		}
+	}
+	return pods
+}
+
+// CheckActiveDRAResourceClaims returns an error if any ResourceClaim still has a Spyre device allocated by the DRA driver.
+// It must pass before switching from the DRA driver to the device plugin, otherwise the devices would be
+// handed out by the device plugin while they are still used through the claims.
+func (s *SpyreNodeStateState) CheckActiveDRAResourceClaims(ctx context.Context) error {
+	logger := log.FromContext(ctx)
+	logger.V(1).Info("checking for allocated Spyre ResourceClaims")
+
+	claimList := &resourcev1.ResourceClaimList{}
+	if err := s.k8sClient.List(ctx, claimList); err != nil {
+		if meta.IsNoMatchError(err) {
+			// the DRA API is not served, so there cannot be any claim
+			return nil
+		}
+		// Fail closed: if the claims cannot be listed, assume some are allocated.
+		return fmt.Errorf("failed to list ResourceClaims: %w", err)
+	}
+
+	var activeClaims []string
+	for _, claim := range claimList.Items {
+		if claim.Status.Allocation == nil {
+			continue
+		}
+		for _, result := range claim.Status.Allocation.Devices.Results {
+			if result.Driver == spyreconst.DRADriverName {
+				activeClaims = append(activeClaims, fmt.Sprintf("%s/%s", claim.Namespace, claim.Name))
+				break
 			}
 		}
 	}
 
-	if len(activePods) > 0 {
-		return fmt.Errorf("cannot enable DRA driver: %d active device plugin workload(s) still running: %s. "+
-			"Please terminate all pods using Spyre devices via device plugin before enabling DRA",
-			len(activePods), strings.Join(activePods, ", "))
+	if len(activeClaims) > 0 {
+		return fmt.Errorf("cannot disable DRA driver: %d ResourceClaim(s) still have Spyre devices allocated: %s. "+
+			"Please delete the workloads and ResourceClaims using Spyre devices via DRA before switching to device plugin",
+			len(activeClaims), strings.Join(activeClaims, ", "))
 	}
-
 	return nil
 }
 
@@ -187,36 +269,51 @@ func (s *SpyreNodeStateState) allocationIsActive(ctx context.Context, logger log
 	allocation spyrev1alpha1.Allocation) (bool, error) {
 	// Check if allocation has devices and a pod reference
 	if len(allocation.DeviceList) > 0 && allocation.Pod != nil {
-		podName := allocation.Pod.Name
-		podNamespace := allocation.Pod.Namespace
-		if podName == "" || podNamespace == "" {
-			return false, nil
-		}
-
-		// Verify the pod still exists
-		pod := &corev1.Pod{}
-		key := client.ObjectKey{Namespace: podNamespace, Name: podName}
-		err := s.k8sClient.Get(ctx, key, pod)
-		switch {
-		case err == nil:
-			// This is the only path that returns true: the Pod exists and its
-			// UID matches the allocation, or the allocation has no UID recorded
-			// (written by an older version; accepted for backward compatibility).
-			if pod.UID == allocation.Pod.UID || allocation.Pod.UID == "" {
-				return true, nil
-			} else {
-				logger.V(1).Info("ignore stale allocation",
-					"pod", fmt.Sprintf("%s/%s", podNamespace, podName),
-					"allocatedUID", allocation.Pod.UID, "currentUID", pod.UID)
-			}
-		case apierrors.IsNotFound(err):
-			logger.V(1).Info("allocated Pod no longer exists",
-				"pod", fmt.Sprintf("%s/%s", podNamespace, podName))
-		default:
-			return false, fmt.Errorf("failed to get pod %s/%s: %w", podNamespace, podName, err)
-		}
+		return s.podIsActive(ctx, logger, *allocation.Pod)
 	}
 	return false, nil
+}
+
+// podIsActive returns true if the Pod referenced by an allocation or a reservation still exists.
+func (s *SpyreNodeStateState) podIsActive(ctx context.Context, logger logr.Logger,
+	ref spyrev1alpha1.Pod) (bool, error) {
+	podName := ref.Name
+	podNamespace := ref.Namespace
+	if podName == "" || podNamespace == "" {
+		return false, nil
+	}
+
+	// Verify the pod still exists
+	pod := &corev1.Pod{}
+	key := client.ObjectKey{Namespace: podNamespace, Name: podName}
+	err := s.k8sClient.Get(ctx, key, pod)
+	switch {
+	case err == nil:
+		// This is the only path that returns true: the Pod exists and its
+		// UID matches the reference, or the reference has no UID recorded
+		// (written by an older version; accepted for backward compatibility).
+		if pod.UID == ref.UID || ref.UID == "" {
+			return true, nil
+		}
+		logger.V(1).Info("ignore stale reference",
+			"pod", fmt.Sprintf("%s/%s", podNamespace, podName),
+			"referencedUID", ref.UID, "currentUID", pod.UID)
+	case apierrors.IsNotFound(err):
+		logger.V(1).Info("referenced Pod no longer exists",
+			"pod", fmt.Sprintf("%s/%s", podNamespace, podName))
+	default:
+		return false, fmt.Errorf("failed to get pod %s/%s: %w", podNamespace, podName, err)
+	}
+	return false, nil
+}
+
+// SpyreNodeStatesExist returns true if any SpyreNodeState resource exists in the cluster.
+func (s *SpyreNodeStateState) SpyreNodeStatesExist(ctx context.Context) (bool, error) {
+	nodeStateList := &spyrev1alpha1.SpyreNodeStateList{}
+	if err := s.k8sClient.List(ctx, nodeStateList, client.Limit(1)); err != nil {
+		return false, fmt.Errorf(spyreNodeStateListErr, err)
+	}
+	return len(nodeStateList.Items) > 0, nil
 }
 
 // DeleteAllSpyreNodeStates deletes all SpyreNodeState resources in the cluster.

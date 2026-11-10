@@ -517,7 +517,6 @@ uninstall-operator: ## Uninstall operator via olm and delete SpyreClusterPolicy
 detect-secrets-install: venv ## Install detect-secret tool
 	$(eval TMP_CONSTRAINTS := $(shell mktemp))
 	@echo "boxsdk<4" > $(TMP_CONSTRAINTS)
-	@echo "chardet<6" >> $(TMP_CONSTRAINTS)
 	. venv/bin/activate && $(PIP) install "git+$(DETECT_SECRETS_GIT)" -c $(TMP_CONSTRAINTS)
 	@rm -f $(TMP_CONSTRAINTS)
 

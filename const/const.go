@@ -111,6 +111,8 @@ const (
 	// the YAML assets and target the spyre-managed-pf / spyre-managed-vf DeviceClasses.
 	DRADeviceRequestManagedPf = "spyre-managed-pf"
 	DRADeviceRequestManagedVf = "spyre-managed-vf"
+	// DRADriverName is the name of the DRA driver as it appears in allocated ResourceClaims.
+	DRADriverName = "spyre.ibm.com"
 
 	// config paths
 	DefaultSenlibConfigFilename = "senlib_config.json"

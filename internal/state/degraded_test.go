@@ -417,7 +417,25 @@ var _ = Describe("Degraded card management", Ordered, func() {
 				HaveField("Type", degradedConditionType), HaveField("Status", corev1.ConditionTrue))))
 
 			By("cleaning up as the SpyreClusterPolicy is deleted")
+			// envtest has no kubelet to finalize the terminating pods which are bound to a node, which Clear waits for
+			kubeletCtx, stopKubelet := context.WithCancel(ctx)
+			defer stopKubelet()
+			go func() {
+				defer GinkgoRecover()
+				for kubeletCtx.Err() == nil {
+					pods := &corev1.PodList{}
+					if err := StateClient.List(kubeletCtx, pods, client.InNamespace(OpNs)); err == nil {
+						for i := range pods.Items {
+							if pods.Items[i].DeletionTimestamp != nil {
+								_ = StateClient.Delete(kubeletCtx, &pods.Items[i], client.GracePeriodSeconds(0))
+							}
+						}
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+			}()
 			Expect(c.Clear(ctx)).To(Succeed())
+			stopKubelet()
 			Expect(getNode(nodeA).Spec.Taints).NotTo(ContainElement(HaveField("Key", taintKey)))
 			b = getNode(nodeB)
 			Expect(b.Spec.Taints).NotTo(ContainElement(HaveField("Key", taintKey)))

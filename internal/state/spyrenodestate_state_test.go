@@ -14,9 +14,11 @@ import (
 	. "github.com/ibm-aiu/spyre-operator/internal/state"
 
 	spyrev1alpha1 "github.com/ibm-aiu/spyre-operator/api/v1alpha1"
+	spyreconst "github.com/ibm-aiu/spyre-operator/const"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	resourcev1 "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -310,5 +312,84 @@ var _ = Describe("SpyreNodeState State", Ordered, func() {
 			By("cleaning up")
 			K8sClient.Delete(ctx, nodeState)
 		})
+
+		It("should detect a pod holding a reservation, and ignore the one whose pod is gone", func() {
+			nodeState := &spyrev1alpha1.SpyreNodeState{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-node-reserved"},
+				Spec:       spyrev1alpha1.SpyreNodeStateSpec{NodeName: "test-node-reserved"},
+			}
+			Expect(K8sClient.Create(ctx, nodeState)).To(Succeed())
+			DeferCleanup(func() { _ = K8sClient.Delete(ctx, nodeState) })
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "reserved-pod", Namespace: "default"},
+				Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "test", Image: "nginx"}}},
+			}
+			Expect(K8sClient.Create(ctx, pod)).To(Succeed())
+			DeferCleanup(func() { _ = K8sClient.Delete(ctx, pod) })
+
+			now := metav1.Now()
+			nodeState.Status.ReserveDevices("spyre_pf",
+				spyrev1alpha1.Pod{Name: "reserved-pod", Namespace: "default"}, []string{testDeviceID}, now)
+			nodeState.Status.ReserveDevices("spyre_pf",
+				spyrev1alpha1.Pod{Name: "gone-pod", Namespace: "default"}, []string{"0002"}, now)
+			Expect(K8sClient.Status().Update(ctx, nodeState)).To(Succeed())
+
+			err := spyreNodeState.CheckActiveDevicePluginWorkloads(ctx)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("default/reserved-pod"))
+			Expect(err.Error()).NotTo(ContainSubstring("default/gone-pod"))
+		})
+
+		Describe("CheckActiveDRAResourceClaims", func() {
+			newClaim := func(name string) *resourcev1.ResourceClaim {
+				return &resourcev1.ResourceClaim{
+					ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"},
+					Spec: resourcev1.ResourceClaimSpec{
+						Devices: resourcev1.DeviceClaim{
+							Requests: []resourcev1.DeviceRequest{{
+								Name:    "req",
+								Exactly: &resourcev1.ExactDeviceRequest{DeviceClassName: "spyre-pf"},
+							}},
+						},
+					},
+				}
+			}
+			allocate := func(claim *resourcev1.ResourceClaim, driver string) {
+				claim.Status.Allocation = &resourcev1.AllocationResult{
+					Devices: resourcev1.DeviceAllocationResult{
+						Results: []resourcev1.DeviceRequestAllocationResult{{
+							Request: "req", Driver: driver, Pool: "node1", Device: "dev0",
+						}},
+					},
+				}
+				Expect(StateClient.Status().Update(ctx, claim)).To(Succeed())
+			}
+
+			DescribeTable("checks the allocated claims",
+				func(create bool, allocatedBy string, expectBlocked bool) {
+					claimName := "spyre-claim"
+					if create {
+						claim := newClaim(claimName)
+						Expect(StateClient.Create(ctx, claim)).To(Succeed())
+						DeferCleanup(func() { _ = StateClient.Delete(ctx, claim) })
+						if allocatedBy != "" {
+							allocate(claim, allocatedBy)
+						}
+					}
+					err := spyreNodeState.CheckActiveDRAResourceClaims(ctx)
+					if expectBlocked {
+						Expect(err).To(HaveOccurred())
+						Expect(err.Error()).To(ContainSubstring("default/" + claimName))
+					} else {
+						Expect(err).NotTo(HaveOccurred())
+					}
+				},
+				Entry("no claim exists", false, "", false),
+				Entry("the claim is not allocated", true, "", false),
+				Entry("the claim is allocated by the other driver", true, "other.example.com", false),
+				Entry("the claim is allocated by the Spyre DRA driver", true, spyreconst.DRADriverName, true),
+			)
+		})
+
 	})
 })
