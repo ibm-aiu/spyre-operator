@@ -421,6 +421,32 @@ var _ = Describe("StateController", Ordered, func() {
 			Expect(state).To(BeEmpty(), message)
 		})
 
+		It("blocks clearing core components while Spyre ResourceClaims are allocated", func() {
+			deployDriver(spyreconst.DRADriverResourceName)
+			claim := &resourcev1.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "clear-claim", Namespace: "default"},
+				Spec: resourcev1.ResourceClaimSpec{Devices: resourcev1.DeviceClaim{
+					Requests: []resourcev1.DeviceRequest{{
+						Name: "req", Exactly: &resourcev1.ExactDeviceRequest{DeviceClassName: "spyre-pf"}}}}},
+			}
+			Expect(StateClient.Create(ctx, claim)).To(Succeed())
+			created = append(created, claim)
+			claim.Status.Allocation = &resourcev1.AllocationResult{Devices: resourcev1.DeviceAllocationResult{
+				Results: []resourcev1.DeviceRequestAllocationResult{{
+					Request: "req", Driver: spyreconst.DRADriverName, Pool: "node1", Device: "dev0"}}}}
+			Expect(StateClient.Status().Update(ctx, claim)).To(Succeed())
+
+			err := stateController.Clear(ctx)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("cannot clear core components"))
+			Expect(err.Error()).To(ContainSubstring("default/clear-claim"))
+
+			By("clearing successfully once the claim is deleted")
+			Expect(StateClient.Delete(ctx, claim)).To(Succeed())
+			err = stateController.Clear(ctx)
+			Expect(err).To(BeNil())
+		})
+
 		DescribeTable("decides whether the cluster is running and its state when not all the components are ready",
 			func(previous spyrev1alpha1.State, switching, expectRunning bool, expectState spyrev1alpha1.State) {
 				cp := policy(spyrev1alpha1.DevicePluginModeDRA)
