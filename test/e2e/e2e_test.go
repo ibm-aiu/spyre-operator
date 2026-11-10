@@ -160,6 +160,105 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 			UpdateModes(ctx, spyreV2Client, k8sClientset, 0, enabledModes, false, spyrev1alpha1.NoSpyreNodes)
 		})
 
+		// Switches between the classic device plugin and the DRA driver while card management stays
+		// enabled. The policy is deleted and recreated with basic mode to test whether card management
+		// is cleaned up properly when DRA mode is on.
+		It("can switch between device plugin and DRA driver with card management enabled", func() {
+			if nodeArchitecture != "amd64" || !testConfig.PseudoDeviceMode {
+				Skip("only available for pseudo device mode on amd64")
+			}
+			By("ensuring all pods are deleted")
+			WaitUntilNoPod(ctx, k8sClientset, spyreV2Client, testNamespace, targetNodeName)
+			if EnsureCardmgmtRegistrySecret(ctx, k8sClientset) {
+				DeferCleanup(func() {
+					DeleteCardmgmtRegistrySecret(ctx, k8sClientset)
+				})
+			}
+			DeferCleanup(func() {
+				clusterPolicy := &spyrev1alpha1.SpyreClusterPolicy{}
+				err := spyreV2Client.Get(ctx, client.ObjectKey{Name: ClusterPolicyName}, clusterPolicy)
+				if errors.IsNotFound(err) {
+					enabledModes := []spyrev1alpha1.SpyreClusterPolicyExperimentalMode{}
+					if testConfig.PseudoDeviceMode {
+						enabledModes = append(enabledModes, spyrev1alpha1.PseudoDeviceMode)
+					}
+					DeployClusterPolicy(ctx, testConfig, k8sClientset, spyreV2Client,
+						enabledModes, false, "", len(nodeNames))
+				}
+			})
+
+			updatePolicy := func(mutate func(clusterPolicy *spyrev1alpha1.SpyreClusterPolicy)) {
+				clusterPolicy := &spyrev1alpha1.SpyreClusterPolicy{}
+				err := spyreV2Client.Get(ctx,
+					client.ObjectKey{Namespace: metav1.NamespaceAll, Name: ClusterPolicyName}, clusterPolicy)
+				Expect(err).To(BeNil())
+				mutate(clusterPolicy)
+				UpdateClusterPolicy(ctx, spyreV2Client, k8sClientset, clusterPolicy, len(nodeNames), spyrev1alpha1.Ready)
+			}
+
+			By("enabling card management with the classic device plugin and reservation mode")
+			updatePolicy(func(clusterPolicy *spyrev1alpha1.SpyreClusterPolicy) {
+				DisableDRADriver(testConfig, clusterPolicy)
+				clusterPolicy.Spec.ExperimentalMode = append(DefaultModes(), spyrev1alpha1.PseudoDeviceMode)
+				clusterPolicy.Spec.HealthChecker.Enabled = false
+				EnableCardmgmtDummy(clusterPolicy, targetNodeName)
+			})
+			ExpectCardmgmtHoldsAllDevices(ctx, k8sClientset, spyreV2Client, targetNodeName)
+
+			By("switching to the DRA driver with card management enabled")
+			updatePolicy(func(clusterPolicy *spyrev1alpha1.SpyreClusterPolicy) {
+				EnableDRADriver(testConfig, clusterPolicy)
+				EnableCardmgmtDummy(clusterPolicy, targetNodeName)
+			})
+			cmLabel := spyreconst.CardManagementLabelKey + "=" + spyreconst.CardManagementLabelValue
+			Eventually(func(g Gomega) {
+				pods := GetPodsWithLabels(ctx, k8sClientset, g, OperatorNamespace, cmLabel, targetNodeName)
+				g.Expect(pods).To(HaveLen(1))
+				g.Expect(pods[0].Status.Phase).To(Equal(v1.PodRunning))
+				g.Expect(pods[0].Status.ResourceClaimStatuses).To(HaveLen(1))
+				s := pods[0].Status.ResourceClaimStatuses[0]
+				g.Expect(s.ResourceClaimName).NotTo(BeNil())
+				claim, err := k8sClientset.ResourceV1().ResourceClaims(OperatorNamespace).Get(
+					ctx, *s.ResourceClaimName, metav1.GetOptions{})
+				g.Expect(err).To(BeNil())
+				g.Expect(claim.Status.Allocation).NotTo(BeNil())
+				requests := map[string]bool{}
+				for _, r := range claim.Status.Allocation.Devices.Results {
+					requests[r.Request] = true
+				}
+				g.Expect(requests).To(HaveKey(spyreconst.DRADeviceRequestManagedPf))
+				g.Expect(requests).To(HaveKey(spyreconst.DRADeviceRequestManagedVf))
+			}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
+
+			By("deleting cluster policy with card management and DRA driver enabled")
+			clusterPolicy := &spyrev1alpha1.SpyreClusterPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: ClusterPolicyName,
+				},
+			}
+			err := spyreV2Client.Delete(ctx, clusterPolicy)
+			Expect(err).To(BeNil())
+			Eventually(func(g Gomega) {
+				err := spyreV2Client.Get(ctx, client.ObjectKey{Name: ClusterPolicyName}, clusterPolicy)
+				g.Expect(errors.IsNotFound(err)).To(BeTrue())
+			}).WithTimeout(3 * time.Minute).WithPolling(5 * time.Second).Should(Succeed())
+
+			By("ensuring no card management pods hang in the cluster")
+			runnerLabel := spyreconst.CardManagementRunnerLabelKey + "=" + spyreconst.CardManagementRunnerLabelValue
+			Eventually(func(g Gomega) {
+				EnsureDeletedPodWithLabels(ctx, k8sClientset, g, OperatorNamespace, cmLabel)
+				EnsureDeletedPodWithLabels(ctx, k8sClientset, g, OperatorNamespace, runnerLabel)
+			}).WithTimeout(3 * time.Minute).WithPolling(5 * time.Second).Should(Succeed())
+
+			By("recreating cluster policy with basic mode")
+			enabledModes := []spyrev1alpha1.SpyreClusterPolicyExperimentalMode{}
+			if testConfig.PseudoDeviceMode {
+				enabledModes = append(enabledModes, spyrev1alpha1.PseudoDeviceMode)
+			}
+			DeployClusterPolicy(ctx, testConfig, k8sClientset, spyreV2Client,
+				enabledModes, false, "", len(nodeNames))
+		})
+
 		It("can use basic mode", func() {
 			// Disable health checker for basic mode test to ensure all devices are available
 			By("disabling health checker for basic mode test")
