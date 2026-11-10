@@ -1007,8 +1007,8 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 		}
 
 		BeforeAll(func() {
-			if !testConfig.Exporter.Enabled {
-				Skip("Metric exporter test skipped: exporter.enabled is false in test config")
+			if nodeArchitecture != "amd64" {
+				Skip("Metric exporter test only runs on amd64")
 			}
 			By("enabling metric exporter in the cluster policy")
 			clusterPolicy := &spyrev1alpha1.SpyreClusterPolicy{}
@@ -1635,8 +1635,8 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 		var originalSpec spyrev1alpha1.SpyreClusterPolicySpec
 
 		BeforeAll(func() {
-			if !testConfig.Exporter.Enabled {
-				Skip("Metric exporter test skipped: exporter.enabled is false in test config")
+			if nodeArchitecture != "amd64" {
+				Skip("Metric exporter test only runs on amd64")
 			}
 			By("ensuring all pods are deleted")
 			WaitUntilNoPod(ctx, k8sClientset, spyreV2Client, testNamespace, targetNodeName)
