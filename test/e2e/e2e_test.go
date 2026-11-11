@@ -1007,8 +1007,8 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 		}
 
 		BeforeAll(func() {
-			if !testConfig.Exporter.Enabled {
-				Skip("Metric exporter test skipped: exporter.enabled is false in test config")
+			if nodeArchitecture != "amd64" {
+				Skip("Metric exporter test only runs on amd64")
 			}
 			By("enabling metric exporter in the cluster policy")
 			clusterPolicy := &spyrev1alpha1.SpyreClusterPolicy{}
@@ -1623,6 +1623,79 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 		It("can gradually allocate 50 Spyres on healthy devices only", func() {
 			draAllocationTestCase(ctx, testNamespace, PfProductId, 0)
 		})
+	})
+
+	// Same as "Metric exporter" but the mock user pod gets its Spyre devices from the DRA driver.
+	Context("DRA Driver with metric exporter", Ordered, func() {
+		testClaimName := "test-metric-claim-template"
+		mockUserContainer := "app"
+		getMetricsKeyFuncs := []func(namespace, name, nodeName string) string{
+			AllocationMetricLabels, PowerMetricLabels,
+		}
+		var originalSpec spyrev1alpha1.SpyreClusterPolicySpec
+
+		BeforeAll(func() {
+			if nodeArchitecture != "amd64" {
+				Skip("Metric exporter test only runs on amd64")
+			}
+			By("ensuring all pods are deleted")
+			WaitUntilNoPod(ctx, k8sClientset, spyreV2Client, testNamespace, targetNodeName)
+			By("enabling dra-driver and metric exporter")
+			clusterPolicy := &spyrev1alpha1.SpyreClusterPolicy{}
+			err := spyreV2Client.Get(ctx,
+				client.ObjectKey{Namespace: metav1.NamespaceAll, Name: ClusterPolicyName}, clusterPolicy)
+			Expect(err).To(BeNil())
+			originalSpec = clusterPolicy.Spec
+			EnableDRADriver(testConfig, clusterPolicy)
+			clusterPolicy.Spec.MetricsExporter.Enabled = true
+			clusterPolicy.Spec.MetricsExporter.NodeSelector = map[string]string{"kubernetes.io/hostname": targetNodeName}
+			clusterPolicy.Spec.MetricsExporter.MetricsPath = "/data" // where the metrics file is copied by mock user.
+			UpdateClusterPolicy(ctx, spyreV2Client, k8sClientset, clusterPolicy, len(nodeNames), spyrev1alpha1.Ready)
+		})
+
+		AfterAll(func() {
+			clusterPolicy := &spyrev1alpha1.SpyreClusterPolicy{}
+			err := spyreV2Client.Get(ctx,
+				client.ObjectKey{Namespace: metav1.NamespaceAll, Name: ClusterPolicyName}, clusterPolicy)
+			Expect(err).To(BeNil())
+			clusterPolicy.Spec = originalSpec
+			UpdateClusterPolicy(ctx, spyreV2Client, k8sClientset, clusterPolicy, len(nodeNames), spyrev1alpha1.Ready)
+		})
+
+		AfterEach(func() {
+			DeleteResourceClaimTemplate(ctx, k8sClientset, testClaimName, OperatorNamespace)
+			By("waiting for all resource claims to be released")
+			Eventually(func(g Gomega) {
+				claims := ListResourceClaims(ctx, k8sClientset, OperatorNamespace)
+				g.Expect(claims).To(BeEmpty())
+			}).WithTimeout(2 * time.Minute).WithPolling(5 * time.Second).Should(Succeed())
+		})
+
+		DescribeTable("Get metrics", func(podName string, numOfSpyre int) {
+			By("deploying resourceclaimtemplate")
+			BuildResourceClaimTemplate(ctx, dynClient, discoClient, &ResourceClaimTemplateData{
+				Name:            testClaimName,
+				Namespace:       OperatorNamespace,
+				Count:           numOfSpyre,
+				ProductId:       PfProductId,
+				DeviceClassName: DeviceClassNameForDevice(PfProductId, 0),
+			})
+			exporterPort := GetExporterPort(ctx, k8sClientset)
+			p := BuildMockUserPodWithClaim(exporterPort, testConfig, podName, OperatorNamespace, targetNodeName, testClaimName)
+			_ = k8sClientset.CoreV1().Pods(p.Namespace).Delete(ctx, podName, metav1.DeleteOptions{})
+			By("creating pod")
+			_, err := k8sClientset.CoreV1().Pods(p.Namespace).Create(ctx, p, metav1.CreateOptions{})
+			Expect(err).To(BeNil())
+			By("waiting for pod to be running")
+			WaitForPodRunning(ctx, k8sClientset, p)
+			By("checking pod log")
+			WaitForKeywordInPodLog(ctx, k8sClientset, p, mockUserContainer, getMetricsKeyFuncs, targetNodeName)
+			By("deleting pod")
+			DeletePod(ctx, k8sClientset, p)
+		},
+			Entry("single Spyre", "dra-single-spyre-metric", 1),
+			Entry("multi Spyre", "dra-multi-spyre-metrics", 2),
+		)
 	})
 
 	// This set of tests should be executed last so that the stop / start

@@ -271,7 +271,7 @@ func BuildPod(name, namespace string, resourceName string, quantity int64, nodeN
 func BuildMockUserPod(exporterPort int, testConfig TestConfig, name, namespace string, numOfSpyre int64, nodeName string) *corev1.Pod {
 	var False = false
 	copyData := "./user-copy.sh"
-	sleepAndRunGetMetric := fmt.Sprintf("sleep 20; curl http://%s.%s:%d; sleep 1000", metricsExporterName, OperatorNamespace, exporterPort)
+	sleepAndRunGetMetric := fmt.Sprintf("sleep 20; curl http://%s.%s:%d/metrics; sleep 1000", metricsExporterName, OperatorNamespace, exporterPort)
 	arg0 := fmt.Sprintf("%s;%s", copyData, sleepAndRunGetMetric)
 	pod := buildPod(name, namespace, "ibm.com/spyre_pf", numOfSpyre, nodeName, arg0, true)
 	pod.Spec.RestartPolicy = corev1.RestartPolicyOnFailure
@@ -284,6 +284,23 @@ func BuildMockUserPod(exporterPort int, testConfig TestConfig, name, namespace s
 	pod.Spec.Containers[0].Image = testConfig.ExporterMockUser.GetImage()
 	pod.Spec.Containers[0].ImagePullPolicy = corev1.PullPolicy(testConfig.ExporterMockUser.ImagePullPolicy)
 	pod.Spec.DNSPolicy = corev1.DNSClusterFirst
+	return pod
+}
+
+// BuildMockUserPodWithClaim builds the same mock user pod as BuildMockUserPod
+// but requests Spyre devices through the DRA ResourceClaimTemplate claimTemplateName
+// instead of the device plugin resource. The pod uses the default scheduler.
+func BuildMockUserPodWithClaim(exporterPort int, testConfig TestConfig, name, namespace string, nodeName, claimTemplateName string) *corev1.Pod {
+	const claimName = "spyre"
+	pod := BuildMockUserPod(exporterPort, testConfig, name, namespace, 1, nodeName)
+	pod.Spec.SchedulerName = ""
+	pod.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+		Claims: []corev1.ResourceClaim{{Name: claimName}},
+	}
+	pod.Spec.ResourceClaims = []corev1.PodResourceClaim{{
+		Name:                      claimName,
+		ResourceClaimTemplateName: &claimTemplateName,
+	}}
 	return pod
 }
 
@@ -519,9 +536,21 @@ func WaitForKeywordInPodLog(ctx context.Context, k8sClientset *kubernetes.Client
 			regexp, err := regexp.Compile(keyword)
 			g.Expect(err).To(BeNil())
 			match := regexp.FindString(bufStr)
-			g.Expect(match).NotTo(BeEmpty())
+			g.Expect(match).NotTo(BeEmpty(), "keyword %q not found in log of %s/%s (container %s); tail of log:\n%s",
+				keyword, pod.Namespace, pod.Name, container, tailString(bufStr, maxLoggedPodLogBytes))
 		}
 	}).WithTimeout(3 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
+}
+
+// maxLoggedPodLogBytes limits the pod log size included in a failure message.
+const maxLoggedPodLogBytes = 8192
+
+// tailString returns at most the last n bytes of s.
+func tailString(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[len(s)-n:]
 }
 
 func WaitUntilNoPod(ctx context.Context, k8sClientset *kubernetes.Clientset, spyreV2Client client.Client, namespace string, nodeName string) {
