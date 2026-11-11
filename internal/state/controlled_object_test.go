@@ -191,6 +191,67 @@ var _ = Describe("ControlledObject", Ordered, func() {
 		})
 	})
 
+	Context("card management DaemonSet template", func() {
+		var app *corev1.Container
+		var volumes []corev1.Volume
+
+		BeforeEach(func() {
+			runtimeObj, gvk, err := DecodeFromFile(StateScheme,
+				filepath.Join(AssetsPath, "state-plugin-components", "spyre-card-management", "0600_daemonset.yaml.tmpl"))
+			Expect(err).To(BeNil())
+			Expect(gvk.Kind).To(Equal("DaemonSet"))
+			ds, ok := runtimeObj.(*appsv1.DaemonSet)
+			Expect(ok).To(BeTrue())
+			volumes = ds.Spec.Template.Spec.Volumes
+			app = nil
+			for i := range ds.Spec.Template.Spec.Containers {
+				if ds.Spec.Template.Spec.Containers[i].Name == "app" {
+					app = &ds.Spec.Template.Spec.Containers[i]
+				}
+			}
+			Expect(app).NotTo(BeNil())
+		})
+
+		It("mounts the ConfigMap at /etc/ibm/spyre and a writable emptyDir at its diags directory", func() {
+			var etcMount, diagsMount *corev1.VolumeMount
+			for i := range app.VolumeMounts {
+				switch app.VolumeMounts[i].MountPath {
+				case "/etc/ibm/spyre":
+					etcMount = &app.VolumeMounts[i]
+				case "/etc/ibm/spyre/diags":
+					diagsMount = &app.VolumeMounts[i]
+				}
+			}
+			Expect(etcMount).NotTo(BeNil())
+			// a plain directory mount, no subPath: kubelet keeps refreshing the ini when the ConfigMap changes
+			Expect(etcMount.SubPath).To(BeEmpty())
+			Expect(diagsMount).NotTo(BeNil())
+			Expect(diagsMount.ReadOnly).To(BeFalse())
+
+			sources := map[string]corev1.VolumeSource{}
+			for _, v := range volumes {
+				sources[v.Name] = v.VolumeSource
+			}
+			Expect(sources[etcMount.Name].ConfigMap).NotTo(BeNil())
+			Expect(sources[etcMount.Name].ConfigMap.Name).To(Equal("spyre-cardmgmt-config"))
+			Expect(sources[diagsMount.Name].EmptyDir).NotTo(BeNil())
+		})
+
+		It("sets the listen address of card management to the pod IP", func() {
+			var host *corev1.EnvVar
+			for i := range app.Env {
+				if app.Env[i].Name == "CARDMGMT_SVC_SERVICE_HOST" {
+					host = &app.Env[i]
+				}
+			}
+			Expect(host).NotTo(BeNil())
+			Expect(host.Value).To(BeEmpty())
+			Expect(host.ValueFrom).NotTo(BeNil())
+			Expect(host.ValueFrom.FieldRef).NotTo(BeNil())
+			Expect(host.ValueFrom.FieldRef.FieldPath).To(Equal("status.podIP"))
+		})
+	})
+
 	Context("ResourceClaimTemplate", func() {
 		cardmgmtDir := filepath.Join(AssetsPath, "state-plugin-components", "spyre-card-management")
 		coreDir := filepath.Join(AssetsPath, "state-core-components", "dra-driver-spyre")

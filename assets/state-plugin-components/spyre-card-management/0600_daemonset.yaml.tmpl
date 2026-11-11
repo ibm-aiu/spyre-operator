@@ -33,6 +33,11 @@ spec:
         configMap:
           name: spyre-cardmgmt-config
           optional: true
+      # /etc/ibm/spyre is the read-only ConfigMap above, but card management creates /etc/ibm/spyre/diags (CM_DIAG_DIR)
+      # at start: image v1.2.5 logs "Read-only file system" and falls back to /tmp, v1.3.1-rc.1 exits.
+      # So only diags is a writable emptyDir, mounted inside the ConfigMap mount; the ini keeps being refreshed by kubelet.
+      - name: cardmgmt-diags
+        emptyDir: {}
       - name: imagepullsecret
         secret:
           secretName: registry-dockerconfig-secret
@@ -81,6 +86,14 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
+        # Card management uses this one value both as the address it listens on and as the address it hands to
+        # the PF/VF/diagnostics runners to connect to. Kubernetes would inject the ClusterIP of cardmgmt-svc,
+        # which a pod cannot bind ("Cannot assign requested address"). The pod IP can be bound and is reachable
+        # by the runners (they run with host networking on the same node). Explicit env wins over the injected one.
+        - name: CARDMGMT_SVC_SERVICE_HOST
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         resources:
           limits:
             cpu: 1000m
@@ -94,6 +107,8 @@ spec:
         volumeMounts:
         - name: configs
           mountPath: /etc/ibm/spyre
+        - name: cardmgmt-diags
+          mountPath: /etc/ibm/spyre/diags
         - name: imagepullsecret
           mountPath: /var/imagepullsecret
           readOnly: true
