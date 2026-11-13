@@ -44,7 +44,7 @@ RUN dnf --installroot=/tmp/ubi-micro \
 
 
 
-FROM registry.access.redhat.com/ubi9-micro:9.6 AS final
+FROM registry.access.redhat.com/ubi9-micro:9.9 AS final
 
 ARG VERSION
 
