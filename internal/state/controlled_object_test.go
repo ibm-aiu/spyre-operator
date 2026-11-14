@@ -9,6 +9,7 @@ package state_test
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -188,6 +189,23 @@ var _ = Describe("ControlledObject", Ordered, func() {
 			// Test GetObject
 			obj := controlledObj.GetObject()
 			Expect(obj).NotTo(BeNil())
+		})
+	})
+
+	Context("card management assets", func() {
+		It("has no Service", func() {
+			// Card management runs one pod per node, each with its own DaemonSet, and the runners connect to
+			// the pod IP of the same node. A Service selecting app=cardmgmt would span every node and could
+			// route a runner to the pod of another node, and nothing connects through it.
+			files, err := filepath.Glob(filepath.Join(AssetsPath, "state-plugin-components", "spyre-card-management", "*"))
+			Expect(err).To(BeNil())
+			Expect(files).NotTo(BeEmpty())
+			for _, f := range files {
+				data, err := os.ReadFile(f)
+				Expect(err).To(BeNil())
+				Expect(string(data)).NotTo(MatchRegexp(`(?m)^kind:\s*Service\s*$`),
+					"%s defines a Service; card management must be reached through the pod IP", f)
+			}
 		})
 	})
 
