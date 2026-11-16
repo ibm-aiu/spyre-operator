@@ -1,6 +1,6 @@
 module github.com/ibm-aiu/spyre-operator
 
-go 1.26.7
+go 1.26.10
 
 require (
 	cel.dev/cel-go v0.33.2
