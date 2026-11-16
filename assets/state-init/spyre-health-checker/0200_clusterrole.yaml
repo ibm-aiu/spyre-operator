@@ -29,3 +29,13 @@ rules:
   - resourceclaims
   verbs:
   - get
+# The health checker reads the labels of its own Node (spyre.ibm.com/health-override).
+# A ClusterRole cannot be limited to one node name here, so this is read-only access to all nodes.
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
