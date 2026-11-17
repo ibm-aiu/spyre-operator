@@ -488,6 +488,8 @@ var _ = Describe("Degraded card management", Ordered, func() {
 			Expect(ready).To(BeFalse())
 		})
 
+		// The component is named card management only because the helpers of this file are; the Service here
+		// stands for any Service in front of a DaemonSet (card management itself has none).
 		It("is not blocked by the service without endpoint when every pod of the DaemonSet is degraded", func() {
 			node := uniqueNode()
 			createNode(node, 2)
@@ -552,6 +554,106 @@ var _ = Describe("Degraded card management", Ordered, func() {
 		})
 	})
 
+	// Card management has no Service: the per-node DaemonSets are the last steps of the component.
+	// These cases pin down that the readiness then follows the nodes, not the DaemonSet that happens to be last.
+	Context("without a Service (the DaemonSets are the last steps)", func() {
+		setNodeStatus := func(node string, ready bool) {
+			ds := getDaemonSet(node)
+			n := int32(1)
+			ds.Status = appsv1.DaemonSetStatus{DesiredNumberScheduled: n, CurrentNumberScheduled: n,
+				UpdatedNumberScheduled: n, ObservedGeneration: ds.Generation}
+			if ready {
+				ds.Status.NumberReady = n
+				ds.Status.NumberAvailable = n
+			}
+			Expect(StateClient.Status().Update(ctx, ds)).To(Succeed())
+		}
+		// newDaemonSetsOnly returns a component made only of the DaemonSets of the two nodes
+		newDaemonSetsOnly := func(nodeA, nodeB string) *ControlledComponent {
+			c := &ControlledComponent{}
+			c.ExportSetName(spyreconst.CardManagementResourceName)
+			c.ExportSetNamespace(OpNs)
+			c.ExportSetClient(StateClient)
+			c.SetObjects([]ControlledObject{newControlledDaemonSet(nodeA), newControlledDaemonSet(nodeB)})
+			for _, n := range []string{nodeA, nodeB} {
+				track(newDaemonSet(n))
+			}
+			return c
+		}
+
+		It("is ready and reports the node with permanent pending as degraded when the other node is ready", func() {
+			nodeA, nodeB := uniqueNode(), uniqueNode()
+			createNode(nodeA, 0)
+			createNode(nodeB, 2)
+			c := newDaemonSetsOnly(nodeA, nodeB)
+			_, _, err := c.Sync(ctx)
+			Expect(err).To(BeNil())
+			createCardMgmtPod(nodeA, 2, time.Hour)
+			setNodeStatus(nodeA, false)
+			setNodeStatus(nodeB, true)
+
+			ready, _, err := c.Sync(ctx)
+			Expect(err).To(BeNil())
+			Expect(ready).To(BeTrue())
+			Expect(c.DegradedNodes()).To(HaveLen(1))
+			Expect(c.DegradedNodes()[0].Name).To(Equal(nodeA))
+		})
+
+		It("is ready when every node is ready", func() {
+			nodeA, nodeB := uniqueNode(), uniqueNode()
+			createNode(nodeA, 2)
+			createNode(nodeB, 2)
+			c := newDaemonSetsOnly(nodeA, nodeB)
+			_, _, err := c.Sync(ctx)
+			Expect(err).To(BeNil())
+			setNodeStatus(nodeA, true)
+			setNodeStatus(nodeB, true)
+
+			ready, _, err := c.Sync(ctx)
+			Expect(err).To(BeNil())
+			Expect(ready).To(BeTrue())
+			Expect(c.DegradedNodes()).To(BeEmpty())
+		})
+
+		It("stays not ready while the pending of a node is still transient", func() {
+			nodeA, nodeB := uniqueNode(), uniqueNode()
+			createNode(nodeA, 2)
+			createNode(nodeB, 2)
+			c := newDaemonSetsOnly(nodeA, nodeB)
+			_, _, err := c.Sync(ctx)
+			Expect(err).To(BeNil())
+			createCardMgmtPod(nodeA, 2, time.Second)
+			setNodeStatus(nodeA, false)
+			setNodeStatus(nodeB, true)
+
+			ready, _, err := c.Sync(ctx)
+			Expect(err).To(BeNil())
+			Expect(ready).To(BeFalse())
+			Expect(c.DegradedNodes()).To(BeEmpty())
+		})
+
+		It("reports every node as degraded when all of them are permanently pending", func() {
+			nodeA, nodeB := uniqueNode(), uniqueNode()
+			createNode(nodeA, 0)
+			createNode(nodeB, 0)
+			c := newDaemonSetsOnly(nodeA, nodeB)
+			_, _, err := c.Sync(ctx)
+			Expect(err).To(BeNil())
+			createCardMgmtPod(nodeA, 2, time.Hour)
+			createCardMgmtPod(nodeB, 2, time.Hour)
+			setNodeStatus(nodeA, false)
+			setNodeStatus(nodeB, false)
+
+			// the caller emits Degraded (not NotReady) when every unready node is confirmed degraded
+			ready, _, err := c.Sync(ctx)
+			Expect(err).To(BeNil())
+			Expect(ready).To(BeTrue())
+			Expect(c.DegradedNodes()).To(HaveLen(2))
+		})
+	})
+
+	// Card management has no Service. This is about a Service in front of a DaemonSet, as the ones of the health
+	// checker and the metrics exporter, which Prometheus uses to discover the pods of every node.
 	Context("Service of DaemonSets", func() {
 		// newService creates the service selecting the pods of the DaemonSet of the node, and returns its controlled object
 		newService := func(node string) ControlledObject {

@@ -103,13 +103,6 @@ var _ = Describe("integration test", Label("integration", "cardmgmt"), Ordered, 
 			Expect(len(pods.Items)).To(BeNumerically("==", 1))
 		})
 
-		It("should have cardmgmt-svc service on x86_64", func() {
-			Eventually(func(g Gomega) {
-				_, err := k8sClientset.CoreV1().Services("spyre-operator").Get(ctx, "cardmgmt-svc", metav1.GetOptions{})
-				g.Expect(err).To(BeNil())
-
-			}).WithTimeout(180 * time.Second).WithPolling(5 * time.Second).Should(Succeed())
-		})
 	})
 
 	Context("deployment of VF Pods", Label("vf"), Ordered, func() {

@@ -87,9 +87,10 @@ spec:
             fieldRef:
               fieldPath: spec.nodeName
         # Card management uses this one value both as the address it listens on and as the address it hands to
-        # the PF/VF/diagnostics runners to connect to. Kubernetes would inject the ClusterIP of cardmgmt-svc,
-        # which a pod cannot bind ("Cannot assign requested address"). The pod IP can be bound and is reachable
-        # by the runners (they run with host networking on the same node). Explicit env wins over the injected one.
+        # the PF/VF/diagnostics runners to connect to. There is one card management pod per node and the runners
+        # are its nested containers on the same node, so they connect to the pod IP directly. No Service is
+        # needed: a Service selecting the pods of every node would route a runner to another node's pod.
+        # The variable name is kept because card management reads it (it was once injected by a Service).
         - name: CARDMGMT_SVC_SERVICE_HOST
           valueFrom:
             fieldRef:
