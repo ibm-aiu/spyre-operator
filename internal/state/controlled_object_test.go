@@ -209,6 +209,74 @@ var _ = Describe("ControlledObject", Ordered, func() {
 		})
 	})
 
+	Context("health checker DaemonSet", func() {
+		var checker *corev1.Container
+		var volumes []corev1.Volume
+
+		BeforeEach(func() {
+			runtimeObj, gvk, err := DecodeFromFile(StateScheme,
+				filepath.Join(AssetsPath, "state-init", "spyre-health-checker", "0400_daemonset.yaml"))
+			Expect(err).To(BeNil())
+			Expect(gvk.Kind).To(Equal("DaemonSet"))
+			ds, ok := runtimeObj.(*appsv1.DaemonSet)
+			Expect(ok).To(BeTrue())
+			volumes = ds.Spec.Template.Spec.Volumes
+			checker = nil
+			for i := range ds.Spec.Template.Spec.Containers {
+				if ds.Spec.Template.Spec.Containers[i].Name == "checker" {
+					checker = &ds.Spec.Template.Spec.Containers[i]
+				}
+			}
+			Expect(checker).NotTo(BeNil())
+		})
+
+		It("mounts the optional node health override ConfigMap read-only, without subPath", func() {
+			var mount *corev1.VolumeMount
+			for i := range checker.VolumeMounts {
+				if checker.VolumeMounts[i].MountPath == "/etc/spyre-health-checker/override" {
+					mount = &checker.VolumeMounts[i]
+				}
+			}
+			Expect(mount).NotTo(BeNil())
+			Expect(mount.ReadOnly).To(BeTrue())
+			// a plain directory mount: with a subPath kubelet would never refresh the file after a change
+			Expect(mount.SubPath).To(BeEmpty())
+
+			var source *corev1.ConfigMapVolumeSource
+			for _, v := range volumes {
+				if v.Name == mount.Name {
+					source = v.ConfigMap
+				}
+			}
+			Expect(source).NotTo(BeNil(), "the mount must refer to a ConfigMap volume of the pod")
+			Expect(source.Name).To(Equal("spyre-health-override"))
+			// optional: without the ConfigMap (the normal case) the pod must still start
+			Expect(source.Optional).NotTo(BeNil())
+			Expect(*source.Optional).To(BeTrue())
+		})
+
+		It("does not create the override ConfigMap: the administrator owns it", func() {
+			files, err := filepath.Glob(filepath.Join(AssetsPath, "state-init", "spyre-health-checker", "*"))
+			Expect(err).To(BeNil())
+			for _, f := range files {
+				data, err := os.ReadFile(f)
+				Expect(err).To(BeNil())
+				Expect(string(data)).NotTo(MatchRegexp(`(?m)^kind:\s*ConfigMap\s*$`),
+					"%s defines a ConfigMap; spyre-health-override must only be created by an administrator", f)
+			}
+		})
+
+		It("only mounts volumes that the pod defines", func() {
+			defined := map[string]bool{}
+			for _, v := range volumes {
+				defined[v.Name] = true
+			}
+			for _, m := range checker.VolumeMounts {
+				Expect(defined[m.Name]).To(BeTrue(), "mount %s has no volume", m.Name)
+			}
+		})
+	})
+
 	Context("card management DaemonSet template", func() {
 		var app *corev1.Container
 		var volumes []corev1.Volume
