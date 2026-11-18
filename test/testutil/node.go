@@ -21,6 +21,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 )
 
 const (
@@ -58,17 +59,27 @@ func isCRC(ctx context.Context, k8sClientset *kubernetes.Clientset) bool {
 }
 
 func CleanUpNode(ctx context.Context, k8sClientset *kubernetes.Clientset, nodeName string) {
-	node, err := k8sClientset.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
-	Expect(err).To(BeNil())
-	newLabel := make(map[string]string)
-	for key, value := range node.Labels {
-		if _, found := ExpectedNodeLabelsWithPseudoDevice[key]; !found {
-			// add only keys those are not in label keys set by the pseudo mode.
-			newLabel[key] = value
+	// Other components (kubelet, NFD) update the node at the same time, so the update can fail with
+	// a 409 Conflict. Read the node again and retry the whole read-modify-write.
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		node, err := k8sClientset.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to get node %s: %w", nodeName, err)
 		}
-	}
-	node.Labels = newLabel
-	_, err = k8sClientset.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{})
+		newLabel := make(map[string]string)
+		for key, value := range node.Labels {
+			if _, found := ExpectedNodeLabelsWithPseudoDevice[key]; !found {
+				// add only keys those are not in label keys set by the pseudo mode.
+				newLabel[key] = value
+			}
+		}
+		node.Labels = newLabel
+		_, err = k8sClientset.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to update node %s: %w", nodeName, err)
+		}
+		return nil
+	})
 	Expect(err).To(BeNil())
 }
 
