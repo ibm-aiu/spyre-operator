@@ -35,6 +35,6 @@ spec:
         overwrite: true
         path: /etc/crio/crio.conf.d/10-custom
   kernelArguments:
-  - intel_iommu=on
+  - intel_iommu=on,sm_off
   - amd_iommu=on
   - iommu=pt
