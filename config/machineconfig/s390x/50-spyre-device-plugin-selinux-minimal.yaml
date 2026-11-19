@@ -47,7 +47,7 @@ spec:
           ExecStart=/usr/bin/chmod 770 /var/lib/kubelet/plugins_registry
           ExecStart=/usr/bin/chmod 770 /var/lib/kubelet/device-plugins
 
-          # delete device plugin directories before creating it
+          # Delete device plugin directories before creating it
           ExecStart=/usr/bin/rm -f /usr/local/etc/device-plugins/complete
           ExecStart=/usr/bin/rm -rf /usr/local/etc/device-plugins/spyre-config
           ExecStart=/usr/bin/rm -rf /usr/local/etc/device-plugins/spyre-metrics
@@ -86,6 +86,14 @@ spec:
           ExecStart=/usr/bin/chmod 770 /usr/local/etc/dra-driver-spyre
           ExecStart=/usr/bin/chcon -R -t container_file_t /usr/local/etc/dra-driver-spyre
           RemainAfterExit=true
+
+          # Allow dra-driver-spyre to run with non-privileged
+          ExecStart=/usr/bin/mkdir -p /var/lib/kubelet/plugins/spyre.ibm.com
+          ExecStart=/usr/bin/mkdir -p /var/run/cdi
+          ExecStart=/usr/bin/chmod 770 /var/lib/kubelet/plugins/spyre.ibm.com
+          ExecStart=/usr/bin/chmod 770 /var/run/cdi
+          ExecStart=/usr/bin/chcon -R -t container_file_t /var/lib/kubelet/plugins/spyre.ibm.com
+          ExecStart=/usr/bin/chcon -R -t container_file_t /var/run/cdi
 
           [Install]
           WantedBy=multi-user.target
