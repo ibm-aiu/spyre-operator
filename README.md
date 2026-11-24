@@ -17,7 +17,7 @@ This phased rollout helps ensure prerequisites are ready before core and optiona
 - IBM Z and LinuxONE user guide: https://www.ibm.com/docs/en/rhocp-ibm-z?topic=spyre-operator-z-linuxone-users-guide
 - Red Hat Ecosystem Catalog entry: https://catalog.redhat.com/en/software/container-stacks/detail/683da25176619df6976559d0
 
-## Repository links
+## Repository links 
 
 - [Contributing](CONTRIBUTING.md)
 - [Maintainers](MAINTAINERS.md)
