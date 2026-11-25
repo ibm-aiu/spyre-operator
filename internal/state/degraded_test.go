@@ -19,6 +19,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -276,6 +277,35 @@ var _ = Describe("Degraded card management", Ordered, func() {
 				corev1.ContainerStatus{State: waiting("CrashLoopBackOff"), RestartCount: 5,
 					LastTerminationState: corev1.ContainerState{Terminated: terminated(0)}}, time.Hour, "", false),
 		)
+
+		It("regards a Failed pod (e.g., UnexpectedAdmissionError) as failing and degraded immediately", func() {
+			node := uniqueNode()
+			createNode(node, 2)
+			ds := newDaemonSet(node)
+			ds.Name = "plain-ds-" + node
+			Expect(StateClient.Create(ctx, ds)).To(Succeed())
+			track(ds)
+			createFailingPod(ds, node, corev1.ContainerStatus{}, time.Second)
+			pod := &corev1.Pod{}
+			Expect(StateClient.Get(ctx, types.NamespacedName{Name: "failing-" + node, Namespace: OpNs}, pod)).To(Succeed())
+			pod.Status = corev1.PodStatus{
+				Phase:   corev1.PodFailed,
+				Reason:  "UnexpectedAdmissionError",
+				Message: "Allocate failed due to no healthy devices present",
+			}
+			Expect(StateClient.Status().Update(ctx, pod)).To(Succeed())
+			defaultObj, err := NewDefaultObject(ctx, "DaemonSet", OpNs, ds)
+			Expect(err).To(BeNil())
+			plain, err := NewDaemonSet(defaultObj, ds, OpNs)
+			Expect(err).To(BeNil())
+			degradable, ok := plain.(DegradableObject)
+			Expect(ok).To(BeTrue())
+			Expect(degradable.Failing(ctx, StateClient)).To(HaveLen(1))
+			degraded := degradable.Degraded(ctx, StateClient)
+			Expect(degraded).To(HaveLen(1))
+			Expect(degraded[0].Name).To(Equal(node))
+			Expect(degraded[0].Reason).To(ContainSubstring("UnexpectedAdmissionError"))
+		})
 	})
 
 	Context("ControlledComponent", func() {
