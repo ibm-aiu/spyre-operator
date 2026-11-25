@@ -851,7 +851,12 @@ func (obj *DaemonSet) failedNodes(ctx context.Context, k8sClient client.Client, 
 // containerFailure returns the reason if a (init) container of the Pod is failing on creation or at runtime.
 // When confirmed is true, a creation failure must have lasted over the grace period, and a runtime crash
 // must have restarted the container enough, which is confirmed instantly without waiting for the grace period.
+// A Pod in the Failed phase (e.g., rejected on admission with UnexpectedAdmissionError) is terminal and is never
+// restarted, so it is regarded as failing and degraded immediately regardless of the grace period.
 func containerFailure(pod *corev1.Pod, confirmed bool) (string, bool) {
+	if pod.Status.Phase == corev1.PodFailed {
+		return fmt.Sprintf("pod %s failed: %s: %s", pod.Name, pod.Status.Reason, pod.Status.Message), true
+	}
 	if pod.Status.Phase != corev1.PodPending && pod.Status.Phase != corev1.PodRunning {
 		return "", false
 	}
