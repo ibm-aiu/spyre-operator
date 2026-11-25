@@ -336,6 +336,9 @@ func (c *ControlledComponent) syncEnabled(ctx context.Context, logger logr.Logge
 // syncObject creates or updates a single controlled object.
 // Returns (true, "", nil) when the object was successfully synced or created.
 func (c *ControlledComponent) syncObject(ctx context.Context, logger logr.Logger, obj ControlledObject) (bool, string, error) {
+	if patchable, ok := obj.(PatchableObject); ok {
+		return c.patchObject(ctx, logger, obj, patchable)
+	}
 	syncedObject, err := obj.Sync(ctx, c.client)
 	if apiErrors.IsNotFound(err) {
 		if err := c.client.Create(ctx, obj.GetObject()); err != nil && !apiErrors.IsAlreadyExists(err) {
@@ -354,6 +357,31 @@ func (c *ControlledComponent) syncObject(ctx context.Context, logger logr.Logger
 			return c.client.Update(ctx, syncedObject)
 		}); err != nil {
 			msg := fmt.Sprintf("failed to update %s: %v", obj.GetID(), err)
+			return false, msg, errors.New(msg)
+		}
+	}
+	return true, "", nil
+}
+
+// patchObject creates or patches an object which must not be overwritten by Update (see PatchableObject).
+func (c *ControlledComponent) patchObject(ctx context.Context, logger logr.Logger,
+	obj ControlledObject, patchable PatchableObject) (bool, string, error) {
+	live, modified, err := patchable.SyncPatch(ctx, c.client)
+	if apiErrors.IsNotFound(err) {
+		if err := c.client.Create(ctx, obj.GetObject()); err != nil && !apiErrors.IsAlreadyExists(err) {
+			spyreerr.LogErrCreate(logger, err)
+			msg := fmt.Sprintf("failed to create %s: %v", obj.GetID(), err)
+			return false, msg, errors.New(msg)
+		}
+		return true, "", nil
+	}
+	if err != nil {
+		msg := fmt.Sprintf("failed to sync %s: %v", obj.GetID(), err)
+		return false, msg, errors.New(msg)
+	}
+	if !c.skipUpdate {
+		if err := c.client.Patch(ctx, modified, client.MergeFrom(live)); err != nil {
+			msg := fmt.Sprintf("failed to patch %s: %v", obj.GetID(), err)
 			return false, msg, errors.New(msg)
 		}
 	}
