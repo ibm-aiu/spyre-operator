@@ -32,7 +32,13 @@ var (
 	DegradedConditionType  = degradedConditionType
 	OverallState           = overallState
 	ClusterRunning         = clusterRunning
+	CountCardsWithFirstVf  = countCardsWithFirstVf
 )
+
+// NewClusterStateWithClient returns a ClusterState which reads the cluster through k8sClient.
+func NewClusterStateWithClient(k8sClient client.Client) *ClusterState {
+	return &ClusterState{OperatorNamespace: "spyre-operator", k8sClient: k8sClient}
+}
 
 func (s *ClusterState) ApplyLogLevel(ctx context.Context, clusterPolicy *spyrev2.SpyreClusterPolicy) error {
 	return s.applyLogLevel(ctx, clusterPolicy)

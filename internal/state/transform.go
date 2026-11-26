@@ -476,9 +476,27 @@ func applyCardManagementSpyreFilter(obj *appsv1.DaemonSet, config *spyrev1alpha1
 	return false, nil
 }
 
+// countCardsWithFirstVf returns the number of cards on the node which have the first VF,
+// i.e. the VF whose address is the PF address with the suffix ".0" replaced with ".1".
+//
+// This is the number of PFs and of VFs the card management Pod requests. The spyre-scheduler
+// hands the card management Pod the cards which have the first VF, so that the Pod is never given
+// a VF which does not exist. The count must follow the same rule as the scheduler.
+// Health is deliberately not considered: it changes more often than the structure of the cards,
+// and every change of the count recreates the card management Pod.
+func countCardsWithFirstVf(nodeState *spyrev1alpha1.SpyreNodeState) int {
+	n := 0
+	for _, sIf := range nodeState.Spec.SpyreInterfaces {
+		if slices.Contains(sIf.Vfs, strings.Replace(sIf.PciAddress, ".0", ".1", 1)) {
+			n++
+		}
+	}
+	return n
+}
+
 // transformCardManagementDevicePluginResources sets the card-management
-// container's extended-resource limits from the node's PF capacity when the
-// device plugin (not DRA) allocates devices.
+// container's extended-resource limits from the cards recorded in the SpyreNodeState of the node
+// when the device plugin (not DRA) allocates devices.
 func transformCardManagementDevicePluginResources(obj *appsv1.DaemonSet, cluster *ClusterState,
 	nodeName string) error {
 	// Device-plugin allocation relies on the spyre-scheduler extender to
@@ -490,35 +508,24 @@ func transformCardManagementDevicePluginResources(obj *appsv1.DaemonSet, cluster
 		return nil // tentatively skip
 	}
 
-	nodeList := &corev1.NodeList{}
-	err := cluster.k8sClient.List(context.Background(), nodeList,
-		client.MatchingLabels{"node-role.kubernetes.io/worker": ""})
-	if err != nil {
-		return fmt.Errorf("failed to transform cardmgmt: %w", err)
+	// The card management is deployed after the device plugin, so the SpyreNodeState of the node
+	// is expected to exist and to have the cards. Otherwise return an error, so that the
+	// reconciliation is retried instead of deploying the Pod which requests no device.
+	nodeState := &spyrev1alpha1.SpyreNodeState{}
+	if err := cluster.k8sClient.Get(context.Background(), client.ObjectKey{Name: nodeName}, nodeState); err != nil {
+		return fmt.Errorf("failed to transform cardmgmt: failed to get SpyreNodeState of node %s: %w", nodeName, err)
 	}
-
-	for _, node := range nodeList.Items {
-		if node.Name != nodeName {
-			continue
-		}
-
-		q, exists := node.Status.Capacity[spyreconst.ResourcePrefix+"/"+spyreconst.PfResourceName]
-		if !exists {
-			break
-		}
-		v, ok := q.AsInt64()
-		if !ok {
-			return fmt.Errorf("failed to convert quantity of spyre_pf: %s", q.String())
-		}
-		if v > 0 {
-			m := map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceName(spyreconst.ResourcePrefix + "/" + spyreconst.PfResourceName): q,
-				corev1.ResourceName(spyreconst.ResourcePrefix + "/" + spyreconst.VfResourceName): q,
-			}
-			obj.Spec.Template.Spec.Containers[0].Resources = corev1.ResourceRequirements{Limits: m}
-		}
-		break
+	n := countCardsWithFirstVf(nodeState)
+	if n == 0 {
+		return fmt.Errorf("failed to transform cardmgmt: no card with the first VF is found in SpyreNodeState of node %s",
+			nodeName)
 	}
+	q := *resource.NewQuantity(int64(n), resource.DecimalSI)
+	m := map[corev1.ResourceName]resource.Quantity{
+		corev1.ResourceName(spyreconst.ResourcePrefix + "/" + spyreconst.PfResourceName): q,
+		corev1.ResourceName(spyreconst.ResourcePrefix + "/" + spyreconst.VfResourceName): q,
+	}
+	obj.Spec.Template.Spec.Containers[0].Resources = corev1.ResourceRequirements{Limits: m}
 	return nil
 }
 
