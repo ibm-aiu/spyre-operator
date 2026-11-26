@@ -60,6 +60,10 @@ spec:
         - name: cardmgmt-health-api-socket
           mountPath: /var/run/cardmgmt-health-check-api
           readOnly: true
+        # Optional node health override. The file <mountPath>/<node name> holds "healthy" or "unhealthy".
+        - name: health-override
+          mountPath: /etc/spyre-health-checker/override
+          readOnly: true
         resources:
           requests:
             cpu: 100m
@@ -125,3 +129,11 @@ spec:
         hostPath:
           path: /usr/local/etc/spyre-cardmgmt
           type: DirectoryOrCreate
+      - name: health-override
+        # Optional ConfigMap spyre-health-override, created by an administrator (the operator never
+        # creates it). A key named after a node, with the value "healthy" or "unhealthy", forces the
+        # health of every Spyre device on that node. Without the ConfigMap the volume is empty and
+        # nothing changes. The mount must not use subPath, or kubelet would never update the files.
+        configMap:
+          name: spyre-health-override
+          optional: true
