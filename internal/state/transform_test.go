@@ -755,7 +755,9 @@ var _ = Describe("Transform", func() {
 				Expect(err.Error()).To(ContainSubstring("SpyreNodeState"))
 			})
 
-			It("returns an error when no card has the first VF yet", func() {
+			// A SpyreNodeState exists for every node, so a node without Spyre card, or without the first VF,
+			// must not be an error: it would block the card management on all the other nodes.
+			It("requests no device without an error when no card has the first VF", func() {
 				ctx := context.Background()
 				nodeState := &spyrev1alpha1.SpyreNodeState{
 					ObjectMeta: metav1.ObjectMeta{Name: nodeName},
@@ -768,7 +770,7 @@ var _ = Describe("Transform", func() {
 				DeferCleanup(func() { Expect(StateClient.Delete(ctx, nodeState)).To(Succeed()) })
 
 				ds := newCardMgmtDaemonset()
-				Expect(TransformCardManagement(ds, &cardMgmtCp, NewClusterStateWithClient(StateClient), false)).NotTo(Succeed())
+				Expect(TransformCardManagement(ds, &cardMgmtCp, NewClusterStateWithClient(StateClient), false)).To(Succeed())
 				Expect(ds.Spec.Template.Spec.Containers[0].Resources.Limits).To(BeEmpty())
 			})
 		})

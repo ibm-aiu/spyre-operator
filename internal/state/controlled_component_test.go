@@ -9,10 +9,8 @@ package state_test
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	spyrev1alpha1 "github.com/ibm-aiu/spyre-operator/api/v1alpha1"
@@ -23,7 +21,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -353,12 +350,12 @@ var _ = Describe("ControlledComponent", Ordered, func() {
 		})
 
 		DescribeTable("can apply num of spyre cards at transform",
-			func(pfCapacity *int64, expectLimits bool) {
+			func(interfaces []spyrev1alpha1.SpyreInterface, expectLimits bool) {
 				stateName := "state-plugin-components"
 				nodeNames := []string{"node1", "node2"}
 
-				By("creating Node resources")
-				for idx, n := range nodeNames {
+				By("creating Node and SpyreNodeState resources")
+				for _, n := range nodeNames {
 					node := &corev1.Node{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: n,
@@ -374,19 +371,13 @@ var _ = Describe("ControlledComponent", Ordered, func() {
 						Expect(err).To(BeNil())
 					}
 
-					// Set capacity based on test case
-					if pfCapacity != nil {
-						numCards := strconv.Itoa((idx + 1) * 2)
-						fmt.Printf("num cards: %s\n", numCards)
-						node.Status.Capacity = corev1.ResourceList{
-							spyreconst.ResourcePrefix + "/" + spyreconst.PfResourceName: *resource.NewQuantity(*pfCapacity, resource.DecimalSI),
-						}
-					} else {
-						// No ibm.com/spyre_pf in capacity
-						node.Status.Capacity = corev1.ResourceList{}
+					// The number of the requested devices follows the cards in SpyreNodeState, not the capacity.
+					nodeState := &spyrev1alpha1.SpyreNodeState{
+						ObjectMeta: metav1.ObjectMeta{Name: n},
+						Spec:       spyrev1alpha1.SpyreNodeStateSpec{NodeName: n, SpyreInterfaces: interfaces},
 					}
-					err = K8sClient.Status().Update(ctx, node)
-					Expect(err).To(BeNil())
+					Expect(K8sClient.Create(ctx, nodeState)).To(Succeed())
+					DeferCleanup(func() { Expect(K8sClient.Delete(ctx, nodeState)).To(Succeed()) })
 				}
 
 				path := filepath.Join(AssetsPath, stateName)
@@ -438,20 +429,30 @@ var _ = Describe("ControlledComponent", Ordered, func() {
 						limits := ds.Spec.Template.Spec.Containers[0].Resources.Limits
 
 						if expectLimits {
-							// Pattern 1: ibm.com/spyre_pf: 2 in capacity
-							Expect(limits).To(HaveKey(corev1.ResourceName("ibm.com/spyre_pf")))
-							pfLimit := limits[corev1.ResourceName("ibm.com/spyre_pf")]
-							Expect(pfLimit.Value()).To(Equal(int64(2)))
+							// Pattern 1: 2 cards have the first VF
+							for _, name := range []string{"ibm.com/spyre_pf", "ibm.com/spyre_vf"} {
+								Expect(limits).To(HaveKey(corev1.ResourceName(name)))
+								limit := limits[corev1.ResourceName(name)]
+								Expect(limit.Value()).To(Equal(int64(2)))
+							}
 						} else {
 							// Pattern 2 & 3: no limits should exist
 							Expect(limits).NotTo(HaveKey(corev1.ResourceName("ibm.com/spyre_pf")))
+							Expect(limits).NotTo(HaveKey(corev1.ResourceName("ibm.com/spyre_vf")))
 						}
 					}
 				}
 			},
-			Entry("when ibm.com/spyre_pf is 2 in capacity", func() *int64 { v := int64(2); return &v }(), true),
-			Entry("when ibm.com/spyre_pf is 0 in capacity", func() *int64 { v := int64(0); return &v }(), false),
-			Entry("when no ibm.com/spyre_pf exists in capacity", nil, false),
+			Entry("when 2 cards have the first VF", []spyrev1alpha1.SpyreInterface{
+				{PciAddress: "0001:01:00.0", NumVfs: 1, Vfs: []string{"0001:01:00.1"}},
+				{PciAddress: "0001:02:00.0", NumVfs: 2, Vfs: []string{"0001:02:00.1", "0001:02:00.2"}},
+				{PciAddress: "0001:03:00.0"},
+			}, true),
+			Entry("when no card has the first VF", []spyrev1alpha1.SpyreInterface{
+				{PciAddress: "0001:01:00.0"},
+				{PciAddress: "0001:02:00.0", NumVfs: 1, Vfs: []string{"0001:02:00.2"}},
+			}, false),
+			Entry("when the node has no Spyre card", nil, false),
 		)
 	})
 

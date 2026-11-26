@@ -509,16 +509,18 @@ func transformCardManagementDevicePluginResources(obj *appsv1.DaemonSet, cluster
 	}
 
 	// The card management is deployed after the device plugin, so the SpyreNodeState of the node
-	// is expected to exist and to have the cards. Otherwise return an error, so that the
-	// reconciliation is retried instead of deploying the Pod which requests no device.
+	// is expected to exist. Otherwise return an error, so that the reconciliation is retried.
+	// A SpyreNodeState is created for every node, including the worker nodes without Spyre cards.
 	nodeState := &spyrev1alpha1.SpyreNodeState{}
 	if err := cluster.k8sClient.Get(context.Background(), client.ObjectKey{Name: nodeName}, nodeState); err != nil {
 		return fmt.Errorf("failed to transform cardmgmt: failed to get SpyreNodeState of node %s: %w", nodeName, err)
 	}
 	n := countCardsWithFirstVf(nodeState)
 	if n == 0 {
-		return fmt.Errorf("failed to transform cardmgmt: no card with the first VF is found in SpyreNodeState of node %s",
-			nodeName)
+		// No device is requested, in the same way as when the node has no PF capacity. This is not an
+		// error: the node may have no Spyre card, and an error here would block the card management
+		// on all the other nodes.
+		return nil
 	}
 	q := *resource.NewQuantity(int64(n), resource.DecimalSI)
 	m := map[corev1.ResourceName]resource.Quantity{
