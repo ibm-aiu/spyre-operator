@@ -86,6 +86,15 @@ type ControlledObject interface {
 	TransformByPolicy(scheme *runtime.Scheme, clusterPolicy *spyrev1alpha1.SpyreClusterPolicy, cluster *ClusterState) error
 }
 
+// PatchableObject is implemented by controlled objects which must not be written back with Update,
+// because the vendored types do not know every field the live object has (e.g., fields added by a newer
+// operator) and Update would prune them. Such an object is updated by sending only its managed fields.
+type PatchableObject interface {
+	// SyncPatch returns the live object, the object modified in place to the desired state,
+	// to be sent by client.MergeFrom(live).
+	SyncPatch(context.Context, client.Client) (live client.Object, modified client.Object, err error)
+}
+
 // DegradedNode describes a node on which a per-node object is permanently unable to become ready
 type DegradedNode struct {
 	Name   string
@@ -1821,18 +1830,27 @@ func (obj *SecondaryScheduler) Fetch(ctx context.Context,
 
 func (obj *SecondaryScheduler) Sync(ctx context.Context,
 	k8sClient client.Client) (client.Object, error) {
-	getObj := &secondschedv1.SecondaryScheduler{}
+	_, modified, err := obj.SyncPatch(ctx, k8sClient)
+	return modified, err
+}
+
+// SyncPatch returns the live object and its copy modified to the desired state. The caller sends
+// client.MergeFrom(live) so that only the managed fields are written, and the fields unknown to the vendored
+// (old) secondschedv1 types, such as spec.topology added by Secondary Scheduler Operator 1.6, are untouched.
+func (obj *SecondaryScheduler) SyncPatch(ctx context.Context,
+	k8sClient client.Client) (client.Object, client.Object, error) {
+	live := &secondschedv1.SecondaryScheduler{}
 	namespacedName := types.NamespacedName{Name: obj.loadedObj.Name, Namespace: obj.loadedObj.Namespace}
-	err := k8sClient.Get(ctx, namespacedName, getObj)
-	if err != nil {
-		return nil, err //nolint:wrapcheck
+	if err := k8sClient.Get(ctx, namespacedName, live); err != nil {
+		return nil, nil, err //nolint:wrapcheck
 	}
-	obj.syncOwners(&getObj.ObjectMeta)
-	getObj.Spec.SchedulerConfig = obj.loadedObj.Spec.SchedulerConfig
-	getObj.Spec.SchedulerImage = obj.loadedObj.Spec.SchedulerImage
-	getObj.Spec.ManagementState = obj.loadedObj.Spec.ManagementState
-	getObj.Spec.LogLevel = obj.loadedObj.Spec.LogLevel
-	return getObj, nil
+	modified := live.DeepCopy()
+	obj.syncOwners(&modified.ObjectMeta)
+	modified.Spec.SchedulerConfig = obj.loadedObj.Spec.SchedulerConfig
+	modified.Spec.SchedulerImage = obj.loadedObj.Spec.SchedulerImage
+	modified.Spec.ManagementState = obj.loadedObj.Spec.ManagementState
+	modified.Spec.LogLevel = obj.loadedObj.Spec.LogLevel
+	return live, modified, nil
 }
 
 func (obj *SecondaryScheduler) TransformByPolicy(scheme *runtime.Scheme,
