@@ -3,7 +3,7 @@ module github.com/ibm-aiu/spyre-operator
 go 1.26.10
 
 require (
-	cel.dev/cel-go v0.33.2
+	cel.dev/cel-go v0.33.4
 	github.com/cert-manager/cert-manager v1.20.5
 	github.com/dustinkirkland/golang-petname v0.0.0-20240428194347-eebcea082ee0
 	github.com/go-logr/logr v1.4.4
