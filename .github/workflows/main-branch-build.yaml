@@ -90,12 +90,40 @@ jobs:
 
         echo "arch=${ARCH}" >> $GITHUB_OUTPUT
         echo "Detected architecture: ${ARCH} from $(uname -m)"
-    - name: Build bundle and setup fbc
+    - name: Generate bundle manifests
       env:
         VERSION: ${{ steps.get_version.outputs.version }}-dev
-      # TODO: add bundle-validate when ppc64le is available
       run: |
-        make bundle bundle-build bundle-push fbc-bundle-add opm fbc-build-setup
+        make bundle
+    - name: Build and push bundle image per architecture
+      env:
+        VERSION: ${{ steps.get_version.outputs.version }}-dev
+      run: |
+        for ARCH in amd64 s390x ppc64le; do
+          make bundle-build bundle-push \
+            BUNDLE_IMG=${REGISTRY}/spyre-operator-bundle:${VERSION}-${ARCH} \
+            DOCKER_BUILD_OPTS="--progress=plain --platform linux/${ARCH} --pull --no-cache --provenance false --sbom false"
+        done
+    - name: Make and push bundle manifest
+      env:
+        BUNDLE_IMG: ${{ env.REGISTRY }}/spyre-operator-bundle:${{ steps.get_version.outputs.version
+          }}-dev
+      run: |
+        docker manifest create   ${BUNDLE_IMG} ${BUNDLE_IMG}-ppc64le ${BUNDLE_IMG}-amd64 ${BUNDLE_IMG}-s390x
+        docker manifest annotate ${BUNDLE_IMG} ${BUNDLE_IMG}-ppc64le --os linux --arch ppc64le
+        docker manifest annotate ${BUNDLE_IMG} ${BUNDLE_IMG}-amd64   --os linux --arch amd64
+        docker manifest annotate ${BUNDLE_IMG} ${BUNDLE_IMG}-s390x   --os linux --arch s390x
+        docker manifest push ${BUNDLE_IMG}
+    - name: Setup fbc
+      env:
+        VERSION: ${{ steps.get_version.outputs.version }}-dev
+      run: |
+        make fbc-bundle-add opm fbc-build-setup
+    - name: Validate bundle
+      env:
+        VERSION: ${{ steps.get_version.outputs.version }}-dev
+      run: |
+        make bundle-validate
     - name: Make and build catalog for amd64
       env:
         VERSION: ${{ steps.get_version.outputs.version }}-dev-amd64
