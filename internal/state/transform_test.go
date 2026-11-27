@@ -695,6 +695,86 @@ var _ = Describe("Transform", func() {
 			Expect(ds.Spec.Template.Spec.Containers[0].VolumeMounts).To(HaveLen(0))
 		})
 
+		Context("number of requested devices", func() {
+			pfName := corev1.ResourceName(spyreconst.ResourcePrefix + "/" + spyreconst.PfResourceName)
+			vfName := corev1.ResourceName(spyreconst.ResourcePrefix + "/" + spyreconst.VfResourceName)
+			const nodeName = "cardmgmt-count-node"
+
+			// 02.0 has no VF, and 04.0 has VFs but not the first one (04.1).
+			// 05.0 is unhealthy, which does not matter to the count.
+			interfaces := []spyrev1alpha1.SpyreInterface{
+				{PciAddress: "0001:01:00.0", NumVfs: 1, Vfs: []string{"0001:01:00.1"}},
+				{PciAddress: "0001:02:00.0"},
+				{PciAddress: "0001:03:00.0", NumVfs: 2, Vfs: []string{"0001:03:00.1", "0001:03:00.2"}},
+				{PciAddress: "0001:04:00.0", NumVfs: 1, Vfs: []string{"0001:04:00.2"}},
+				{PciAddress: "0001:05:00.0", NumVfs: 1, Vfs: []string{"0001:05:00.1"}, Health: spyrev1alpha1.SpyreUnhealthy},
+			}
+
+			It("counts the cards which have the first VF regardless of health", func() {
+				nodeState := &spyrev1alpha1.SpyreNodeState{
+					Spec: spyrev1alpha1.SpyreNodeStateSpec{SpyreInterfaces: interfaces},
+				}
+				Expect(CountCardsWithFirstVf(nodeState)).To(Equal(3))
+			})
+
+			It("counts zero when no card has the first VF", func() {
+				nodeState := &spyrev1alpha1.SpyreNodeState{
+					Spec: spyrev1alpha1.SpyreNodeStateSpec{
+						SpyreInterfaces: []spyrev1alpha1.SpyreInterface{{PciAddress: "0001:02:00.0"}},
+					},
+				}
+				Expect(CountCardsWithFirstVf(nodeState)).To(BeZero())
+			})
+
+			newCardMgmtDaemonset := func() *appsv1.DaemonSet {
+				ds := newDaemonset("test-cardmgmt")
+				ds.Spec.Template.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": nodeName}
+				return ds
+			}
+
+			It("requests the number of the cards which have the first VF for both PFs and VFs", func() {
+				ctx := context.Background()
+				nodeState := &spyrev1alpha1.SpyreNodeState{
+					ObjectMeta: metav1.ObjectMeta{Name: nodeName},
+					Spec:       spyrev1alpha1.SpyreNodeStateSpec{NodeName: nodeName, SpyreInterfaces: interfaces},
+				}
+				Expect(StateClient.Create(ctx, nodeState)).To(Succeed())
+				DeferCleanup(func() { Expect(StateClient.Delete(ctx, nodeState)).To(Succeed()) })
+
+				ds := newCardMgmtDaemonset()
+				Expect(TransformCardManagement(ds, &cardMgmtCp, NewClusterStateWithClient(StateClient), false)).To(Succeed())
+				limits := ds.Spec.Template.Spec.Containers[0].Resources.Limits
+				Expect(limits[pfName]).To(Equal(*resource.NewQuantity(3, resource.DecimalSI)))
+				Expect(limits[vfName]).To(Equal(*resource.NewQuantity(3, resource.DecimalSI)))
+			})
+
+			It("returns an error when the SpyreNodeState of the node does not exist", func() {
+				ds := newCardMgmtDaemonset()
+				err := TransformCardManagement(ds, &cardMgmtCp, NewClusterStateWithClient(StateClient), false)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("SpyreNodeState"))
+			})
+
+			// A SpyreNodeState exists for every node, so a node without Spyre card, or without the first VF,
+			// must not be an error: it would block the card management on all the other nodes.
+			It("requests no device without an error when no card has the first VF", func() {
+				ctx := context.Background()
+				nodeState := &spyrev1alpha1.SpyreNodeState{
+					ObjectMeta: metav1.ObjectMeta{Name: nodeName},
+					Spec: spyrev1alpha1.SpyreNodeStateSpec{
+						NodeName:        nodeName,
+						SpyreInterfaces: []spyrev1alpha1.SpyreInterface{{PciAddress: "0001:02:00.0"}},
+					},
+				}
+				Expect(StateClient.Create(ctx, nodeState)).To(Succeed())
+				DeferCleanup(func() { Expect(StateClient.Delete(ctx, nodeState)).To(Succeed()) })
+
+				ds := newCardMgmtDaemonset()
+				Expect(TransformCardManagement(ds, &cardMgmtCp, NewClusterStateWithClient(StateClient), false)).To(Succeed())
+				Expect(ds.Spec.Template.Spec.Containers[0].Resources.Limits).To(BeEmpty())
+			})
+		})
+
 		Context("spyreFilter regex", func() {
 			DescribeTable("filter nodes by regex pattern",
 				func(nodeName string, filterPattern string, hasFilter bool, shouldSchedule bool, expectError bool) {
